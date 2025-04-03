@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface TextToSpeechResult {
-  speak: (text: string) => void;
+  speak: (text: string, voiceId?: string) => void;
   isSpeaking: boolean;
   stopSpeaking: () => void;
   hasSpeechSupport: boolean;
@@ -30,7 +30,7 @@ export function useTextToSpeech(): TextToSpeechResult {
     setIsSpeaking(false);
   }, []);
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, voiceId: string = "default") => {
     if (!text) return;
 
     // Stop any ongoing speech
@@ -38,13 +38,16 @@ export function useTextToSpeech(): TextToSpeechResult {
     setIsSpeaking(true);
 
     try {
+      console.log("Synthesizing speech with voice:", voiceId);
       // Try to use ElevenLabs API
-      const response = await apiRequest("POST", "/api/synthesize", {
-        text,
-        voiceId: "default" // Can be customized based on user preference
+      const data = await apiRequest<{audioUrl: string}>({
+        method: "POST", 
+        endpoint: "/api/synthesize", 
+        data: {
+          text,
+          voiceId
+        }
       });
-      
-      const data = await response.json();
       
       // If we got an audio URL, play it
       if (data.audioUrl) {
@@ -58,8 +61,9 @@ export function useTextToSpeech(): TextToSpeechResult {
         // Set up event handlers
         audio.onplay = () => setIsSpeaking(true);
         audio.onended = () => setIsSpeaking(false);
-        audio.onerror = () => {
-          console.error("Audio playback error");
+        audio.onerror = (e) => {
+          console.error("Audio playback error:", e);
+          console.log("Audio src that failed:", audio.src);
           setIsSpeaking(false);
           fallbackToBuiltInTTS(text);
         };

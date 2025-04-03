@@ -42,10 +42,10 @@ export default function Home() {
     if (messages.length > 0 && !isMuteEnabled) {
       const latestMessage = messages[messages.length - 1];
       if (latestMessage.role === 'assistant') {
-        speak(latestMessage.content);
+        speak(latestMessage.content, voiceId);
       }
     }
-  }, [messages, isMuteEnabled, speak]);
+  }, [messages, isMuteEnabled, speak, voiceId]);
 
   const handleSendVoiceMessage = () => {
     if (transcript.trim()) {
@@ -92,7 +92,7 @@ export default function Home() {
   // Allow replaying of message speech
   const handleMessageTap = (message: Message) => {
     if (message.role === 'assistant' && !isMuteEnabled) {
-      speak(message.content);
+      speak(message.content, voiceId);
     }
   };
 

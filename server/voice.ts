@@ -116,18 +116,24 @@ export async function synthesizeSpeech(
   }
   
   try {
+    console.log("Voice synthesis request:", { text: optimizedText.substring(0, 50) + "...", voiceId: requestedVoiceId });
+    
     // Check if we have ElevenLabs API key
     if (!process.env.ELEVENLABS_API_KEY) {
+      console.log("No ElevenLabs API key found, using fallback synthesis");
       return await fallbackSynthesis(optimizedText);
     }
     
     // Get the voice to use
     const selectedVoice = voices[requestedVoiceId] || voices.default;
+    console.log("Selected voice:", selectedVoice.name);
     
     // Generate a unique filename
     const timestamp = Date.now();
     const audioFilename = `speech_${timestamp}.mp3`;
     const audioFilepath = path.join(AUDIO_DIR, audioFilename);
+    
+    console.log("Audio will be saved to:", audioFilepath);
     
     // Call ElevenLabs API directly
     const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -136,6 +142,7 @@ export async function synthesizeSpeech(
     // Use the latest model for better quality
     const modelId = 'eleven_turbo_v2';
     
+    console.log("Calling ElevenLabs API...");
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -150,15 +157,38 @@ export async function synthesizeSpeech(
     });
     
     if (!response.ok) {
-      throw new Error(`ElevenLabs API responded with status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`ElevenLabs API responded with status: ${response.status}, message: ${errorText}`);
     }
+    
+    console.log("ElevenLabs API response received successfully");
     
     // Save the audio file
     const arrayBuffer = await response.arrayBuffer();
-    fs.writeFileSync(audioFilepath, Buffer.from(arrayBuffer));
+    
+    // Check if the response is valid
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error("ElevenLabs API returned an empty response");
+    }
+    
+    // Ensure the audio directory exists
+    if (!fs.existsSync(AUDIO_DIR)) {
+      fs.mkdirSync(AUDIO_DIR, { recursive: true });
+    }
+    
+    // Write the file
+    try {
+      fs.writeFileSync(audioFilepath, Buffer.from(arrayBuffer));
+      console.log("Audio file saved successfully:", audioFilepath);
+    } catch (error) {
+      const writeError = error as Error;
+      console.error("Error writing audio file:", writeError);
+      throw new Error(`Failed to write audio file: ${writeError.message}`);
+    }
     
     // Create the URL path for the audio file
     const audioUrl = `/audio/${audioFilename}`;
+    console.log("Audio URL for client:", audioUrl);
     
     // Cache the result
     audioCache.set(cacheKey, {
