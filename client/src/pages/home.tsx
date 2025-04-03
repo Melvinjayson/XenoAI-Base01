@@ -104,7 +104,7 @@ export default function Home() {
           <div className="rounded-full bg-primary w-8 h-8 flex items-center justify-center mr-2">
             <Mic className="w-4 h-4 text-primary-foreground" />
           </div>
-          <h1 className="text-lg font-semibold">VoiceAI</h1>
+          <h1 className="text-lg font-semibold">Xeno AI</h1>
         </div>
         <div className="flex space-x-1">
           <Link href="/knowledge-graph">

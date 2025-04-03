@@ -10,7 +10,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     {
       id: "welcome",
       role: "assistant",
-      content: "Hi there! I'm your AI assistant. You can ask me questions, and I'll search for answers. Try asking something or tap the mic to use voice input.",
+      content: "Hi there! I'm Xeno AI, your personal AI assistant. You can ask me questions, and I'll search for answers. Try asking something or tap the mic to use voice input.",
       timestamp: Date.now(),
     },
   ]);
@@ -32,17 +32,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
-      const response = await apiRequest("POST", "/api/chat", {
-        message: content,
-        history: messages
-          .filter((msg) => msg.id !== "welcome")
-          .map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
+      const data = await apiRequest({
+        method: "POST", 
+        endpoint: "/api/chat", 
+        data: {
+          message: content,
+          history: messages
+            .filter((msg) => msg.id !== "welcome")
+            .map((msg) => ({
+              role: msg.role,
+              content: msg.content,
+            })),
+        }
       });
-
-      const data = await response.json();
       
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
@@ -71,7 +73,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       {
         id: "welcome",
         role: "assistant",
-        content: "Hi there! I'm your AI assistant. You can ask me questions, and I'll search for answers. Try asking something or tap the mic to use voice input.",
+        content: "Hi there! I'm Xeno AI, your personal AI assistant. You can ask me questions, and I'll search for answers. Try asking something or tap the mic to use voice input.",
         timestamp: Date.now(),
       },
     ]);
