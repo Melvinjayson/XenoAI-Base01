@@ -3,7 +3,7 @@ import ChatContainer from "@/components/chat/chat-container";
 import InputArea from "@/components/chat/input-area";
 import VoiceIndicator from "@/components/chat/voice-indicator";
 import BottomSheet from "@/components/ui/bottom-sheet";
-import { Settings, Mic, VolumeX, Volume2, Trash2, X } from "lucide-react";
+import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network } from "lucide-react";
 import { useChat } from "@/context/chat-context";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
@@ -11,6 +11,7 @@ import { Message } from "@/types";
 import { Button } from "@/components/ui/button";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { useTheme } from "@/context/theme-context";
+import { Link } from "wouter";
 
 export default function Home() {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
@@ -106,6 +107,14 @@ export default function Home() {
           <h1 className="text-lg font-semibold">VoiceAI</h1>
         </div>
         <div className="flex space-x-1">
+          <Link href="/knowledge-graph">
+            <button 
+              className="p-2 rounded-full hover:bg-muted" 
+              aria-label="Knowledge Graph"
+            >
+              <Network className="w-5 h-5" />
+            </button>
+          </Link>
           <button 
             className="p-2 rounded-full hover:bg-muted" 
             aria-label={isMuteEnabled ? "Enable voice" : "Mute voice"} 

@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { chat } from "./openai";
 import { webSearch, getSuggestions } from "./search";
 import { synthesizeSpeech } from "./voice";
+import { createKnowledgeGraphFromSearch, expandGraphNode, analyzeKnowledgeGraph } from "./knowledge-graph";
 import path from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -97,6 +98,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // API endpoint for knowledge graph search
+  app.post("/api/knowledge-graph/search", async (req, res) => {
+    try {
+      const { query } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      const result = await createKnowledgeGraphFromSearch(query);
+      return res.json(result);
+    } catch (error) {
+      console.error("Knowledge graph search API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to build knowledge graph", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for expanding a node in the knowledge graph
+  app.post("/api/knowledge-graph/expand", async (req, res) => {
+    try {
+      const { nodeId, nodeType, label } = req.body;
+      
+      if (!nodeId || !nodeType || !label) {
+        return res.status(400).json({ error: "nodeId, nodeType, and label are required" });
+      }
+
+      const graph = await expandGraphNode(nodeId, nodeType, label);
+      return res.json({ graph });
+    } catch (error) {
+      console.error("Knowledge graph expand API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to expand knowledge graph node", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for analyzing a knowledge graph
+  app.post("/api/knowledge-graph/analyze", async (req, res) => {
+    try {
+      const { graph } = req.body;
+      
+      if (!graph || !graph.nodes || !graph.edges) {
+        return res.status(400).json({ error: "Valid graph object with nodes and edges is required" });
+      }
+
+      const insights = await analyzeKnowledgeGraph(graph);
+      return res.json({ insights });
+    } catch (error) {
+      console.error("Knowledge graph analysis API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to analyze knowledge graph", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
   // API health check endpoint
   app.get("/api/health", (_req, res) => {
     const openaiApiKey = process.env.OPENAI_API_KEY ? "✓" : "✗";
