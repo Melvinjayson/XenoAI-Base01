@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useTheme, ThemeMode, ConservationMode } from '@/context/theme-context';
+import { useTheme, ThemeMode, ConservationMode, FontSize, ReducedMotion } from '@/context/theme-context';
 import { Sun, Moon, MonitorSmartphone, Battery, BatteryLow, BatteryMedium, 
-         Volume2, VolumeX, VolumeIcon, UserIcon, Settings as SettingsIcon } from 'lucide-react';
+         Volume2, VolumeX, VolumeIcon, UserIcon, Settings as SettingsIcon,
+         Type, ZoomIn, ZoomOut, MousePointer, Contrast } from 'lucide-react';
 import { 
   Sheet, 
   SheetContent, 
@@ -44,7 +45,13 @@ export function SettingsPanel({
     setThemeMode, 
     isDarkMode, 
     conservationMode, 
-    setConservationMode 
+    setConservationMode,
+    fontSize,
+    setFontSize,
+    reducedMotion,
+    setReducedMotion,
+    highContrast,
+    setHighContrast
   } = useTheme();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -55,6 +62,18 @@ export function SettingsPanel({
 
   const handleConservationChange = (value: string) => {
     setConservationMode(value as ConservationMode);
+  };
+  
+  const handleFontSizeChange = (value: string) => {
+    setFontSize(value as FontSize);
+  };
+  
+  const handleReducedMotionChange = (value: string) => {
+    setReducedMotion(value as ReducedMotion);
+  };
+  
+  const handleHighContrastChange = (checked: boolean) => {
+    setHighContrast(checked);
   };
 
   const handleVoiceIdChange = (value: string) => {
@@ -164,35 +183,82 @@ export function SettingsPanel({
               <h3 className="text-sm font-medium">Text Size</h3>
               <p className="text-xs text-muted-foreground">Adjust the size of text throughout the application</p>
               
-              <div className="flex items-center space-x-2">
-                <span className="text-xs">A</span>
-                <Slider 
-                  defaultValue={[100]} 
-                  max={150} 
-                  min={80} 
-                  step={10}
-                  className="w-full"
-                  onValueChange={(value) => {
-                    document.documentElement.style.fontSize = `${value[0]}%`;
-                  }}
-                />
-                <span className="text-lg">A</span>
-              </div>
+              <RadioGroup 
+                value={fontSize} 
+                onValueChange={handleFontSizeChange}
+                className="flex gap-4"
+              >
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="bg-background border rounded-md p-2">
+                    <Type className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <RadioGroupItem value="small" id="size-small" className="sr-only" />
+                  <Label htmlFor="size-small" className="text-xs">Small</Label>
+                </div>
+                
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="bg-background border rounded-md p-2">
+                    <Type className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <RadioGroupItem value="medium" id="size-medium" className="sr-only" />
+                  <Label htmlFor="size-medium" className="text-xs">Medium</Label>
+                </div>
+                
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="bg-background border rounded-md p-2">
+                    <Type className="h-7 w-7 text-blue-500" />
+                  </div>
+                  <RadioGroupItem value="large" id="size-large" className="sr-only" />
+                  <Label htmlFor="size-large" className="text-xs">Large</Label>
+                </div>
+              </RadioGroup>
             </div>
             
             <Separator />
             
             <div className="space-y-4">
               <h3 className="text-sm font-medium">Reduce Motion</h3>
-              <div className="flex items-center space-x-2">
+              <p className="text-xs text-muted-foreground">Minimize animations for reduced visual distractions</p>
+              
+              <RadioGroup 
+                value={reducedMotion} 
+                onValueChange={handleReducedMotionChange}
+                className="flex gap-4"
+              >
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="bg-background border rounded-md p-2">
+                    <MousePointer className="h-6 w-6 text-green-500 animate-bounce" />
+                  </div>
+                  <RadioGroupItem value="off" id="motion-off" className="sr-only" />
+                  <Label htmlFor="motion-off" className="text-xs">Normal</Label>
+                </div>
+                
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="bg-background border rounded-md p-2">
+                    <MousePointer className="h-6 w-6 text-yellow-500" />
+                  </div>
+                  <RadioGroupItem value="on" id="motion-on" className="sr-only" />
+                  <Label htmlFor="motion-on" className="text-xs">Reduced</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">High Contrast</h3>
+              <p className="text-xs text-muted-foreground">Increases contrast for better visibility and readability</p>
+              
+              <div className="flex items-center space-x-4">
                 <Switch 
-                  id="motion"
-                  defaultChecked={conservationMode !== 'off'}
-                  onCheckedChange={(checked) => {
-                    setConservationMode(checked ? 'low' : 'off');
-                  }}
+                  id="high-contrast"
+                  checked={highContrast}
+                  onCheckedChange={handleHighContrastChange}
                 />
-                <Label htmlFor="motion">Minimize animations</Label>
+                <div className="flex items-center space-x-2">
+                  <Contrast className="h-5 w-5 text-primary" />
+                  <Label htmlFor="high-contrast">High contrast mode</Label>
+                </div>
               </div>
             </div>
           </TabsContent>
@@ -234,14 +300,21 @@ export function SettingsPanel({
                 
                 <div className="space-y-4">
                   <h3 className="text-sm font-medium">Voice Type</h3>
+                  <div className="text-xs text-muted-foreground mb-3">
+                    Select a voice that matches your preference. Different voices have distinct speaking styles and accents.
+                  </div>
                   <RadioGroup 
                     value={voiceId} 
                     onValueChange={handleVoiceIdChange}
-                    className="space-y-2"
+                    className="space-y-2 max-h-[200px] overflow-y-auto pr-2"
+                    aria-label="Select voice type"
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="default" id="voice-default" />
-                      <Label htmlFor="voice-default">Rachel (Female)</Label>
+                      <Label htmlFor="voice-default" className="flex justify-between w-full">
+                        <span>Rachel (Female)</span>
+                        <span className="text-xs text-muted-foreground">Default</span>
+                      </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="male" id="voice-male" />
@@ -250,6 +323,18 @@ export function SettingsPanel({
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="british" id="voice-british" />
                       <Label htmlFor="voice-british">Adam (British)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="australian" id="voice-australian" />
+                      <Label htmlFor="voice-australian">Nicole (Australian)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="indian" id="voice-indian" />
+                      <Label htmlFor="voice-indian">Anand (Indian)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="casual" id="voice-casual" />
+                      <Label htmlFor="voice-casual">Bella (Casual Female)</Label>
                     </div>
                   </RadioGroup>
                 </div>

@@ -36,28 +36,78 @@ const defaultVoiceSettings: VoiceSettings = {
 const voices: Record<string, Voice> = {
   'default': {
     voice_id: '21m00Tcm4TlvDq8ikWAM', // Rachel voice
-    name: 'Rachel',
+    name: 'Rachel (Female)',
     settings: defaultVoiceSettings,
   },
   'male': {
     voice_id: 'TxGEqnHWrfWFTfGW9XjX', // Josh voice
-    name: 'Josh',
+    name: 'Josh (Male)',
     settings: defaultVoiceSettings,
   },
   'british': {
     voice_id: 'pNInz6obpgDQGcFmaJgB', // Adam voice 
-    name: 'Adam',
+    name: 'Adam (British)',
     settings: defaultVoiceSettings,
   },
+  'australian': {
+    voice_id: 'D38z5RcWu1voky8WS1ja', // Nicole voice
+    name: 'Nicole (Australian)',
+    settings: {
+      stability: 0.6,
+      similarity_boost: 0.8,
+    }
+  },
+  'indian': {
+    voice_id: 'ThT5KcBeYPX3keUQqHPh', // Anand voice
+    name: 'Anand (Indian)',
+    settings: {
+      stability: 0.55,
+      similarity_boost: 0.75,
+    }
+  },
+  'casual': {
+    voice_id: 'EXAVITQu4vr4xnSDxMaL', // Bella voice
+    name: 'Bella (Casual Female)',
+    settings: {
+      stability: 0.45,
+      similarity_boost: 0.85,
+    }
+  }
 };
+
+// Truncate and optimize text for voice synthesis to save tokens
+function optimizeTextForVoice(text: string, maxLength: number = 500): string {
+  if (text.length <= maxLength) return text;
+  
+  // If text is too long, try to find a good stopping point (end of sentence)
+  const truncatedText = text.substring(0, maxLength);
+  const lastPeriod = truncatedText.lastIndexOf('.');
+  const lastQuestion = truncatedText.lastIndexOf('?');
+  const lastExclamation = truncatedText.lastIndexOf('!');
+  
+  // Find the last sentence ending
+  let endIndex = Math.max(lastPeriod, lastQuestion, lastExclamation);
+  if (endIndex < 0) endIndex = truncatedText.lastIndexOf(' ');
+  if (endIndex < 0) endIndex = maxLength;
+  
+  // Add a note about truncation if we're cutting significant content
+  if (text.length > maxLength * 1.5) {
+    return `${text.substring(0, endIndex + 1)} I've summarized this response for voice. You can read the full answer in the chat.`;
+  }
+  
+  return text.substring(0, endIndex + 1);
+}
 
 export async function synthesizeSpeech(
   request: VoiceSynthesisRequest
 ): Promise<VoiceSynthesisResponse> {
   const { text, voiceId: requestedVoiceId = 'default' } = request;
   
+  // Optimize the text for voice synthesis
+  const optimizedText = optimizeTextForVoice(text);
+  
   // Create a cache key based on text and voice
-  const cacheKey = `voice:${requestedVoiceId}:${text.substring(0, 100)}`;
+  const cacheKey = `voice:${requestedVoiceId}:${optimizedText.substring(0, 100)}`;
   
   // Check if we have a cached version
   const cachedAudio = audioCache.get(cacheKey);
@@ -68,7 +118,7 @@ export async function synthesizeSpeech(
   try {
     // Check if we have ElevenLabs API key
     if (!process.env.ELEVENLABS_API_KEY) {
-      return await fallbackSynthesis(text);
+      return await fallbackSynthesis(optimizedText);
     }
     
     // Get the voice to use
@@ -83,6 +133,9 @@ export async function synthesizeSpeech(
     const apiKey = process.env.ELEVENLABS_API_KEY;
     const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice.voice_id}`;
     
+    // Use the latest model for better quality
+    const modelId = 'eleven_turbo_v2';
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -90,9 +143,9 @@ export async function synthesizeSpeech(
         'xi-api-key': apiKey
       },
       body: JSON.stringify({
-        text: text,
+        text: optimizedText,
         voice_settings: selectedVoice.settings,
-        model_id: 'eleven_monolingual_v1'
+        model_id: modelId
       })
     });
     
@@ -116,7 +169,7 @@ export async function synthesizeSpeech(
     return { audioUrl };
   } catch (error) {
     console.error('ElevenLabs speech synthesis error:', error);
-    return await fallbackSynthesis(text);
+    return await fallbackSynthesis(optimizedText);
   }
 }
 

@@ -24,6 +24,11 @@
     --destructive-foreground: 0 0% 98%;
     --ring: 262 83.3% 65.1%;
     --radius: 0.5rem;
+    
+    /* Accessibility variables */
+    --contrast-factor: 1;
+    --motion-speed: 1;
+    --font-scale: 1;
   }
 
   .dark {
@@ -70,5 +75,60 @@
 
   .conservation-high {
     color-scheme: dark;
+  }
+  
+  /* Font size accessibility */
+  .text-small {
+    --font-scale: 0.875;
+  }
+  
+  .text-medium {
+    --font-scale: 1;
+  }
+  
+  .text-large {
+    --font-scale: 1.25;
+  }
+  
+  /* Apply font scaling to all text elements */
+  h1, h2, h3, h4, h5, h6, p, span, div, button, a, input, textarea, select, label {
+    font-size: calc(var(--font-scale) * 1em);
+  }
+  
+  /* Reduced motion */
+  .reduce-motion * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  /* High contrast */
+  .high-contrast {
+    --contrast-factor: 1.5;
+  }
+  
+  .high-contrast {
+    filter: contrast(var(--contrast-factor));
+  }
+  
+  .high-contrast .text-muted-foreground {
+    opacity: 0.9;
+  }
+  
+  .high-contrast button,
+  .high-contrast a {
+    outline: 2px solid transparent;
+  }
+  
+  .high-contrast button:focus,
+  .high-contrast a:focus {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+  }
+  
+  /* Improved focus styles for keyboard navigation */
+  :focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
   }
 }

@@ -2,13 +2,21 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ConservationMode = 'off' | 'low' | 'high';
+export type FontSize = 'small' | 'medium' | 'large';
+export type ReducedMotion = 'off' | 'on';
 
 interface ThemeContextType {
   themeMode: ThemeMode;
   conservationMode: ConservationMode;
+  fontSize: FontSize;
+  reducedMotion: ReducedMotion;
+  highContrast: boolean;
   isDarkMode: boolean;
   setThemeMode: (mode: ThemeMode) => void;
   setConservationMode: (mode: ConservationMode) => void;
+  setFontSize: (size: FontSize) => void;
+  setReducedMotion: (motion: ReducedMotion) => void;
+  setHighContrast: (contrast: boolean) => void;
   toggleTheme: () => void;
 }
 
@@ -28,9 +36,29 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     () => (localStorage.getItem('conservationMode') as ConservationMode) || 'off'
   );
   
+  const [fontSize, setFontSize] = useState<FontSize>(
+    () => (localStorage.getItem('fontSize') as FontSize) || 'medium'
+  );
+  
+  const [reducedMotion, setReducedMotion] = useState<ReducedMotion>(
+    () => (localStorage.getItem('reducedMotion') as ReducedMotion) || 'off'
+  );
+  
+  const [highContrast, setHighContrast] = useState<boolean>(
+    () => localStorage.getItem('highContrast') === 'true'
+  );
+  
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
-  // Handle system preference changes
+  // Check system preferences for reduced motion
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion && reducedMotion === 'off') {
+      setReducedMotion('on');
+    }
+  }, [reducedMotion]);
+
+  // Handle system preference changes for dark mode
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
@@ -61,21 +89,39 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, [themeMode]);
 
-  // Apply theme class to document
+  // Apply all theme-related classes to document
   useEffect(() => {
+    // Theme dark/light mode
     document.documentElement.classList.toggle('dark', isDarkMode);
     document.documentElement.classList.toggle('light', !isDarkMode);
     
-    // Apply conservation mode classes
+    // Conservation mode
     document.documentElement.classList.remove('conservation-low', 'conservation-high');
     if (conservationMode === 'low') {
       document.documentElement.classList.add('conservation-low');
     } else if (conservationMode === 'high') {
       document.documentElement.classList.add('conservation-high');
     }
-  }, [isDarkMode, conservationMode]);
+    
+    // Font size
+    document.documentElement.classList.remove('text-small', 'text-medium', 'text-large');
+    document.documentElement.classList.add(`text-${fontSize}`);
+    
+    // Reduced motion
+    document.documentElement.classList.toggle('reduce-motion', reducedMotion === 'on');
+    
+    // High contrast
+    document.documentElement.classList.toggle('high-contrast', highContrast);
+    
+    // Set CSS variables for accessibility
+    if (highContrast) {
+      document.documentElement.style.setProperty('--contrast-factor', '1.5');
+    } else {
+      document.documentElement.style.removeProperty('--contrast-factor');
+    }
+  }, [isDarkMode, conservationMode, fontSize, reducedMotion, highContrast]);
 
-  // Save preferences to localStorage
+  // Save all preferences to localStorage
   useEffect(() => {
     localStorage.setItem('themeMode', themeMode);
   }, [themeMode]);
@@ -83,6 +129,18 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     localStorage.setItem('conservationMode', conservationMode);
   }, [conservationMode]);
+  
+  useEffect(() => {
+    localStorage.setItem('fontSize', fontSize);
+  }, [fontSize]);
+  
+  useEffect(() => {
+    localStorage.setItem('reducedMotion', reducedMotion);
+  }, [reducedMotion]);
+  
+  useEffect(() => {
+    localStorage.setItem('highContrast', highContrast.toString());
+  }, [highContrast]);
 
   // Toggle between light and dark (regardless of system settings)
   const toggleTheme = () => {
@@ -91,19 +149,20 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     );
   };
 
-  // Update conservation mode handler
-  const handleSetConservationMode = (mode: ConservationMode) => {
-    setConservationMode(mode);
-  };
-
   return (
     <ThemeContext.Provider 
       value={{
         themeMode,
         conservationMode,
+        fontSize,
+        reducedMotion,
+        highContrast,
         isDarkMode,
         setThemeMode,
-        setConservationMode: handleSetConservationMode,
+        setConservationMode,
+        setFontSize,
+        setReducedMotion,
+        setHighContrast,
         toggleTheme
       }}
     >
