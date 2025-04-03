@@ -268,6 +268,7 @@ export async function enhancedSearch(query: string): Promise<SearchResult> {
     const sources: SearchSource[] = contentResults.map((result, index) => ({
       name: result.title,
       url: result.link,
+      value: result.link, // Add value property to match expected type
       snippet: result.snippet,
       thumbnail: result.thumbnail,
       publishDate: result.publishDate

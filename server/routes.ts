@@ -3,8 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { chat } from "./openai";
 import { webSearch, getSuggestions } from "./search";
+import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
 import { createKnowledgeGraphFromSearch, expandGraphNode, analyzeKnowledgeGraph } from "./knowledge-graph";
+import { WebSocketServer } from "ws";
 import path from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -173,6 +175,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // API endpoint for open source search
+  app.post("/api/opensearch", async (req, res) => {
+    try {
+      const { query } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      const result = await openSearch(query);
+      return res.json(result);
+    } catch (error) {
+      console.error("Open search API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to perform open search", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for open source conversational search
+  app.post("/api/opensearch/conversational", async (req, res) => {
+    try {
+      const { query, sessionId = "default" } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      const response = await openConversationalResponse(query, sessionId);
+      return res.json(response);
+    } catch (error) {
+      console.error("Open conversational search API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to process conversational search", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for user preferences
+  app.post("/api/user/preferences", async (req, res) => {
+    try {
+      const { preferences, sessionId = "default" } = req.body;
+      
+      if (!preferences || typeof preferences !== 'object') {
+        return res.status(400).json({ error: "Valid preferences object is required" });
+      }
+
+      // Store each preference
+      const savedPreferences = [];
+      for (const [key, value] of Object.entries(preferences)) {
+        const preference = await storage.saveUserPreference(
+          sessionId,
+          key,
+          typeof value === 'string' ? value : JSON.stringify(value)
+        );
+        savedPreferences.push(preference);
+      }
+
+      return res.json({ preferences: savedPreferences });
+    } catch (error) {
+      console.error("User preferences API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to save preferences", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  app.get("/api/user/preferences", async (req, res) => {
+    try {
+      const sessionId = req.query.sessionId as string || "default";
+      const preferences = await storage.getUserPreferences(sessionId);
+      return res.json({ preferences });
+    } catch (error) {
+      console.error("Get preferences API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get preferences", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Create HTTP server
   const httpServer = createServer(app);
+
+  // Set up WebSocket server for real-time updates
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+
+  wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+    
+    // Send welcome message
+    ws.send(JSON.stringify({
+      type: 'connection',
+      message: 'Connected to AI Assistant WebSocket server'
+    }));
+    
+    ws.on('message', async (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        if (data.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+        }
+        else if (data.type === 'onboarding_progress') {
+          // Echo back onboarding progress to confirm receipt
+          ws.send(JSON.stringify({
+            type: 'onboarding_update',
+            data: data.data
+          }));
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Failed to process message'
+        }));
+      }
+    });
+    
+    ws.on('close', () => {
+      console.log('WebSocket client disconnected');
+    });
+  });
+
   return httpServer;
 }

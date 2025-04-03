@@ -17,6 +17,7 @@ export interface SearchResult {
 export interface SearchSource {
   name: string;
   url: string;
+  value: string; // Added value property for compatibility
   snippet?: string;
   thumbnail?: string | null;
   publishDate?: string | null;

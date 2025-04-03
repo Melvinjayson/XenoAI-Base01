@@ -2,6 +2,7 @@ import { ChatMessage, ChatResponse, AssetData, SearchResult } from './types';
 import OpenAI from 'openai';
 import { webSearch } from './search';
 import { conversationalResponse } from './agent';
+import { memoryManager, MemoryOptions } from './memory-manager';
 
 // System message for the OpenAI API
 const systemMessage: ChatMessage = {

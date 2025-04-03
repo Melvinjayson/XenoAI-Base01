@@ -231,6 +231,7 @@ Make sure your answer is accurate, well-structured, and based on the provided so
     const enhancedSources: SearchSource[] = contentResults.map(result => ({
       name: result.title,
       url: result.link,
+      value: result.link, // Add value property to match expected type
       snippet: result.snippet,
       thumbnail: result.thumbnail,
       publishDate: result.publishDate
