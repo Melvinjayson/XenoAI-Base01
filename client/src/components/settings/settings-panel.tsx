@@ -114,23 +114,23 @@ export function SettingsPanel({
                 className="flex gap-4"
               >
                 <div className="flex flex-col items-center space-y-2">
-                  <div className="bg-background border rounded-md p-2">
+                  <div className="bg-background border-2 rounded-md p-3 cursor-pointer hover:bg-muted transition-colors">
                     <Sun className="h-6 w-6 text-yellow-500" />
                   </div>
                   <RadioGroupItem value="light" id="light" className="sr-only" />
-                  <Label htmlFor="light" className="text-xs">Light</Label>
+                  <Label htmlFor="light" className="text-sm font-medium">Light</Label>
                 </div>
                 
                 <div className="flex flex-col items-center space-y-2">
-                  <div className="bg-background border rounded-md p-2">
+                  <div className="bg-background border-2 rounded-md p-3 cursor-pointer hover:bg-muted transition-colors">
                     <Moon className="h-6 w-6 text-blue-500" />
                   </div>
                   <RadioGroupItem value="dark" id="dark" className="sr-only" />
-                  <Label htmlFor="dark" className="text-xs">Dark</Label>
+                  <Label htmlFor="dark" className="text-sm font-medium">Dark</Label>
                 </div>
                 
                 <div className="flex flex-col items-center space-y-2">
-                  <div className="bg-background border rounded-md p-2">
+                  <div className="bg-background border-2 rounded-md p-3 cursor-pointer hover:bg-muted transition-colors">
                     <MonitorSmartphone className="h-6 w-6 text-gray-500" />
                   </div>
                   <RadioGroupItem value="system" id="system" className="sr-only" />
