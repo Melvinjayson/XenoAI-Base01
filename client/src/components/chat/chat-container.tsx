@@ -4,9 +4,10 @@ import { Message } from "@/types";
 
 interface ChatContainerProps {
   messages: Message[];
+  onMessageTap?: (message: Message) => void;
 }
 
-export default function ChatContainer({ messages }: ChatContainerProps) {
+export default function ChatContainer({ messages, onMessageTap }: ChatContainerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -16,7 +17,13 @@ export default function ChatContainer({ messages }: ChatContainerProps) {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6" role="log" aria-live="polite">
       {messages.map((message) => (
-        <ChatMessage key={message.id} message={message} />
+        <div 
+          key={message.id} 
+          onClick={() => onMessageTap && onMessageTap(message)}
+          className={message.role === 'assistant' ? 'cursor-pointer active:opacity-80' : ''}
+        >
+          <ChatMessage message={message} />
+        </div>
       ))}
       <div ref={messagesEndRef} />
     </div>

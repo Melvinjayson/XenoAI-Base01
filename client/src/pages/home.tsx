@@ -1,26 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ChatContainer from "@/components/chat/chat-container";
 import InputArea from "@/components/chat/input-area";
 import VoiceIndicator from "@/components/chat/voice-indicator";
 import BottomSheet from "@/components/ui/bottom-sheet";
-import { Settings, Mic } from "lucide-react";
+import { Settings, Mic, VolumeX, Volume2, Trash2, X } from "lucide-react";
 import { useChat } from "@/context/chat-context";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { useTextToSpeech } from "@/hooks/use-text-to-speech";
+import { Message } from "@/types";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
-  const { messages, sendMessage, clearConversation } = useChat();
+  const [isMuteEnabled, setIsMuteEnabled] = useState(false);
+  const [bottomSheetContent, setBottomSheetContent] = useState<'help' | 'settings'>('help');
+  const { messages, isLoading, sendMessage, clearConversation } = useChat();
+  
   const { 
     isListening, 
     transcript, 
     startListening, 
     stopListening, 
+    resetTranscript,
     hasRecognitionSupport 
   } = useSpeechRecognition();
+  
+  const {
+    speak,
+    isSpeaking,
+    stopSpeaking,
+    hasSpeechSupport
+  } = useTextToSpeech();
+
+  // Automatically speak the latest assistant message
+  useEffect(() => {
+    if (messages.length > 0 && !isMuteEnabled) {
+      const latestMessage = messages[messages.length - 1];
+      if (latestMessage.role === 'assistant') {
+        speak(latestMessage.content);
+      }
+    }
+  }, [messages, isMuteEnabled, speak]);
 
   const handleSendVoiceMessage = () => {
     if (transcript.trim()) {
       sendMessage(transcript);
+      resetTranscript();
     }
   };
 
@@ -29,12 +54,28 @@ export default function Home() {
       stopListening();
       handleSendVoiceMessage();
     } else {
+      if (isSpeaking) {
+        stopSpeaking();
+      }
       startListening();
     }
   };
 
   const handleHelpClick = () => {
+    setBottomSheetContent('help');
     setIsBottomSheetOpen(true);
+  };
+
+  const handleSettingsClick = () => {
+    setBottomSheetContent('settings');
+    setIsBottomSheetOpen(true);
+  };
+
+  const handleToggleMute = () => {
+    if (isSpeaking && !isMuteEnabled) {
+      stopSpeaking();
+    }
+    setIsMuteEnabled(!isMuteEnabled);
   };
 
   const handleVoiceCommand = (command: string) => {
@@ -49,6 +90,13 @@ export default function Home() {
     return false;
   };
 
+  // Allow replaying of message speech
+  const handleMessageTap = (message: Message) => {
+    if (message.role === 'assistant' && !isMuteEnabled) {
+      speak(message.content);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto relative overflow-hidden">
       {/* Header */}
@@ -59,15 +107,26 @@ export default function Home() {
           </div>
           <h1 className="text-lg font-semibold">VoiceAI</h1>
         </div>
-        <div className="flex">
-          <button className="p-2" aria-label="Settings">
+        <div className="flex space-x-1">
+          <button 
+            className="p-2 rounded-full hover:bg-gray-100" 
+            aria-label={isMuteEnabled ? "Enable voice" : "Mute voice"} 
+            onClick={handleToggleMute}
+          >
+            {isMuteEnabled ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
+          <button 
+            className="p-2 rounded-full hover:bg-gray-100" 
+            aria-label="Settings"
+            onClick={handleSettingsClick}
+          >
             <Settings className="w-5 h-5" />
           </button>
         </div>
       </header>
 
       {/* Chat Container */}
-      <ChatContainer messages={messages} />
+      <ChatContainer messages={messages} onMessageTap={handleMessageTap} />
 
       {/* Voice Recording Indicator */}
       {isListening && <VoiceIndicator transcript={transcript} />}
@@ -85,7 +144,87 @@ export default function Home() {
       <BottomSheet 
         isOpen={isBottomSheetOpen} 
         onClose={() => setIsBottomSheetOpen(false)}
-      />
+      >
+        {bottomSheetContent === 'help' ? (
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Help & Tips</h2>
+              <button 
+                className="p-1 rounded-full hover:bg-gray-200" 
+                onClick={() => setIsBottomSheetOpen(false)}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <h3 className="font-medium text-lg mb-2">Voice Commands</h3>
+            <ul className="space-y-2 mb-4">
+              <li className="flex items-start">
+                <span className="bg-primary/10 text-primary font-medium px-2 py-1 rounded mr-2 text-sm">
+                  "Clear conversation"
+                </span>
+                <span>Starts a new chat</span>
+              </li>
+              <li className="flex items-start">
+                <span className="bg-primary/10 text-primary font-medium px-2 py-1 rounded mr-2 text-sm">
+                  "Stop" or "Cancel"
+                </span>
+                <span>Stops listening</span>
+              </li>
+            </ul>
+
+            <h3 className="font-medium text-lg mb-2">Tips</h3>
+            <ul className="list-disc list-inside space-y-2">
+              <li>Tap the mic button to use voice input</li>
+              <li>Tap any assistant message to hear it again</li>
+              <li>Use the mute button to turn voice on/off</li>
+              <li>Ask follow-up questions for more details</li>
+            </ul>
+          </div>
+        ) : (
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Settings</h2>
+              <button 
+                className="p-1 rounded-full hover:bg-gray-200" 
+                onClick={() => setIsBottomSheetOpen(false)}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium">Voice Output</h3>
+                  <p className="text-sm text-gray-600">Enable or disable voice responses</p>
+                </div>
+                <Button 
+                  variant={isMuteEnabled ? "outline" : "default"}
+                  size="sm"
+                  onClick={handleToggleMute}
+                >
+                  {isMuteEnabled ? "Enable" : "Disable"}
+                </Button>
+              </div>
+              
+              <div className="pt-2 border-t border-gray-200">
+                <Button 
+                  variant="destructive" 
+                  className="w-full" 
+                  onClick={() => {
+                    clearConversation();
+                    setIsBottomSheetOpen(false);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear Conversation
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }
