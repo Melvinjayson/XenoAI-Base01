@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { VoiceSynthesisRequest, VoiceSynthesisResponse, Cache, CacheEntry } from './types';
-import { Voice, VoiceSettings } from 'elevenlabs-node';
+import { VoiceSynthesisRequest, VoiceSynthesisResponse, Cache } from './types';
 
 // Cache for audio files
 const audioCache: Cache<string> = new Map();
@@ -13,6 +12,18 @@ const AUDIO_DIR = path.join(process.cwd(), 'public', 'audio');
 // Ensure audio directory exists
 if (!fs.existsSync(AUDIO_DIR)) {
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
+}
+
+// Interface for voice settings and voice
+interface VoiceSettings {
+  stability: number;
+  similarity_boost: number;
+}
+
+interface Voice {
+  voice_id: string;
+  name: string;
+  settings: VoiceSettings;
 }
 
 // Default voice settings
@@ -43,10 +54,10 @@ const voices: Record<string, Voice> = {
 export async function synthesizeSpeech(
   request: VoiceSynthesisRequest
 ): Promise<VoiceSynthesisResponse> {
-  const { text, voiceId = 'default' } = request;
+  const { text, voiceId: requestedVoiceId = 'default' } = request;
   
   // Create a cache key based on text and voice
-  const cacheKey = `voice:${voiceId}:${text.substring(0, 100)}`;
+  const cacheKey = `voice:${requestedVoiceId}:${text.substring(0, 100)}`;
   
   // Check if we have a cached version
   const cachedAudio = audioCache.get(cacheKey);
@@ -60,32 +71,41 @@ export async function synthesizeSpeech(
       return await fallbackSynthesis(text);
     }
     
-    // Import ElevenLabs
-    const { ElevenLabs } = await import('elevenlabs-node');
-    
-    // Initialize ElevenLabs
-    const elevenlabs = new ElevenLabs({
-      apiKey: process.env.ELEVENLABS_API_KEY,
-    });
-    
     // Get the voice to use
-    const voice = voices[voiceId] || voices.default;
+    const selectedVoice = voices[requestedVoiceId] || voices.default;
     
     // Generate a unique filename
     const timestamp = Date.now();
-    const filename = `speech_${timestamp}.mp3`;
-    const filepath = path.join(AUDIO_DIR, filename);
+    const audioFilename = `speech_${timestamp}.mp3`;
+    const audioFilepath = path.join(AUDIO_DIR, audioFilename);
     
-    // Generate speech
-    await elevenlabs.generate({
-      voice: voice.voice_id,
-      text: text,
-      fileName: filepath,
-      voiceSettings: voice.settings,
+    // Call ElevenLabs API directly
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice.voice_id}`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': apiKey
+      },
+      body: JSON.stringify({
+        text: text,
+        voice_settings: selectedVoice.settings,
+        model_id: 'eleven_monolingual_v1'
+      })
     });
     
+    if (!response.ok) {
+      throw new Error(`ElevenLabs API responded with status: ${response.status}`);
+    }
+    
+    // Save the audio file
+    const arrayBuffer = await response.arrayBuffer();
+    fs.writeFileSync(audioFilepath, Buffer.from(arrayBuffer));
+    
     // Create the URL path for the audio file
-    const audioUrl = `/audio/${filename}`;
+    const audioUrl = `/audio/${audioFilename}`;
     
     // Cache the result
     audioCache.set(cacheKey, {

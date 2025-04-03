@@ -9,12 +9,16 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { Message } from "@/types";
 import { Button } from "@/components/ui/button";
+import { SettingsPanel } from "@/components/settings/settings-panel";
+import { useTheme } from "@/context/theme-context";
 
 export default function Home() {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isMuteEnabled, setIsMuteEnabled] = useState(false);
-  const [bottomSheetContent, setBottomSheetContent] = useState<'help' | 'settings'>('help');
+  const [voiceVolume, setVoiceVolume] = useState(100);
+  const [voiceId, setVoiceId] = useState('default');
   const { messages, isLoading, sendMessage, clearConversation } = useChat();
+  const { isDarkMode } = useTheme();
   
   const { 
     isListening, 
@@ -62,12 +66,6 @@ export default function Home() {
   };
 
   const handleHelpClick = () => {
-    setBottomSheetContent('help');
-    setIsBottomSheetOpen(true);
-  };
-
-  const handleSettingsClick = () => {
-    setBottomSheetContent('settings');
     setIsBottomSheetOpen(true);
   };
 
@@ -98,30 +96,31 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-md mx-auto relative overflow-hidden">
+    <div className={`flex flex-col h-screen max-w-md mx-auto relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center">
           <div className="rounded-full bg-primary w-8 h-8 flex items-center justify-center mr-2">
-            <Mic className="w-4 h-4 text-white" />
+            <Mic className="w-4 h-4 text-primary-foreground" />
           </div>
           <h1 className="text-lg font-semibold">VoiceAI</h1>
         </div>
         <div className="flex space-x-1">
           <button 
-            className="p-2 rounded-full hover:bg-gray-100" 
+            className="p-2 rounded-full hover:bg-muted" 
             aria-label={isMuteEnabled ? "Enable voice" : "Mute voice"} 
             onClick={handleToggleMute}
           >
             {isMuteEnabled ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
-          <button 
-            className="p-2 rounded-full hover:bg-gray-100" 
-            aria-label="Settings"
-            onClick={handleSettingsClick}
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+          <SettingsPanel 
+            voiceEnabled={!isMuteEnabled}
+            setVoiceEnabled={(enabled) => setIsMuteEnabled(!enabled)}
+            voiceVolume={voiceVolume}
+            setVoiceVolume={setVoiceVolume}
+            voiceId={voiceId}
+            setVoiceId={setVoiceId}
+          />
         </div>
       </header>
 
@@ -140,90 +139,61 @@ export default function Home() {
         voiceSupported={hasRecognitionSupport}
       />
 
-      {/* Bottom Sheet */}
+      {/* Help Bottom Sheet */}
       <BottomSheet 
         isOpen={isBottomSheetOpen} 
         onClose={() => setIsBottomSheetOpen(false)}
       >
-        {bottomSheetContent === 'help' ? (
-          <div className="p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Help & Tips</h2>
-              <button 
-                className="p-1 rounded-full hover:bg-gray-200" 
-                onClick={() => setIsBottomSheetOpen(false)}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <h3 className="font-medium text-lg mb-2">Voice Commands</h3>
-            <ul className="space-y-2 mb-4">
-              <li className="flex items-start">
-                <span className="bg-primary/10 text-primary font-medium px-2 py-1 rounded mr-2 text-sm">
-                  "Clear conversation"
-                </span>
-                <span>Starts a new chat</span>
-              </li>
-              <li className="flex items-start">
-                <span className="bg-primary/10 text-primary font-medium px-2 py-1 rounded mr-2 text-sm">
-                  "Stop" or "Cancel"
-                </span>
-                <span>Stops listening</span>
-              </li>
-            </ul>
+        <div className="p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Help & Tips</h2>
+            <button 
+              className="p-1 rounded-full hover:bg-muted" 
+              onClick={() => setIsBottomSheetOpen(false)}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <h3 className="font-medium text-lg mb-2">Voice Commands</h3>
+          <ul className="space-y-2 mb-4">
+            <li className="flex items-start">
+              <span className="bg-primary/10 text-primary font-medium px-2 py-1 rounded mr-2 text-sm">
+                "Clear conversation"
+              </span>
+              <span>Starts a new chat</span>
+            </li>
+            <li className="flex items-start">
+              <span className="bg-primary/10 text-primary font-medium px-2 py-1 rounded mr-2 text-sm">
+                "Stop" or "Cancel"
+              </span>
+              <span>Stops listening</span>
+            </li>
+          </ul>
 
-            <h3 className="font-medium text-lg mb-2">Tips</h3>
-            <ul className="list-disc list-inside space-y-2">
-              <li>Tap the mic button to use voice input</li>
-              <li>Tap any assistant message to hear it again</li>
-              <li>Use the mute button to turn voice on/off</li>
-              <li>Ask follow-up questions for more details</li>
-            </ul>
+          <h3 className="font-medium text-lg mb-2">Tips</h3>
+          <ul className="list-disc list-inside space-y-2">
+            <li>Tap the mic button to use voice input</li>
+            <li>Tap any assistant message to hear it again</li>
+            <li>Use the mute button to turn voice on/off</li>
+            <li>Ask follow-up questions for more details</li>
+            <li>Open settings to customize theme and voice options</li>
+          </ul>
+          
+          <div className="pt-4 mt-4 border-t border-border">
+            <Button 
+              variant="destructive" 
+              className="w-full" 
+              onClick={() => {
+                clearConversation();
+                setIsBottomSheetOpen(false);
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear Conversation
+            </Button>
           </div>
-        ) : (
-          <div className="p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Settings</h2>
-              <button 
-                className="p-1 rounded-full hover:bg-gray-200" 
-                onClick={() => setIsBottomSheetOpen(false)}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Voice Output</h3>
-                  <p className="text-sm text-gray-600">Enable or disable voice responses</p>
-                </div>
-                <Button 
-                  variant={isMuteEnabled ? "outline" : "default"}
-                  size="sm"
-                  onClick={handleToggleMute}
-                >
-                  {isMuteEnabled ? "Enable" : "Disable"}
-                </Button>
-              </div>
-              
-              <div className="pt-2 border-t border-gray-200">
-                <Button 
-                  variant="destructive" 
-                  className="w-full" 
-                  onClick={() => {
-                    clearConversation();
-                    setIsBottomSheetOpen(false);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Clear Conversation
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </BottomSheet>
     </div>
   );
