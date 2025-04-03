@@ -10,12 +10,24 @@ export type Cache<T> = Map<string, CacheEntry<T>>;
 export interface SearchResult {
   content: string;
   sources: SearchSource[];
+  assets?: AssetData[];
+  relatedQueries?: string[];
 }
 
 export interface SearchSource {
   name: string;
   url: string;
   snippet?: string;
+  thumbnail?: string | null;
+  publishDate?: string | null;
+}
+
+export type AssetType = 'image' | 'chart' | 'table' | 'code';
+
+export interface AssetData {
+  type: AssetType;
+  title?: string;
+  content: any; // The content varies by type
 }
 
 // Chat types
@@ -29,7 +41,12 @@ export interface ChatResponse {
   sources?: {
     name: string;
     value: string;
+    snippet?: string;
+    thumbnail?: string | null;
+    publishDate?: string | null;
   }[];
+  assets?: AssetData[];
+  relatedQueries?: string[];
 }
 
 // Voice synthesis types

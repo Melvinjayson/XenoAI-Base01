@@ -50,6 +50,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         content: data.message,
         timestamp: Date.now(),
         sources: data.sources || [],
+        assets: data.assets || [],
+        relatedQueries: data.relatedQueries || [],
       };
 
       setMessages((prev) => [...prev, assistantMessage]);

@@ -45,24 +45,67 @@ async function generateSearchResultWithOpenAI(query: string): Promise<SearchResu
     const currentDate = new Date().toISOString().split('T')[0];
     
     const prompt = `
-    You are a web search assistant that provides up-to-date information about "${query}".
+    You are a web search assistant that provides rich, interactive search results about "${query}".
     
     Today's date is ${currentDate}.
     
     Please generate a comprehensive answer with the following:
-    1. A detailed response that addresses the query directly
-    2. At least 3 relevant sources that would be found on the web (website name and URL)
-    3. For each source, provide a brief snippet of content that might appear on that page
+    1. A detailed response that addresses the query directly with proper markdown formatting for headings, lists, etc.
+    2. At least 3-5 relevant sources that would be found on the web (website name, URL, and snippet)
+    3. Include relevant media assets that would enhance understanding of the topic:
+       - Images (provide image URLs when relevant)
+       - Charts or tables (structure data in appropriate format)
+       - Code examples (if applicable)
+    4. For news or trending topics, include publication dates in sources
+    5. Provide 3 follow-up questions or related topics the user might be interested in
     
     Format your response as JSON with these fields:
     {
-      "answer": "Your detailed answer here...",
+      "answer": "Your detailed markdown-formatted answer here...",
       "sources": [
         {
           "name": "Website name",
           "url": "https://example.com/page",
-          "snippet": "A brief excerpt from this source..."
+          "snippet": "A brief excerpt from this source...",
+          "thumbnail": "https://example.com/thumbnail.jpg", // Optional
+          "publishDate": "2024-03-31" // Optional, ISO format date
         }
+      ],
+      "assets": [
+        {
+          "type": "image", 
+          "title": "Descriptive title",
+          "content": "https://example.com/image.jpg" // URL for the image
+        },
+        {
+          "type": "chart",
+          "title": "Chart title",
+          "content": [
+            {"name": "Category 1", "value": 30},
+            {"name": "Category 2", "value": 50}
+          ]
+        },
+        {
+          "type": "table",
+          "title": "Table title",
+          "content": {
+            "headers": ["Column 1", "Column 2"],
+            "rows": [
+              ["Row 1 Cell 1", "Row 1 Cell 2"],
+              ["Row 2 Cell 1", "Row 2 Cell 2"]
+            ]
+          }
+        },
+        {
+          "type": "code",
+          "title": "Code example",
+          "content": "console.log('Hello world');"
+        }
+      ],
+      "relatedQueries": [
+        "First related question?",
+        "Second related question?",
+        "Third related question?"
       ]
     }
     `;
@@ -70,7 +113,7 @@ async function generateSearchResultWithOpenAI(query: string): Promise<SearchResu
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: "You are a web search assistant that provides accurate, up-to-date information with relevant sources." },
+        { role: "system", content: "You are a web search assistant that provides accurate, up-to-date information with relevant sources, media, and interactive elements similar to Flipboard." },
         { role: "user", content: prompt }
       ],
       response_format: { type: "json_object" }
@@ -88,8 +131,12 @@ async function generateSearchResultWithOpenAI(query: string): Promise<SearchResu
       sources: parsedContent.sources.map((source: any) => ({
         name: source.name,
         url: source.url,
-        snippet: source.snippet
-      }))
+        snippet: source.snippet,
+        thumbnail: source.thumbnail || null,
+        publishDate: source.publishDate || null
+      })),
+      assets: parsedContent.assets || [],
+      relatedQueries: parsedContent.relatedQueries || []
     };
   } catch (error) {
     console.error('OpenAI search generation error:', error);
@@ -97,7 +144,9 @@ async function generateSearchResultWithOpenAI(query: string): Promise<SearchResu
     // Fallback to a basic result if OpenAI fails
     return {
       content: `I searched for information about "${query}" but encountered an issue with the search service. Please try again later.`,
-      sources: []
+      sources: [],
+      assets: [],
+      relatedQueries: []
     };
   }
 }
