@@ -45,8 +45,8 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           <div className="rounded-full bg-primary w-8 h-8 flex items-center justify-center mr-2 flex-shrink-0">
             <Mic className="w-4 h-4 text-white" />
           </div>
-          <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full">
-            <div className="prose prose-sm max-w-none">
+          <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full dark:text-white">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
             
