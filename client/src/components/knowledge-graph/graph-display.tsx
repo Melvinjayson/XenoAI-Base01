@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useKnowledgeGraph } from '@/context/knowledge-graph-context';
 import ForceGraph2D from 'react-force-graph-2d';
-import { GraphNode, GraphEdge } from '@/types/knowledge-graph';
+import ForceGraph3D from 'react-force-graph-3d';
+import { GraphNode, GraphEdge, NodeType } from '@/types/knowledge-graph';
 import { useTheme } from '@/context/theme-context';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -9,9 +10,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { LoaderIcon, ZoomInIcon, ZoomOutIcon, ExpandIcon, SearchIcon, Network } from 'lucide-react';
+import { 
+  LoaderIcon, ZoomInIcon, ZoomOutIcon, ExpandIcon, SearchIcon, 
+  Network, Layers, Filter, X, Maximize2, Minimize2, RotateCw, 
+  ChevronsUp, Eye, EyeOff, SlidersHorizontal
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel
+} from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 
 // Node colors by type
 const nodeColors: Record<string, string> = {
@@ -53,6 +71,21 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
   const [selectedView, setSelectedView] = useState<'graph' | 'insights'>('graph');
   const graphRef = useRef<any>(null);
   const isMobile = useIsMobile();
+  
+  // Enhanced visualization settings
+  const [is3D, setIs3D] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
+  const [showMiniMap, setShowMiniMap] = useState(false);
+  const [showNodeLabels, setShowNodeLabels] = useState(true);
+  const [showLinkLabels, setShowLinkLabels] = useState(false);
+  const [visibleNodeTypes, setVisibleNodeTypes] = useState<NodeType[]>(
+    ['query', 'entity', 'document', 'concept', 'insight', 'person', 'organization', 'location', 'time', 'statistic']
+  );
+  const [graphAnimation, setGraphAnimation] = useState(true);
+  const [clusterNodes, setClusterNodes] = useState(false);
+  const [highlightConnections, setHighlightConnections] = useState(true);
+  const [enhancedTooltips, setEnhancedTooltips] = useState(true);
   
   // Calculate graph background color based on theme
   const graphBgColor = isDarkMode ? '#121212' : '#ffffff';
@@ -146,17 +179,57 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
     }
   }, [state.selectedNodes, hoveredNode, isDarkMode, textColor]);
   
-  // Transform the graph data for the visualization
-  const graphData = {
-    nodes: state.graph.nodes.map(node => ({
-      ...node,
-      color: node.color || nodeColors[node.type as keyof typeof nodeColors] || '#999999'
-    })),
-    links: state.graph.edges.map(edge => ({
-      ...edge,
-      color: edgeColors[edge.type as keyof typeof edgeColors] || '#99999980'
-    }))
-  };
+  // Apply node filters
+  const filteredNodes = useMemo(() => {
+    return state.graph.nodes.filter(node => visibleNodeTypes.includes(node.type as NodeType));
+  }, [state.graph.nodes, visibleNodeTypes]);
+  
+  // Apply edge filters
+  const filteredEdges = useMemo(() => {
+    // Only include edges where both source and target nodes are visible
+    return state.graph.edges.filter(edge => {
+      const sourceNode = state.graph.nodes.find(n => n.id === edge.source);
+      const targetNode = state.graph.nodes.find(n => n.id === edge.target);
+      return sourceNode && targetNode && 
+             visibleNodeTypes.includes(sourceNode.type as NodeType) && 
+             visibleNodeTypes.includes(targetNode.type as NodeType);
+    });
+  }, [state.graph.edges, state.graph.nodes, visibleNodeTypes]);
+  
+  // Determine node sizes based on their connections
+  const nodeDegrees = useMemo(() => {
+    const degrees = new Map<string, number>();
+    filteredEdges.forEach(edge => {
+      degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+      degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+    });
+    return degrees;
+  }, [filteredEdges]);
+  
+  // Transform the graph data for the visualization with enhanced properties
+  const graphData = useMemo(() => {
+    return {
+      nodes: filteredNodes.map(node => {
+        const baseSize = node.type === 'query' ? 12 : 8;
+        const connections = nodeDegrees.get(node.id) || 0;
+        // Scale node size based on connections (capped for readability)
+        const connectionFactor = Math.min(1 + (connections * 0.2), 2.5);
+        
+        return {
+          ...node,
+          val: node.size || (baseSize * connectionFactor), // used by 3D renderer
+          size: node.size || (baseSize * connectionFactor), // used by our custom renderer
+          color: node.color || nodeColors[node.type as keyof typeof nodeColors] || '#999999'
+        };
+      }),
+      links: filteredEdges.map(edge => ({
+        ...edge,
+        color: edgeColors[edge.type as keyof typeof edgeColors] || '#99999980',
+        // For curvature in 3D view
+        curvature: edge.type === 'related_to' ? 0.3 : 0.1
+      }))
+    };
+  }, [filteredNodes, filteredEdges, nodeDegrees]);
   
   return (
     <div className={cn('flex flex-col h-full w-full', className)}>
@@ -214,6 +287,131 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
           ) : (
             <>
               <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+                {/* View type toggle */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        onClick={() => setIs3D(!is3D)} 
+                        size="icon" 
+                        variant={is3D ? "default" : "outline"}
+                      >
+                        <Layers className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{is3D ? "Switch to 2D" : "Switch to 3D"}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
+                {/* Display options */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        onClick={() => setShowLegend(!showLegend)} 
+                        size="icon" 
+                        variant={showLegend ? "default" : "outline"}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Toggle Legend</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
+                {/* Mini-map toggle */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        onClick={() => setShowMiniMap(!showMiniMap)} 
+                        size="icon" 
+                        variant={showMiniMap ? "default" : "outline"}
+                        disabled={is3D}
+                      >
+                        <Minimize2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Toggle Mini-Map</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
+                {/* Filter options */}
+                <DropdownMenu>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="outline">
+                            <Filter className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>Filter Nodes</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Node Types</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    
+                    {Object.keys(nodeColors).map((type) => (
+                      <DropdownMenuCheckboxItem
+                        key={type}
+                        checked={visibleNodeTypes.includes(type as NodeType)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setVisibleNodeTypes([...visibleNodeTypes, type as NodeType]);
+                          } else {
+                            setVisibleNodeTypes(visibleNodeTypes.filter(t => t !== type));
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          <span 
+                            className="w-3 h-3 rounded-full mr-2" 
+                            style={{ backgroundColor: nodeColors[type as keyof typeof nodeColors] }}
+                          />
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </div>
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Display Options</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={clusterNodes}
+                      onCheckedChange={setClusterNodes}
+                    >
+                      Group similar nodes
+                    </DropdownMenuCheckboxItem>
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={showNodeLabels}
+                      onCheckedChange={setShowNodeLabels}
+                    >
+                      Show node labels
+                    </DropdownMenuCheckboxItem>
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={showLinkLabels}
+                      onCheckedChange={setShowLinkLabels}
+                    >
+                      Show relationship labels
+                    </DropdownMenuCheckboxItem>
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={highlightConnections}
+                      onCheckedChange={setHighlightConnections}
+                    >
+                      Highlight connections
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                {/* Zoom controls */}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -248,38 +446,171 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
                 </TooltipProvider>
               </div>
               
-              <ForceGraph2D
-                ref={graphRef}
-                graphData={graphData}
-                nodeCanvasObject={nodeCanvasObject}
-                backgroundColor={graphBgColor}
-                linkDirectionalArrowLength={3}
-                linkDirectionalArrowRelPos={0.9}
-                linkWidth={1}
-                nodeRelSize={6}
-                onNodeClick={handleNodeClick}
-                onNodeHover={setHoveredNode}
-                cooldownTicks={100}
-                d3AlphaDecay={0.02}
-                d3VelocityDecay={0.3}
-                nodeLabel={(node: any) => `${node.label} (${node.type})`}
-                linkLabel={(link: any) => link.type || 'relates to'}
-                width={isMobile ? 350 : 600}
-                height={400}
-              />
+              {/* Display toggle between 2D and 3D */}
+              {is3D ? (
+                <ForceGraph3D
+                  ref={graphRef}
+                  graphData={graphData}
+                  backgroundColor={graphBgColor}
+                  nodeColor={(node: any) => node.color}
+                  nodeLabel={(node: any) => `${node.label} (${node.type})`}
+                  linkLabel={(link: any) => link.type || 'relates to'}
+                  linkColor={(link: any) => link.color}
+                  linkWidth={1}
+                  linkDirectionalArrowLength={3}
+                  linkDirectionalArrowRelPos={0.9}
+                  linkCurvature="curvature"
+                  nodeVal={(node: any) => node.val}
+                  onNodeClick={handleNodeClick}
+                  onNodeHover={setHoveredNode}
+                  cooldownTicks={100}
+                  d3AlphaDecay={0.02}
+                  d3VelocityDecay={0.3}
+                  showNavInfo={true}
+                  width={isMobile ? 350 : 800}
+                  height={500}
+                />
+              ) : (
+                <ForceGraph2D
+                  ref={graphRef}
+                  graphData={graphData}
+                  nodeCanvasObject={nodeCanvasObject}
+                  backgroundColor={graphBgColor}
+                  linkDirectionalArrowLength={3}
+                  linkDirectionalArrowRelPos={0.9}
+                  linkCurvature="curvature"
+                  linkWidth={1}
+                  nodeRelSize={6}
+                  onNodeClick={handleNodeClick}
+                  onNodeHover={setHoveredNode}
+                  cooldownTicks={100}
+                  d3AlphaDecay={0.02}
+                  d3VelocityDecay={0.3}
+                  nodeLabel={(node: any) => `${node.label} (${node.type})`}
+                  linkLabel={(link: any) => link.type || 'relates to'}
+                  width={isMobile ? 350 : 800}
+                  height={500}
+                />
+              )}
               
+              {/* Mini-map for navigation (simplified) */}
+              {!is3D && showMiniMap && (
+                <div className="absolute bottom-2 right-2 w-[150px] h-[150px] border rounded-md overflow-hidden bg-background/80 p-2">
+                  <h5 className="text-xs font-medium mb-1">Mini-Map</h5>
+                  <div className="w-full h-[120px] relative">
+                    {graphData.nodes.map((node: any) => (
+                      <div
+                        key={node.id}
+                        className="absolute w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor: node.color,
+                          left: `${Math.min(Math.max((node.x || 0) / 10 + 50, 0), 100)}%`,
+                          top: `${Math.min(Math.max((node.y || 0) / 10 + 50, 0), 100)}%`,
+                          transform: 'translate(-50%, -50%)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Node type legend */}
+              {showLegend && (
+                <div className="absolute bottom-2 left-2 bg-background p-2 rounded-md border shadow-md max-w-[200px]">
+                  <h4 className="text-sm font-medium mb-2">Node Types</h4>
+                  <div className="grid grid-cols-2 gap-1">
+                    {Object.entries(nodeColors).map(([type, color]) => (
+                      <div key={type} className="flex items-center">
+                        <span 
+                          className="w-3 h-3 rounded-full mr-1" 
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-xs">{type}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Enhanced hover tooltip */}
               {hoveredNode && (
-                <div className="absolute bottom-2 left-2 right-2 bg-background p-2 rounded-md border shadow-md max-w-md">
-                  <div className="flex items-center">
-                    <span 
-                      className="w-3 h-3 rounded-full mr-2" 
-                      style={{ backgroundColor: hoveredNode.color || nodeColors[hoveredNode.type as keyof typeof nodeColors] }}
-                    />
-                    <h4 className="font-medium">{hoveredNode.label}</h4>
+                <div className="absolute bottom-2 left-2 right-2 bg-background p-3 rounded-md border shadow-md max-w-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span 
+                        className="w-4 h-4 rounded-full mr-2" 
+                        style={{ backgroundColor: hoveredNode.color || nodeColors[hoveredNode.type as keyof typeof nodeColors] }}
+                      />
+                      <h4 className="font-medium">{hoveredNode.label}</h4>
+                    </div>
                     <Badge variant="outline" className="ml-2 text-xs">{hoveredNode.type}</Badge>
                   </div>
+                  
                   {hoveredNode.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{hoveredNode.description}</p>
+                    <p className="text-sm text-muted-foreground mt-2">{hoveredNode.description}</p>
+                  )}
+                  
+                  {enhancedTooltips && (
+                    <>
+                      <Separator className="my-2" />
+                      
+                      <div className="grid grid-cols-2 gap-1 text-xs mt-2">
+                        <div>Connected to:</div>
+                        <div className="font-medium">
+                          {graphData.links.filter(
+                            (link: any) => link.source.id === hoveredNode.id || link.target.id === hoveredNode.id
+                          ).length} nodes
+                        </div>
+                        
+                        {hoveredNode.score !== undefined && (
+                          <>
+                            <div>Relevance:</div>
+                            <div className="font-medium">
+                              <Progress 
+                                value={hoveredNode.score * 100} 
+                                className="h-2 w-16 inline-block mr-1" 
+                              />
+                              {Math.round(hoveredNode.score * 100)}%
+                            </div>
+                          </>
+                        )}
+                        
+                        <div>Created:</div>
+                        <div className="font-medium">
+                          {new Date(hoveredNode.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-1 mt-2">
+                        <Button 
+                          size="sm" 
+                          className="h-7 text-xs"
+                          onClick={() => expandNode(hoveredNode.id)}
+                        >
+                          Expand Node
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            dispatch({ type: 'select_node', payload: hoveredNode.id });
+                            // Center view on this node
+                            if (graphRef.current) {
+                              const distance = is3D ? 150 : undefined;
+                              graphRef.current.centerAt(
+                                hoveredNode.x, 
+                                hoveredNode.y, 
+                                distance
+                              );
+                              graphRef.current.zoom(2, 400);
+                            }
+                          }}
+                        >
+                          Focus
+                        </Button>
+                      </div>
+                    </>
                   )}
                 </div>
               )}
