@@ -96,6 +96,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // API health check endpoint
+  app.get("/api/health", (_req, res) => {
+    const openaiApiKey = process.env.OPENAI_API_KEY ? "✓" : "✗";
+    const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY ? "✓" : "✗";
+    
+    return res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      services: {
+        openai: openaiApiKey,
+        elevenlabs: elevenLabsApiKey
+      }
+    });
+  });
 
   const httpServer = createServer(app);
   return httpServer;

@@ -1,6 +1,7 @@
 import { ChatMessage, ChatResponse, AssetData, SearchResult } from './types';
 import OpenAI from 'openai';
 import { webSearch } from './search';
+import { conversationalResponse } from './agent';
 
 // System message for the OpenAI API
 const systemMessage: ChatMessage = {
@@ -31,13 +32,19 @@ function isInformationalQuery(query: string): boolean {
          (query.split(" ").length >= 4 && !query.includes("?"));
 }
 
-// Function to handle chat with OpenAI
+// Function to format chat history for LangChain
+function formatChatHistoryForLangChain(history: ChatMessage[]): string[] {
+  return history.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`);
+}
+
+// Function to handle chat with OpenAI and LangChain
 export async function chat(userMessage: string, history: ChatMessage[]): Promise<ChatResponse> {
   try {
     // For informational queries, try to get enhanced search results first
     if (isInformationalQuery(userMessage)) {
       try {
-        // Attempt to get search results with rich content
+        console.log('Using web search for informational query:', userMessage);
+        // Attempt to get search results with rich content using our enhanced search
         const searchResult = await webSearch(userMessage);
         
         // If we have search results with sources, use them for the response
@@ -60,11 +67,32 @@ export async function chat(userMessage: string, history: ChatMessage[]): Promise
         }
       } catch (searchError) {
         console.error('Search error in chat function:', searchError);
-        // Continue with regular chat if search fails
+        // Continue with conversational flow if search fails
       }
     }
     
-    // Fallback to standard chat flow if search wasn't used or failed
+    // Check if this is a follow-up question by looking at history
+    if (history.length > 0) {
+      try {
+        console.log('Using LangChain for contextual follow-up with history length:', history.length);
+        // Format the chat history for LangChain
+        const formattedHistory = formatChatHistoryForLangChain(history);
+        
+        // Use LangChain for better contextual conversation with memory
+        const langChainResponse = await conversationalResponse(userMessage, formattedHistory);
+        
+        return {
+          message: langChainResponse.message,
+          relatedQueries: langChainResponse.relatedQueries
+        };
+      } catch (langChainError) {
+        console.error('LangChain conversation error:', langChainError);
+        // Continue with standard OpenAI if LangChain fails
+      }
+    }
+    
+    // Fallback to standard chat flow if search and LangChain weren't used or failed
+    console.log('Falling back to standard OpenAI chat');
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     
     // Prepare messages for the API with explicit typing

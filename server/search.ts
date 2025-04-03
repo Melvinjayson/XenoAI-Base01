@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { Cache, SearchResult } from './types';
+import { enhancedSearch, conversationalResponse } from './agent';
+import OpenAI from 'openai';
 
 // In-memory cache for search results
 const searchCache: Cache<SearchResult> = new Map();
@@ -7,7 +9,7 @@ const searchCache: Cache<SearchResult> = new Map();
 // Default expiration time for cached results (30 minutes)
 const CACHE_EXPIRY_MS = 30 * 60 * 1000;
 
-// Function to perform web search with OpenAI
+// Function to perform web search using LangChain enhanced search
 export async function webSearch(query: string): Promise<SearchResult> {
   // Check cache first
   const cacheKey = `search:${query.toLowerCase().trim()}`;
@@ -18,9 +20,9 @@ export async function webSearch(query: string): Promise<SearchResult> {
   }
 
   try {
-    // If we have a Perplexity API key, we would use it here
-    // For now, we'll generate a simulated result using OpenAI
-    const result = await generateSearchResultWithOpenAI(query);
+    console.log('Starting enhanced search with LangChain for:', query);
+    // Use our LangChain enhanced search for real web results
+    const result = await enhancedSearch(query);
     
     // Cache the result
     searchCache.set(cacheKey, {
@@ -30,16 +32,30 @@ export async function webSearch(query: string): Promise<SearchResult> {
     
     return result;
   } catch (error) {
-    console.error('Search error:', error);
-    throw new Error('Failed to perform web search');
+    console.error('LangChain search error:', error);
+    
+    // Fallback to OpenAI if LangChain search fails
+    try {
+      console.log('Falling back to OpenAI search generation for:', query);
+      const fallbackResult = await generateSearchResultWithOpenAI(query);
+      
+      // Cache the fallback result
+      searchCache.set(cacheKey, {
+        data: fallbackResult,
+        timestamp: Date.now()
+      });
+      
+      return fallbackResult;
+    } catch (fallbackError) {
+      console.error('Fallback search error:', fallbackError);
+      throw new Error('Failed to perform web search');
+    }
   }
 }
 
-// Function to generate search results using OpenAI
+// Function to generate search results using OpenAI (fallback method)
 async function generateSearchResultWithOpenAI(query: string): Promise<SearchResult> {
   try {
-    // Import OpenAI
-    const OpenAI = (await import('openai')).default;
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     
     const currentDate = new Date().toISOString().split('T')[0];
@@ -111,7 +127,7 @@ async function generateSearchResultWithOpenAI(query: string): Promise<SearchResu
     `;
     
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         { role: "system", content: "You are a web search assistant that provides accurate, up-to-date information with relevant sources, media, and interactive elements similar to Flipboard." },
         { role: "user", content: prompt }
@@ -151,35 +167,71 @@ async function generateSearchResultWithOpenAI(query: string): Promise<SearchResu
   }
 }
 
+// Enhanced getSuggestions function that uses LangChain for better contextual suggestions
 export async function getSuggestions(query: string): Promise<string[]> {
   try {
-    // This would typically call an API, but we're generating locally
-    const baseQuery = query.toLowerCase().trim();
+    // Generate more contextually relevant suggestions using our conversational model
+    const response = await conversationalResponse(query, []);
     
-    if (baseQuery.includes('weather')) {
-      return [
-        'What will the weather be like tomorrow?',
-        'Is it going to rain this weekend?',
-        'What\'s the current temperature?'
-      ];
+    if (response.relatedQueries && response.relatedQueries.length > 0) {
+      return response.relatedQueries;
     }
     
-    if (baseQuery.includes('news')) {
-      return [
-        'What are the top headlines today?',
-        'Latest technology news',
-        'Breaking news in politics'
-      ];
-    }
+    // Fallback to OpenAI if conversationalResponse doesn't provide suggestions
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     
-    // Default suggestions
-    return [
-      `Tell me more about ${query}`,
-      `What are the key aspects of ${query}?`,
-      `Compare ${query} with alternatives`
-    ];
+    const promptResponse = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        { 
+          role: "system", 
+          content: "Generate 5 search suggestions related to the user's query. Return only the suggestions as a JSON array of strings with the key 'suggestions'." 
+        },
+        { 
+          role: "user", 
+          content: `Generate search suggestions for: "${query}"` 
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 200,
+    });
+    
+    const content = promptResponse.choices[0].message.content;
+    if (!content) return getDefaultSuggestions(query);
+    
+    const suggestions = JSON.parse(content);
+    return Array.isArray(suggestions.suggestions) ? suggestions.suggestions : getDefaultSuggestions(query);
   } catch (error) {
-    console.error('Error generating suggestions:', error);
-    return [];
+    console.error('Error getting suggestions:', error);
+    return getDefaultSuggestions(query);
   }
+}
+
+// Helper function for default suggestions based on query context
+function getDefaultSuggestions(query: string): string[] {
+  const baseQuery = query.toLowerCase().trim();
+  
+  if (baseQuery.includes('weather')) {
+    return [
+      'What will the weather be like tomorrow?',
+      'Is it going to rain this weekend?',
+      'What\'s the current temperature?'
+    ];
+  }
+  
+  if (baseQuery.includes('news')) {
+    return [
+      'What are the top headlines today?',
+      'Latest technology news',
+      'Breaking news in politics'
+    ];
+  }
+  
+  // Default suggestions
+  return [
+    `Tell me more about ${query}`,
+    `What are the key aspects of ${query}?`,
+    `Compare ${query} with alternatives`
+  ];
 }
