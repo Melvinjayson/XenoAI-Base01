@@ -53,6 +53,13 @@ export interface GraphInsight {
   nodeIds: string[]; // related nodes
   edgeIds: string[]; // related edges
   createdAt: number;
+  rationale?: string; // explanation for why this insight exists
+  confidence?: number; // confidence score (0-1)
+  history?: { // tracking changes over time for self-learning
+    previousRelevance?: number;
+    correctionCount?: number;
+    lastUpdated?: number;
+  };
 }
 
 export interface GraphLayout {

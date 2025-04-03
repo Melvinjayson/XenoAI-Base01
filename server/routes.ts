@@ -5,7 +5,7 @@ import { chat } from "./openai";
 import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
-import { createKnowledgeGraphFromSearch, expandGraphNode, analyzeKnowledgeGraph } from "./knowledge-graph";
+import { createKnowledgeGraphFromSearch, expandGraphNode, analyzeKnowledgeGraph, type NodeType } from "./knowledge-graph";
 import { WebSocketServer } from "ws";
 import path from "path";
 
@@ -206,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const sourceNode = {
               id: sourceId,
               label: source.name,
-              type: 'document',
+              type: 'document' as NodeType,
               description: source.snippet,
               score: 0.9,
               createdAt: Date.now(),

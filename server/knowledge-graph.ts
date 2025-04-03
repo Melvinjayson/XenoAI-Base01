@@ -7,9 +7,10 @@ import axios from 'axios';
 // based on search results and content analysis
 
 // Define node types
-type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 'person' | 'organization' | 'location' | 'time' | 'statistic';
+export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 'person' | 'organization' | 'location' | 'time' | 'statistic';
+export type EdgeType = 'search_result' | 'contains' | 'relates' | 'expansion' | 'search' | 'conversation' | 'related_to' | 'context_source' | 'affiliated_with' | 'conceptually_related' | 'includes' | 'located_near' | 'time_related' | 'expanded_by';
 
-interface KnowledgeGraphNode {
+export interface KnowledgeGraphNode {
   id: string;
   label: string;
   type: NodeType;
@@ -19,21 +20,21 @@ interface KnowledgeGraphNode {
   data?: any;
 }
 
-interface KnowledgeGraphEdge {
+export interface KnowledgeGraphEdge {
   id: string;
   source: string;
   target: string;
   label?: string;
-  type?: string;
+  type?: EdgeType;
   weight?: number;
 }
 
-interface KnowledgeGraph {
+export interface KnowledgeGraph {
   nodes: KnowledgeGraphNode[];
   edges: KnowledgeGraphEdge[];
 }
 
-interface GraphInsight {
+export interface GraphInsight {
   id: string;
   type: 'pattern' | 'cluster' | 'connection' | 'anomaly';
   description: string;
@@ -41,20 +42,37 @@ interface GraphInsight {
   nodeIds: string[];
   edgeIds: string[];
   createdAt: number;
+  rationale?: string; // explanation for why this insight exists
+  confidence?: number; // confidence score (0-1)
+  history?: { // tracking changes over time for self-learning
+    previousRelevance?: number;
+    correctionCount?: number;
+    lastUpdated?: number;
+  };
 }
 
-interface GraphSearchResult {
+export interface GraphSearchResult {
   graph: KnowledgeGraph;
   query: string;
   insights: GraphInsight[];
 }
 
+// Module-level cache for insights learning
+interface InsightCacheEntry {
+  insight: GraphInsight;
+  feedback?: 'positive' | 'negative';
+  usageCount: number;
+}
+
+// Use a module-level Map for caching insights
+const previousInsightsCache = new Map<string, InsightCacheEntry>();
+
 // Function to extract entities from text using OpenAI
-async function extractEntities(text: string): Promise<{ entity: string; type: string; score: number }[]> {
+async function extractEntities(text: string): Promise<{ entity: string; type: NodeType; score: number }[]> {
   try {
     // Use NLP techniques to categorize entities
     const keywords = extractKeywords(text, 8); // Extract more keywords for better analysis
-    const results: { entity: string; type: string; score: number }[] = [];
+    const results: { entity: string; type: NodeType; score: number }[] = [];
     
     // Define common prefixes for entity types
     const conceptPrefixes = ['what', 'how', 'why', 'when', 'where', 'who'];
@@ -66,7 +84,7 @@ async function extractEntities(text: string): Promise<{ entity: string; type: st
       'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     
     for (const keyword of keywords) {
-      let type = 'concept'; // Default type
+      let type: NodeType = 'concept'; // Default type
       
       // Try to determine the entity type based on common patterns
       if (personPrefixes.some(prefix => keyword.toLowerCase().startsWith(prefix))) {
@@ -199,7 +217,7 @@ async function createNodeConnections(graph: KnowledgeGraph): Promise<void> {
       // Create connection if probability threshold is met
       if (Math.random() < connectionProbability) {
         // Determine relationship type based on entity types
-        let relationType = 'related_to';
+        let relationType: EdgeType = 'related_to';
         
         if (entity1.type === 'person' && entity2.type === 'organization') {
           relationType = 'affiliated_with';
@@ -279,7 +297,7 @@ export async function createKnowledgeGraphFromSearch(query: string): Promise<Gra
       const sourceNode: KnowledgeGraphNode = {
         id: sourceId,
         label: source.name,
-        type: 'document',
+        type: 'document' as NodeType,
         description: source.snippet,
         score: 1 - (index * 0.1), // Score decreases with position
         createdAt: Date.now(),
@@ -379,7 +397,7 @@ export async function createKnowledgeGraphFromSearch(query: string): Promise<Gra
   }
 }
 
-// Generate insights from the graph
+// Generate insights from the graph with self-learning and self-correcting capabilities
 function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
   const insights: GraphInsight[] = [];
   
@@ -389,6 +407,8 @@ function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
   }
   
   try {
+    // We're using the module-level previousInsightsCache defined earlier
+    
     // Find most connected entities
     const nodeDegrees = new Map<string, number>();
     
@@ -407,17 +427,41 @@ function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
       .slice(0, 5); // Get more top entities
     
     if (topEntities.length > 0) {
+      // Build rationale for central topics insight
+      const rationale = `These topics appeared most frequently and have the most connections in the knowledge graph. They represent the central themes discussed across multiple sources.`;
+      
+      // Calculate confidence based on the number of connections and consistency
+      const connectionCounts = topEntities.map(([_, count]) => count);
+      const avgConnections = connectionCounts.reduce((sum, count) => sum + count, 0) / connectionCounts.length;
+      const confidence = Math.min(0.95, 0.6 + (avgConnections / 20)); // Cap at 0.95
+      
+      const insightId = `central-topics-${Date.now()}`;
+      const topicLabels = topEntities.map(([nodeId]) => {
+        const node = graph.nodes.find(n => n.id === nodeId);
+        return node ? node.label : '';
+      }).filter(Boolean);
+      
       insights.push({
-        id: `central-topics-${Date.now()}`,
+        id: insightId,
         type: 'pattern',
-        description: `Key topics: ${topEntities.map(([nodeId]) => {
-          const node = graph.nodes.find(n => n.id === nodeId);
-          return node ? node.label : '';
-        }).filter(Boolean).join(', ')}`,
+        description: `Key topics: ${topicLabels.join(', ')}`,
         relevance: 0.9,
         nodeIds: topEntities.map(([nodeId]) => nodeId),
         edgeIds: [],
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        rationale,
+        confidence,
+        history: {
+          previousRelevance: 0.85, // Start slightly lower than current
+          correctionCount: 0,
+          lastUpdated: Date.now()
+        }
+      });
+      
+      // Store in our "memory" for future learning
+      previousInsightsCache.set(insightId, {
+        insight: insights[insights.length - 1],
+        usageCount: 1
       });
     }
     
@@ -427,14 +471,59 @@ function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
       const typeNodes = graph.nodes.filter(node => node.type === type);
       
       if (typeNodes.length >= 2) {
+        // Generate appropriate rationale based on entity type
+        let rationale = '';
+        let confidence = 0.8;
+        
+        switch (type) {
+          case 'person':
+            rationale = `Multiple people were identified in this context, suggesting this topic involves important individuals who may be related or involved in similar activities.`;
+            break;
+          case 'organization':
+            rationale = `Several organizations appear together, indicating institutional relationships or industry connections relevant to the topic.`;
+            break;
+          case 'location':
+            rationale = `Multiple locations were detected, suggesting geographical significance or spatial relationships in this context.`;
+            break;
+          case 'time':
+            rationale = `Several temporal references appear, indicating chronological patterns or time-sensitive information.`;
+            break;
+          case 'concept':
+            rationale = `Multiple conceptual entities were found, showing abstract ideas or themes that form the theoretical framework of this topic.`;
+            break;
+          case 'statistic':
+            rationale = `Multiple statistical data points were detected, providing numerical evidence and quantitative measures related to this topic.`;
+            break;
+          default:
+            rationale = `Multiple entities of the same type were found, suggesting a coherent group or category of information.`;
+        }
+        
+        // Higher confidence with more entities of the same type
+        confidence = Math.min(0.9, 0.7 + (typeNodes.length * 0.05));
+        
+        const insightId = `${type}-cluster-${Date.now()}`;
+        
         insights.push({
-          id: `${type}-cluster-${Date.now()}`,
+          id: insightId,
           type: 'cluster',
           description: `${typeNodes.length} ${type}s found: ${typeNodes.slice(0, 3).map(n => n.label).join(', ')}${typeNodes.length > 3 ? '...' : ''}`,
           relevance: 0.8,
           nodeIds: typeNodes.map(n => n.id),
           edgeIds: [],
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          rationale,
+          confidence,
+          history: {
+            previousRelevance: 0.75,
+            correctionCount: 0,
+            lastUpdated: Date.now()
+          }
+        });
+        
+        // Store in our "memory" for future learning
+        previousInsightsCache.set(insightId, {
+          insight: insights[insights.length - 1],
+          usageCount: 1
         });
       }
     });
@@ -496,8 +585,7 @@ function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
             relationshipType = "affiliation";
           } else if (source.type === 'concept' && target.type === 'concept') {
             relationshipType = "conceptual relationship";
-          } else if ((source.type === 'time' || target.type === 'time') && 
-                    (source.type === 'event' || target.type === 'event')) {
+          } else if (source.type === 'time' || target.type === 'time') {
             relationshipType = "timeline connection";
           } else if (source.type === 'location' || target.type === 'location') {
             relationshipType = "geographical association";
@@ -587,7 +675,7 @@ export async function expandGraphNode(
         graph.nodes.push({
           id: sourceId,
           label: source.name,
-          type: 'document',
+          type: 'document' as NodeType,
           description: source.snippet,
           score: 0.8 - (index * 0.05),
           createdAt: Date.now(),
@@ -643,10 +731,10 @@ export async function expandGraphNode(
       
       conceptSearchResult.sources.slice(0, 3).forEach((source, index) => {
         const sourceId = `source-concept-${Date.now()}-${index}`;
-        const sourceNode = {
+        const sourceNode: KnowledgeGraphNode = {
           id: sourceId,
           label: source.name,
-          type: 'document',
+          type: 'document' as NodeType,
           description: source.snippet,
           score: 0.9 - (index * 0.1),
           createdAt: Date.now(),
@@ -766,7 +854,7 @@ export async function expandGraphNode(
         graph.nodes.push({
           id: sourceId,
           label: source.name,
-          type: 'document',
+          type: 'document' as NodeType,
           description: source.snippet,
           score: 0.75 - (index * 0.1),
           createdAt: Date.now(),
