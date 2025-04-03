@@ -14,21 +14,31 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 // Node colors by type
-const nodeColors = {
+const nodeColors: Record<string, string> = {
   query: '#6B4BFF', // primary purple
   entity: '#00C2FF', // bright blue
   document: '#FF6B4B', // coral
   concept: '#4BFF6B', // green
   insight: '#FFBB4B', // yellow
+  person: '#E74C3C', // red
+  organization: '#3498DB', // blue
+  location: '#2ECC71', // green
+  time: '#9B59B6', // purple
+  statistic: '#F1C40F', // yellow
 };
 
 // Edge colors by type
-const edgeColors = {
+const edgeColors: Record<string, string> = {
   search_result: '#6B4BFF80', // primary with transparency
   contains: '#00C2FF80', // blue with transparency
   relates: '#FF6B4B80', // coral with transparency
   expansion: '#4BFF6B80', // green with transparency
   search: '#6B4BFF80', // primary with transparency
+  conversation: '#00C2FF80', // bright blue with transparency
+  related_to: '#FF6B4B80', // coral with transparency
+  context_source: '#9B59B680', // purple with transparency
+  affiliated_with: '#E74C3C80', // red with transparency
+  conceptually_related: '#4BFF6B80', // green with transparency
 };
 
 interface GraphDisplayProps {

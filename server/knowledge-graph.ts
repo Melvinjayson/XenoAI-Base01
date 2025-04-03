@@ -6,10 +6,13 @@ import axios from 'axios';
 // This file contains functions for building and manipulating a knowledge graph
 // based on search results and content analysis
 
+// Define node types
+type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 'person' | 'organization' | 'location' | 'time' | 'statistic';
+
 interface KnowledgeGraphNode {
   id: string;
   label: string;
-  type: string;
+  type: NodeType;
   description?: string;
   score?: number;
   createdAt: number;

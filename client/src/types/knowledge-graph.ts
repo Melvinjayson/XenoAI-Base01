@@ -1,6 +1,6 @@
 // Knowledge Graph Types
 
-export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight';
+export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 'person' | 'organization' | 'location' | 'time' | 'statistic';
 
 export interface GraphNode {
   id: string;

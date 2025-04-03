@@ -1,33 +1,96 @@
-import React from 'react';
-import { KnowledgeGraphProvider } from '@/context/knowledge-graph-context';
+import React, { useState, useRef } from 'react';
+import { KnowledgeGraphProvider, useKnowledgeGraph } from '@/context/knowledge-graph-context';
+import { useChat } from '@/context/chat-context';
 import GraphDisplay from '@/components/knowledge-graph/graph-display';
 import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
-import { ArrowLeftIcon } from 'lucide-react';
+import { ArrowLeftIcon, MessageSquareTextIcon, LoaderIcon } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+// Wrapper component to access both contexts
+const KnowledgeGraphContent = () => {
+  const { createKnowledgeGraphFromConversation } = useChat();
+  const { importGraphFromConversation } = useKnowledgeGraph();
+  const [loadingConversation, setLoadingConversation] = useState(false);
+  const { toast } = useToast();
+  
+  // Function to create a knowledge graph from the current chat conversation
+  const handleCreateFromConversation = async () => {
+    setLoadingConversation(true);
+    try {
+      // Call our new function from the chat context
+      const result = await createKnowledgeGraphFromConversation();
+      
+      if (!result) {
+        throw new Error('No conversation data available');
+      }
+      
+      // Import the graph data into our knowledge graph context
+      importGraphFromConversation(result);
+      
+      toast({
+        title: 'Knowledge Graph Created',
+        description: `Created knowledge graph from conversation with ${result.graph.nodes.length} nodes and ${result.graph.edges.length} connections.`,
+      });
+    } catch (error) {
+      console.error('Error creating graph from conversation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create knowledge graph from conversation.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingConversation(false);
+    }
+  };
+  
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="mr-4">
+              <ArrowLeftIcon className="w-4 h-4 mr-2" />
+              Back to Chat
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold">Knowledge Graph Explorer</h1>
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="ml-auto"
+          onClick={handleCreateFromConversation}
+          disabled={loadingConversation}
+        >
+          {loadingConversation ? (
+            <LoaderIcon className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <MessageSquareTextIcon className="w-4 h-4 mr-2" />
+          )}
+          Graph from Conversation
+        </Button>
+      </div>
+      
+      <div className="bg-card border rounded-lg shadow-sm flex-1 overflow-hidden">
+        <GraphDisplay className="p-4 h-full" />
+      </div>
+    </>
+  );
+};
 
 export default function KnowledgeGraphPage() {
   return (
     <div className="container mx-auto p-4 flex flex-col h-[calc(100vh-4rem)]">
-      <div className="flex items-center mb-4">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="mr-4">
-            <ArrowLeftIcon className="w-4 h-4 mr-2" />
-            Back to Chat
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold">Knowledge Graph Explorer</h1>
-      </div>
-      
-      <div className="bg-card border rounded-lg shadow-sm flex-1 overflow-hidden">
-        <KnowledgeGraphProvider>
-          <GraphDisplay className="p-4 h-full" />
-        </KnowledgeGraphProvider>
-      </div>
+      <KnowledgeGraphProvider>
+        <KnowledgeGraphContent />
+      </KnowledgeGraphProvider>
       
       <div className="mt-4 text-sm text-muted-foreground">
         <p>
-          Search for topics to build an interactive knowledge graph. Click on nodes to expand them
-          and discover connections between concepts.
+          Search for topics to build an interactive knowledge graph or create one from your current conversation.
+          Click on nodes to expand them and discover connections between concepts.
         </p>
       </div>
     </div>

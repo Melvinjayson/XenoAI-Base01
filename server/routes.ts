@@ -159,6 +159,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // API endpoint for creating a knowledge graph from conversation context
+  app.post("/api/knowledge-graph/from-conversation", async (req, res) => {
+    try {
+      const { messages, searchResults } = req.body;
+      
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "Valid message history array is required" });
+      }
+      
+      // Extract conversation text to create a query
+      const conversationText = messages
+        .map(m => m.content)
+        .join(" ");
+      
+      // Create a more focused query by extracting key topics
+      let query = conversationText;
+      if (conversationText.length > 200) {
+        // If the conversation is long, try to extract the main topics
+        const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content;
+        if (lastUserMessage) {
+          query = lastUserMessage; // Use the last user message as primary query
+        }
+      }
+      
+      console.log(`Creating knowledge graph from conversation with query: ${query}`);
+      
+      // Create knowledge graph from the conversation
+      const result = await createKnowledgeGraphFromSearch(query);
+      
+      // If there are search results provided, enrich the graph with those
+      if (searchResults && searchResults.sources && searchResults.sources.length > 0) {
+        // Add search results as source nodes if they don't exist
+        for (const source of searchResults.sources) {
+          const sourceId = `source-context-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+          
+          // Check if a similar source already exists
+          const existingSource = result.graph.nodes.find(
+            node => node.type === 'document' && 
+            node.label.toLowerCase() === source.name.toLowerCase()
+          );
+          
+          if (!existingSource) {
+            // Add the source node
+            const sourceNode = {
+              id: sourceId,
+              label: source.name,
+              type: 'document',
+              description: source.snippet,
+              score: 0.9,
+              createdAt: Date.now(),
+              data: { url: source.url }
+            };
+            
+            result.graph.nodes.push(sourceNode);
+            
+            // Connect to the query node (first node)
+            const queryNodeId = result.graph.nodes[0].id;
+            result.graph.edges.push({
+              id: `edge-query-context-${Math.random().toString(36).substring(7)}`,
+              source: queryNodeId,
+              target: sourceId,
+              type: 'context_source',
+              weight: 0.85
+            });
+          }
+        }
+        
+        // Re-analyze the enhanced graph
+        result.insights = await analyzeKnowledgeGraph(result.graph);
+      }
+      
+      return res.json(result);
+    } catch (error) {
+      console.error("Knowledge graph from conversation API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to build knowledge graph from conversation", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
 
   // API health check endpoint
   app.get("/api/health", (_req, res) => {

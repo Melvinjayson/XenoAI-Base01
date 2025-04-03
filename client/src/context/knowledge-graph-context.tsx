@@ -7,9 +7,12 @@ import {
   GraphState, 
   GraphLayout,
   GraphInsight,
-  GraphAnalysisOptions
+  GraphAnalysisOptions,
+  NodeType
 } from '@/types/knowledge-graph';
 import { apiRequest } from '@/lib/queryClient';
+// Import types from our main types file
+import { KnowledgeGraph as AppKnowledgeGraph, GraphInsight as AppGraphInsight } from '@/types';
 
 const initialGraph: KnowledgeGraph = {
   nodes: [],
@@ -202,6 +205,11 @@ interface KnowledgeGraphContextType {
   analyzeGraph: () => void;
   expandNode: (nodeId: string) => Promise<void>;
   clearGraph: () => void;
+  importGraphFromConversation: (graphData: {
+    graph: AppKnowledgeGraph;
+    insights: AppGraphInsight[];
+    query: string;
+  }) => void;
 }
 
 const KnowledgeGraphContext = createContext<KnowledgeGraphContextType | undefined>(undefined);
@@ -357,6 +365,108 @@ export function KnowledgeGraphProvider({ children }: KnowledgeGraphProviderProps
     dispatch({ type: 'clear_graph', payload: null });
     setInsights([]);
   };
+  
+  // Node colors by type
+  const nodeColors: Record<string, string> = {
+    query: '#6B4BFF', // primary purple
+    entity: '#00C2FF', // bright blue
+    document: '#FF6B4B', // coral
+    concept: '#4BFF6B', // green
+    insight: '#FFBB4B', // yellow
+    person: '#E74C3C', // red
+    organization: '#3498DB', // blue
+    location: '#2ECC71', // green
+    time: '#9B59B6', // purple
+    statistic: '#F1C40F', // yellow
+  };
+  
+  // Function to import a graph generated from conversation
+  const importGraphFromConversation = (graphData: {
+    graph: AppKnowledgeGraph;
+    insights: AppGraphInsight[];
+    query: string;
+  }) => {
+    if (!graphData.graph || !graphData.graph.nodes || !graphData.graph.edges) {
+      console.error('Invalid graph data received from conversation');
+      return;
+    }
+    
+    try {
+      // Clear previous graph first
+      dispatch({ type: 'clear_graph', payload: null });
+      
+      // Create a conversation node
+      const conversationNode: GraphNode = {
+        id: `conversation-${Date.now()}`,
+        label: `Conversation: ${graphData.query}`,
+        type: 'query',
+        createdAt: Date.now(),
+        color: '#00C2FF' // bright blue
+      };
+      
+      dispatch({ type: 'add_node', payload: conversationNode });
+      
+      // Convert the received graph to the format we need
+      const convertedGraph: KnowledgeGraph = {
+        nodes: graphData.graph.nodes.map(node => ({
+          id: node.id,
+          label: node.label,
+          type: node.type as NodeType, // Type assertion to NodeType
+          description: node.description,
+          score: node.score,
+          createdAt: node.createdAt,
+          data: node.data,
+          color: nodeColors[node.type] || '#999999'
+        })),
+        edges: graphData.graph.edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: edge.type || 'relates',
+          weight: edge.weight || 0.5
+        }))
+      };
+      
+      // Merge the graph
+      dispatch({ type: 'merge_graph', payload: convertedGraph });
+      
+      // Connect conversation node to the main nodes
+      const topNodes = convertedGraph.nodes
+        .filter(node => node.type !== 'document')
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, 5);
+      
+      topNodes.forEach(node => {
+        const edge: GraphEdge = {
+          id: `${conversationNode.id}-${node.id}`,
+          source: conversationNode.id,
+          target: node.id,
+          type: 'conversation',
+          weight: 0.9
+        };
+        
+        dispatch({ type: 'add_edge', payload: edge });
+      });
+      
+      // Set insights
+      if (graphData.insights && graphData.insights.length > 0) {
+        // Convert insights if needed
+        const convertedInsights: GraphInsight[] = graphData.insights.map(insight => ({
+          id: insight.id,
+          type: insight.type,
+          description: insight.description,
+          relevance: insight.relevance,
+          nodeIds: insight.nodeIds,
+          edgeIds: insight.edgeIds,
+          createdAt: insight.createdAt
+        }));
+        
+        setInsights(convertedInsights);
+      }
+    } catch (error) {
+      console.error('Error importing graph from conversation:', error);
+    }
+  };
 
   // Run analysis when the graph changes
   useEffect(() => {
@@ -375,7 +485,8 @@ export function KnowledgeGraphProvider({ children }: KnowledgeGraphProviderProps
         searchGraph,
         analyzeGraph,
         expandNode,
-        clearGraph
+        clearGraph,
+        importGraphFromConversation
       }}
     >
       {children}
