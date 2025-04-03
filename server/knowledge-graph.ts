@@ -49,15 +49,51 @@ interface GraphSearchResult {
 // Function to extract entities from text using OpenAI
 async function extractEntities(text: string): Promise<{ entity: string; type: string; score: number }[]> {
   try {
-    // This would typically use OpenAI to extract entities
-    // For now, we'll use a simple keyword extraction
-    const keywords = extractKeywords(text, 5);
+    // Use NLP techniques to categorize entities
+    const keywords = extractKeywords(text, 8); // Extract more keywords for better analysis
+    const results: { entity: string; type: string; score: number }[] = [];
     
-    return keywords.map(keyword => ({
-      entity: keyword,
-      type: 'concept',
-      score: 0.7 + Math.random() * 0.3 // Random score between 0.7 and 1.0
-    }));
+    // Define common prefixes for entity types
+    const conceptPrefixes = ['what', 'how', 'why', 'when', 'where', 'who'];
+    const personPrefixes = ['mr', 'mrs', 'dr', 'professor', 'ceo', 'president', 'founder'];
+    const locationPrefixes = ['north', 'south', 'east', 'west', 'new', 'los', 'san', 'mount'];
+    const organizationPrefixes = ['corp', 'inc', 'llc', 'company', 'organization', 'foundation', 'institute'];
+    const timePrefixes = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 
+      'august', 'september', 'october', 'november', 'december', 'monday', 'tuesday', 
+      'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    for (const keyword of keywords) {
+      let type = 'concept'; // Default type
+      
+      // Try to determine the entity type based on common patterns
+      if (personPrefixes.some(prefix => keyword.toLowerCase().startsWith(prefix))) {
+        type = 'person';
+      } else if (locationPrefixes.some(prefix => keyword.toLowerCase().startsWith(prefix))) {
+        type = 'location';
+      } else if (organizationPrefixes.some(prefix => keyword.toLowerCase().startsWith(prefix))) {
+        type = 'organization';
+      } else if (timePrefixes.some(prefix => keyword.toLowerCase().includes(prefix))) {
+        type = 'time';
+      } else if (/\d{4}/.test(keyword)) {
+        type = 'time'; // Years are often indicated by 4 consecutive digits
+      } else if (/\d+%/.test(keyword)) {
+        type = 'statistic';
+      }
+      
+      // Determine the score based on uniqueness and length of the keyword
+      // Longer, more unique terms tend to be more important
+      const baseScore = 0.7;
+      const lengthFactor = Math.min(0.15, keyword.length * 0.01);
+      const uniquenessFactor = text.toLowerCase().split(keyword.toLowerCase()).length > 2 ? 0.05 : 0.15;
+      
+      results.push({
+        entity: keyword,
+        type: type,
+        score: baseScore + lengthFactor + uniquenessFactor
+      });
+    }
+    
+    return results;
   } catch (error) {
     console.error('Error extracting entities:', error);
     return [];
@@ -98,6 +134,121 @@ function extractKeywords(text: string, maxKeywords: number = 5): string[] {
 }
 
 // Create a knowledge graph from search results
+// Function to create additional connections between nodes in the graph
+async function createNodeConnections(graph: KnowledgeGraph): Promise<void> {
+  const entityNodes = graph.nodes.filter(node => 
+    ['concept', 'person', 'organization', 'location', 'time', 'statistic'].includes(node.type)
+  );
+  
+  // Skip if not enough entities
+  if (entityNodes.length < 3) return;
+  
+  // Create connections between similar entities
+  for (let i = 0; i < entityNodes.length; i++) {
+    const entity1 = entityNodes[i];
+    
+    for (let j = i + 1; j < entityNodes.length; j++) {
+      const entity2 = entityNodes[j];
+      
+      // If entities are of same type, there's a higher chance they're related
+      let connectionProbability = 0.2; // Base probability
+      
+      if (entity1.type === entity2.type) {
+        connectionProbability += 0.2; // Increase probability for same type
+      }
+      
+      // If entities appear in same sources, they're likely related
+      const entity1Sources = graph.edges
+        .filter(edge => edge.target === entity1.id && edge.type === 'contains')
+        .map(edge => edge.source);
+        
+      const entity2Sources = graph.edges
+        .filter(edge => edge.target === entity2.id && edge.type === 'contains')
+        .map(edge => edge.source);
+        
+      const sharedSources = entity1Sources.filter(source => entity2Sources.includes(source));
+      
+      if (sharedSources.length > 0) {
+        connectionProbability += 0.3; // Significant increase for shared sources
+      }
+      
+      // Apply semantic similarity (simplified with string comparison)
+      const stringSimilarity = (str1: string, str2: string): number => {
+        const longerString = str1.length > str2.length ? str1 : str2;
+        const shorterString = str1.length > str2.length ? str2 : str1;
+        
+        // Very simple similarity check - would use proper algorithm in production
+        if (longerString.toLowerCase().includes(shorterString.toLowerCase())) {
+          return 0.8; // High similarity if one is substring of other
+        }
+        
+        // Count common words
+        const words1 = str1.toLowerCase().split(/\s+/);
+        const words2 = str2.toLowerCase().split(/\s+/);
+        const commonWords = words1.filter(word => words2.includes(word));
+        
+        return commonWords.length / Math.max(words1.length, words2.length);
+      };
+      
+      const similarity = stringSimilarity(entity1.label, entity2.label);
+      connectionProbability += similarity * 0.3;
+      
+      // Create connection if probability threshold is met
+      if (Math.random() < connectionProbability) {
+        // Determine relationship type based on entity types
+        let relationType = 'related_to';
+        
+        if (entity1.type === 'person' && entity2.type === 'organization') {
+          relationType = 'affiliated_with';
+        } else if (entity1.type === 'location' && entity2.type === 'location') {
+          relationType = 'located_near';
+        } else if (entity1.type === 'time' && entity2.type === 'time') {
+          relationType = 'time_related';
+        } else if (entity1.type === 'concept' && entity2.type === 'concept') {
+          relationType = 'conceptually_related';
+        }
+        
+        // Add the edge
+        graph.edges.push({
+          id: `edge-rel-${entity1.id}-${entity2.id}`,
+          source: entity1.id,
+          target: entity2.id,
+          type: relationType,
+          weight: 0.5 + (similarity * 0.3) + (sharedSources.length * 0.1)
+        });
+      }
+    }
+  }
+  
+  // Create hierarchical relationships (simplified)
+  // For example, entities that are subtopics or parts of other entities
+  const potentialHierarchies = entityNodes.filter(node => 
+    node.type === 'concept' || node.type === 'organization'
+  );
+  
+  for (let i = 0; i < potentialHierarchies.length; i++) {
+    const parent = potentialHierarchies[i];
+    
+    for (let j = 0; j < entityNodes.length; j++) {
+      if (i === j) continue; // Skip self
+      
+      const child = entityNodes[j];
+      
+      // Check if child's name contains parent's name, suggesting hierarchical relationship
+      if (child.label.toLowerCase().includes(parent.label.toLowerCase()) && 
+          child.label.length > parent.label.length) {
+        graph.edges.push({
+          id: `edge-hierarchy-${parent.id}-${child.id}`,
+          source: parent.id,
+          target: child.id,
+          type: 'includes',
+          weight: 0.7
+        });
+      }
+    }
+  }
+}
+
 export async function createKnowledgeGraphFromSearch(query: string): Promise<GraphSearchResult> {
   try {
     // Get search results
@@ -153,7 +304,7 @@ export async function createKnowledgeGraphFromSearch(query: string): Promise<Gra
           
           // Check if a similar entity already exists
           const existingNode = graph.nodes.find(
-            node => node.type === 'concept' && 
+            node => node.type === entity.type && 
             node.label.toLowerCase() === entity.entity.toLowerCase()
           );
           
@@ -186,12 +337,26 @@ export async function createKnowledgeGraphFromSearch(query: string): Promise<Gra
               type: 'contains',
               weight: entity.score
             });
+            
+            // Directly connect important entities to the query
+            if (entity.score > 0.85) {
+              graph.edges.push({
+                id: `edge-query-entity-${index}-${entityIndex}`,
+                source: queryNode.id,
+                target: entityId,
+                type: 'related_to',
+                weight: entity.score * 0.8
+              });
+            }
           }
         });
       }
     });
     
     await Promise.all(sourcePromises);
+    
+    // Create additional connections between nodes based on relationships
+    await createNodeConnections(graph);
     
     // Generate insights
     const insights = generateInsights(graph);
@@ -236,7 +401,7 @@ function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
         return node && node.type !== 'query';
       })
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
+      .slice(0, 5); // Get more top entities
     
     if (topEntities.length > 0) {
       insights.push({
@@ -253,9 +418,27 @@ function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
       });
     }
     
+    // Identify entity clusters by type
+    const entityTypes = ['person', 'organization', 'location', 'time', 'concept', 'statistic'];
+    entityTypes.forEach(type => {
+      const typeNodes = graph.nodes.filter(node => node.type === type);
+      
+      if (typeNodes.length >= 2) {
+        insights.push({
+          id: `${type}-cluster-${Date.now()}`,
+          type: 'cluster',
+          description: `${typeNodes.length} ${type}s found: ${typeNodes.slice(0, 3).map(n => n.label).join(', ')}${typeNodes.length > 3 ? '...' : ''}`,
+          relevance: 0.8,
+          nodeIds: typeNodes.map(n => n.id),
+          edgeIds: [],
+          createdAt: Date.now()
+        });
+      }
+    });
+    
     // Find connections between concepts
-    const conceptNodes = graph.nodes.filter(node => node.type === 'concept');
-    const conceptConnections: { source: string; target: string; shared: string[] }[] = [];
+    const conceptNodes = graph.nodes.filter(node => ['concept', 'person', 'organization', 'location', 'time'].includes(node.type));
+    const conceptConnections: { source: string; target: string; shared: string[]; strength: number }[] = [];
     
     // For each pair of concepts, find sources they share
     for (let i = 0; i < conceptNodes.length; i++) {
@@ -277,10 +460,16 @@ function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
         );
         
         if (sharedSources.length > 0) {
+          // Calculate connection strength based on shared sources and node scores
+          const c1Score = concept1.score || 0.5;
+          const c2Score = concept2.score || 0.5;
+          const strength = (sharedSources.length * 0.3) + (c1Score * 0.35) + (c2Score * 0.35);
+          
           conceptConnections.push({
             source: concept1.id,
             target: concept2.id,
-            shared: sharedSources
+            shared: sharedSources,
+            strength
           });
         }
       }
@@ -288,31 +477,81 @@ function generateInsights(graph: KnowledgeGraph): GraphInsight[] {
     
     // Add insight for connected concepts
     if (conceptConnections.length > 0) {
-      // Sort by number of shared sources
-      const topConnection = conceptConnections.sort(
-        (a, b) => b.shared.length - a.shared.length
-      )[0];
+      // Sort by connection strength
+      const topConnections = conceptConnections
+        .sort((a, b) => b.strength - a.strength)
+        .slice(0, 3);
       
-      const source = graph.nodes.find(n => n.id === topConnection.source);
-      const target = graph.nodes.find(n => n.id === topConnection.target);
+      topConnections.forEach((connection, idx) => {
+        const source = graph.nodes.find(n => n.id === connection.source);
+        const target = graph.nodes.find(n => n.id === connection.target);
+        
+        if (source && target) {
+          // Make the description more insightful based on node types
+          let relationshipType = "relationship";
+          if (source.type === 'person' && target.type === 'organization') {
+            relationshipType = "affiliation";
+          } else if (source.type === 'concept' && target.type === 'concept') {
+            relationshipType = "conceptual relationship";
+          } else if ((source.type === 'time' || target.type === 'time') && 
+                    (source.type === 'event' || target.type === 'event')) {
+            relationshipType = "timeline connection";
+          } else if (source.type === 'location' || target.type === 'location') {
+            relationshipType = "geographical association";
+          }
+          
+          insights.push({
+            id: `connection-${Date.now()}-${idx}`,
+            type: 'connection',
+            description: `Strong ${relationshipType} found between "${source.label}" and "${target.label}"`,
+            relevance: 0.7 + (connection.strength * 0.3), // Scale the relevance by connection strength
+            nodeIds: [source.id, target.id],
+            edgeIds: connection.shared.flatMap(sourceId => 
+              graph.edges
+                .filter(edge => 
+                  (edge.source === sourceId && (edge.target === source.id || edge.target === target.id))
+                )
+                .map(edge => edge.id)
+            ),
+            createdAt: Date.now()
+          });
+        }
+      });
+    }
+    
+    // Identify trends by analyzing time-related entities
+    const timeNodes = graph.nodes.filter(node => node.type === 'time');
+    if (timeNodes.length >= 2) {
+      insights.push({
+        id: `time-trend-${Date.now()}`,
+        type: 'pattern',
+        description: `Temporal pattern detected across: ${timeNodes.slice(0, 4).map(n => n.label).join(', ')}`,
+        relevance: 0.75,
+        nodeIds: timeNodes.map(n => n.id),
+        edgeIds: [],
+        createdAt: Date.now()
+      });
+    }
+    
+    // Identify potential anomalies (nodes with high score but low connectivity)
+    const anomalyNodes = graph.nodes
+      .filter(node => 
+        node.type !== 'query' && 
+        node.score && node.score > 0.85 && 
+        (nodeDegrees.get(node.id) || 0) <= 1
+      )
+      .slice(0, 2);
       
-      if (source && target) {
-        insights.push({
-          id: `connection-${Date.now()}`,
-          type: 'connection',
-          description: `Strong relationship found between "${source.label}" and "${target.label}"`,
-          relevance: 0.85,
-          nodeIds: [source.id, target.id],
-          edgeIds: topConnection.shared.flatMap(sourceId => 
-            graph.edges
-              .filter(edge => 
-                (edge.source === sourceId && (edge.target === source.id || edge.target === target.id))
-              )
-              .map(edge => edge.id)
-          ),
-          createdAt: Date.now()
-        });
-      }
+    if (anomalyNodes.length > 0) {
+      insights.push({
+        id: `anomalies-${Date.now()}`,
+        type: 'anomaly',
+        description: `Interesting outliers detected: ${anomalyNodes.map(n => n.label).join(', ')}`,
+        relevance: 0.7,
+        nodeIds: anomalyNodes.map(n => n.id),
+        edgeIds: [],
+        createdAt: Date.now()
+      });
     }
     
     return insights;
@@ -351,17 +590,57 @@ export async function expandGraphNode(
           createdAt: Date.now(),
           data: { url: source.url }
         });
+        
+        // Connect this source to the original node
+        graph.edges.push({
+          id: `edge-query-source-exp-${index}`,
+          source: nodeId,
+          target: sourceId,
+          type: 'related_to',
+          weight: 0.8 - (index * 0.05)
+        });
+        
+        // Extract entities from this source
+        if (source.snippet) {
+          extractEntities(source.snippet).then(entities => {
+            entities.forEach((entity, entityIndex) => {
+              const entityId = `entity-query-exp-${Date.now()}-${index}-${entityIndex}`;
+              
+              // Add entity node
+              graph.nodes.push({
+                id: entityId,
+                label: entity.entity,
+                type: entity.type,
+                score: entity.score,
+                createdAt: Date.now()
+              });
+              
+              // Connect entity to source
+              graph.edges.push({
+                id: `edge-source-entity-exp-${index}-${entityIndex}`,
+                source: sourceId,
+                target: entityId,
+                type: 'contains',
+                weight: entity.score
+              });
+            });
+          }).catch(e => console.error("Error extracting entities:", e));
+        }
       });
       
-    } else if (nodeType === 'concept' || nodeType === 'entity') {
-      // For concept nodes, search specifically about this concept
-      const conceptSearchResult = await webSearch(`information about ${label}`);
+    } else if (nodeType === 'concept' || nodeType === 'entity' || nodeType === 'person' || 
+               nodeType === 'organization' || nodeType === 'location' || nodeType === 'time') {
+      // For concept and entity nodes, search specifically about this concept/entity
+      const searchQuery = `information about ${label}`;
+      console.log(`Expanding node with search: ${searchQuery}`);
+      const conceptSearchResult = await webSearch(searchQuery);
       
       // Add new nodes from the concept search
+      const sourceNodes: KnowledgeGraphNode[] = [];
+      
       conceptSearchResult.sources.slice(0, 3).forEach((source, index) => {
         const sourceId = `source-concept-${Date.now()}-${index}`;
-        
-        graph.nodes.push({
+        const sourceNode = {
           id: sourceId,
           label: source.name,
           type: 'document',
@@ -369,6 +648,18 @@ export async function expandGraphNode(
           score: 0.9 - (index * 0.1),
           createdAt: Date.now(),
           data: { url: source.url }
+        };
+        
+        graph.nodes.push(sourceNode);
+        sourceNodes.push(sourceNode);
+        
+        // Connect this source to the original node
+        graph.edges.push({
+          id: `edge-concept-source-${index}`,
+          source: nodeId,
+          target: sourceId,
+          type: 'expanded_by',
+          weight: 0.9
         });
       });
       
@@ -381,38 +672,135 @@ export async function expandGraphNode(
       
       if (allText) {
         const entities = await extractEntities(allText);
+        const entityNodes: KnowledgeGraphNode[] = [];
         
         entities.forEach((entity, entityIndex) => {
-          const entityId = `entity-expanded-${Date.now()}-${entityIndex}`;
+          // Check if this entity is similar to existing ones to avoid duplication
+          if (entityNodes.some(n => n.label.toLowerCase() === entity.entity.toLowerCase())) {
+            return;
+          }
           
-          graph.nodes.push({
+          const entityId = `entity-expanded-${Date.now()}-${entityIndex}`;
+          const entityNode = {
             id: entityId,
             label: entity.entity,
             type: entity.type,
             score: entity.score,
             createdAt: Date.now()
+          };
+          
+          graph.nodes.push(entityNode);
+          entityNodes.push(entityNode);
+          
+          // Connect this entity to the original node
+          graph.edges.push({
+            id: `edge-origin-entity-${entityIndex}`,
+            source: nodeId,
+            target: entityId,
+            type: 'related_to',
+            weight: 0.75
+          });
+          
+          // Connect entity to each source where it might be found
+          sourceNodes.forEach((source, sourceIndex) => {
+            if (source.description && 
+                source.description.toLowerCase().includes(entity.entity.toLowerCase())) {
+              graph.edges.push({
+                id: `edge-source-entity-exp-${sourceIndex}-${entityIndex}`,
+                source: source.id,
+                target: entityId,
+                type: 'contains',
+                weight: entity.score * 0.8
+              });
+            }
           });
         });
+        
+        // Create connections between related entities
+        for (let i = 0; i < entityNodes.length; i++) {
+          for (let j = i + 1; j < entityNodes.length; j++) {
+            if (Math.random() < 0.3) { // Only create some connections to avoid too much noise
+              graph.edges.push({
+                id: `edge-entity-entity-${i}-${j}`,
+                source: entityNodes[i].id,
+                target: entityNodes[j].id,
+                type: 'related_to',
+                weight: 0.6
+              });
+            }
+          }
+        }
       }
       
     } else if (nodeType === 'document') {
-      // For document nodes, analyze the content of the document
-      // This would typically fetch and analyze the page content
-      // For now, we'll just add some placeholder related concepts
+      // For document nodes, try to fetch and analyze more content from the URL
+      // or related sources based on the document title
       
-      const relatedConcepts = [
-        { entity: `Related to ${label} - Topic 1`, type: 'concept', score: 0.85 },
-        { entity: `Related to ${label} - Topic 2`, type: 'concept', score: 0.78 },
-        { entity: `Related to ${label} - Topic 3`, type: 'concept', score: 0.72 }
-      ];
+      // Try to extract URL if available
+      let documentUrl: string | undefined;
       
-      relatedConcepts.forEach((concept, index) => {
+      try {
+        const node = JSON.parse(JSON.stringify(nodeId)); // This is a hack to try to get the original node data
+        if (node && node.data && node.data.url) {
+          documentUrl = node.data.url;
+        }
+      } catch (e) {
+        console.log("No URL available in node data");
+      }
+      
+      // If we have a URL, we could fetch and analyze content (simplified here)
+      if (documentUrl) {
+        console.log(`Would fetch and analyze: ${documentUrl}`);
+      }
+      
+      // Search for related information
+      const relatedSearchResult = await webSearch(`${label} related information`);
+      
+      // Add related sources
+      relatedSearchResult.sources.slice(0, 2).forEach((source, index) => {
+        const sourceId = `source-doc-related-${Date.now()}-${index}`;
+        
         graph.nodes.push({
-          id: `concept-doc-${Date.now()}-${index}`,
-          label: concept.entity,
-          type: concept.type,
-          score: concept.score,
+          id: sourceId,
+          label: source.name,
+          type: 'document',
+          description: source.snippet,
+          score: 0.75 - (index * 0.1),
+          createdAt: Date.now(),
+          data: { url: source.url }
+        });
+        
+        // Connect to original document
+        graph.edges.push({
+          id: `edge-doc-related-${index}`,
+          source: nodeId,
+          target: sourceId,
+          type: 'related_to',
+          weight: 0.7
+        });
+      });
+      
+      // Extract and add key entities from the document name/description
+      const docEntities = await extractEntities(label);
+      
+      docEntities.forEach((entity, entityIndex) => {
+        const entityId = `entity-doc-${Date.now()}-${entityIndex}`;
+        
+        graph.nodes.push({
+          id: entityId,
+          label: entity.entity,
+          type: entity.type,
+          score: entity.score,
           createdAt: Date.now()
+        });
+        
+        // Connect entity to document
+        graph.edges.push({
+          id: `edge-doc-entity-${entityIndex}`,
+          source: nodeId,
+          target: entityId,
+          type: 'contains',
+          weight: entity.score
         });
       });
     }
