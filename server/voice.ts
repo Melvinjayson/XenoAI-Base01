@@ -1,10 +1,14 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { VoiceSynthesisRequest, VoiceSynthesisResponse, Cache } from './types';
 
 // Cache for audio files
 const audioCache: Cache<string> = new Map();
-const CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Active synthesis requests to prevent duplicate processing
+const activeSynthesisRequests = new Map<string, Promise<VoiceSynthesisResponse>>();
 
 // Audio directory
 const AUDIO_DIR = path.join(process.cwd(), 'public', 'audio');
@@ -13,6 +17,38 @@ const AUDIO_DIR = path.join(process.cwd(), 'public', 'audio');
 if (!fs.existsSync(AUDIO_DIR)) {
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
 }
+
+// Clean up old audio files (files older than 48 hours)
+function cleanupOldAudioFiles() {
+  try {
+    const files = fs.readdirSync(AUDIO_DIR);
+    const now = Date.now();
+    const maxAge = 48 * 60 * 60 * 1000; // 48 hours
+    
+    files.forEach(file => {
+      if (!file.startsWith('speech_')) return; // Only process our speech files
+      
+      const filePath = path.join(AUDIO_DIR, file);
+      const stats = fs.statSync(filePath);
+      const fileAge = now - stats.mtimeMs;
+      
+      if (fileAge > maxAge) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`Removed old audio file: ${filePath}`);
+        } catch (error) {
+          console.error(`Failed to remove old audio file: ${filePath}`, error);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error cleaning up old audio files:', error);
+  }
+}
+
+// Run cleanup on startup and every 6 hours
+cleanupOldAudioFiles();
+setInterval(cleanupOldAudioFiles, 6 * 60 * 60 * 1000);
 
 // Interface for voice settings and voice
 interface VoiceSettings {
@@ -103,104 +139,158 @@ export async function synthesizeSpeech(
 ): Promise<VoiceSynthesisResponse> {
   const { text, voiceId: requestedVoiceId = 'default' } = request;
   
+  // Skip empty text
+  if (!text || text.trim() === '') {
+    return { audioUrl: '' };
+  }
+  
   // Optimize the text for voice synthesis
   const optimizedText = optimizeTextForVoice(text);
   
-  // Create a cache key based on text and voice
-  const cacheKey = `voice:${requestedVoiceId}:${optimizedText.substring(0, 100)}`;
+  // Create a more stable cache key with MD5 hash to handle very similar texts
+  const hash = crypto.createHash('md5').update(`${requestedVoiceId}:${optimizedText}`).digest('hex');
+  const cacheKey = `voice:${hash}`;
   
   // Check if we have a cached version
   const cachedAudio = audioCache.get(cacheKey);
   if (cachedAudio && Date.now() - cachedAudio.timestamp < CACHE_EXPIRY_MS) {
+    console.log("Using cached audio for:", optimizedText.substring(0, 30) + "...");
     return { audioUrl: cachedAudio.data };
   }
   
-  try {
-    console.log("Voice synthesis request:", { text: optimizedText.substring(0, 50) + "...", voiceId: requestedVoiceId });
-    
-    // Check if we have ElevenLabs API key
-    if (!process.env.ELEVENLABS_API_KEY) {
-      console.log("No ElevenLabs API key found, using fallback synthesis");
-      return await fallbackSynthesis(optimizedText);
-    }
-    
-    // Get the voice to use
-    const selectedVoice = voices[requestedVoiceId] || voices.default;
-    console.log("Selected voice:", selectedVoice.name);
-    
-    // Generate a unique filename
-    const timestamp = Date.now();
-    const audioFilename = `speech_${timestamp}.mp3`;
-    const audioFilepath = path.join(AUDIO_DIR, audioFilename);
-    
-    console.log("Audio will be saved to:", audioFilepath);
-    
-    // Call ElevenLabs API directly
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice.voice_id}`;
-    
-    // Use the latest model for better quality
-    const modelId = 'eleven_turbo_v2';
-    
-    console.log("Calling ElevenLabs API...");
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'xi-api-key': apiKey
-      },
-      body: JSON.stringify({
-        text: optimizedText,
-        voice_settings: selectedVoice.settings,
-        model_id: modelId
-      })
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`ElevenLabs API responded with status: ${response.status}, message: ${errorText}`);
-    }
-    
-    console.log("ElevenLabs API response received successfully");
-    
-    // Save the audio file
-    const arrayBuffer = await response.arrayBuffer();
-    
-    // Check if the response is valid
-    if (arrayBuffer.byteLength === 0) {
-      throw new Error("ElevenLabs API returned an empty response");
-    }
-    
-    // Ensure the audio directory exists
-    if (!fs.existsSync(AUDIO_DIR)) {
-      fs.mkdirSync(AUDIO_DIR, { recursive: true });
-    }
-    
-    // Write the file
-    try {
-      fs.writeFileSync(audioFilepath, Buffer.from(arrayBuffer));
-      console.log("Audio file saved successfully:", audioFilepath);
-    } catch (error) {
-      const writeError = error as Error;
-      console.error("Error writing audio file:", writeError);
-      throw new Error(`Failed to write audio file: ${writeError.message}`);
-    }
-    
-    // Create the URL path for the audio file
-    const audioUrl = `/audio/${audioFilename}`;
-    console.log("Audio URL for client:", audioUrl);
-    
-    // Cache the result
-    audioCache.set(cacheKey, {
-      data: audioUrl,
-      timestamp: Date.now(),
-    });
-    
-    return { audioUrl };
-  } catch (error) {
-    console.error('ElevenLabs speech synthesis error:', error);
-    return await fallbackSynthesis(optimizedText);
+  // Check if this exact request is already being processed
+  if (activeSynthesisRequests.has(cacheKey)) {
+    console.log("Request already in progress, joining existing request");
+    return activeSynthesisRequests.get(cacheKey)!;
   }
+  
+  // Create a new synthesis request and store it
+  const synthesisPromise = (async () => {
+    try {
+      console.log("Voice synthesis request:", { 
+        text: optimizedText.substring(0, 50) + "...", 
+        voiceId: requestedVoiceId,
+        hash: hash.substring(0, 8)
+      });
+      
+      // Check if we have ElevenLabs API key
+      if (!process.env.ELEVENLABS_API_KEY) {
+        console.log("No ElevenLabs API key found, using fallback synthesis");
+        return await fallbackSynthesis(optimizedText);
+      }
+      
+      // Get the voice to use
+      const selectedVoice = voices[requestedVoiceId] || voices.default;
+      console.log("Selected voice:", selectedVoice.name);
+      
+      // Check file system first - we might have a file with same hash
+      const existingFiles = fs.readdirSync(AUDIO_DIR).filter(file => file.includes(hash.substring(0, 8)));
+      if (existingFiles.length > 0) {
+        const audioUrl = `/audio/${existingFiles[0]}`;
+        console.log("Found existing audio file with same hash:", existingFiles[0]);
+        
+        // Cache the result
+        audioCache.set(cacheKey, {
+          data: audioUrl,
+          timestamp: Date.now(),
+        });
+        
+        return { audioUrl };
+      }
+      
+      // Generate a unique filename with hash prefix for easy identification
+      const timestamp = Date.now();
+      const audioFilename = `speech_${hash.substring(0, 8)}_${timestamp}.mp3`;
+      const audioFilepath = path.join(AUDIO_DIR, audioFilename);
+      
+      console.log("Audio will be saved to:", audioFilepath);
+      
+      // Call ElevenLabs API directly
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice.voice_id}`;
+      
+      // Use the latest model for better quality
+      const modelId = 'eleven_turbo_v2';
+      
+      console.log("Calling ElevenLabs API...");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'xi-api-key': apiKey
+          },
+          body: JSON.stringify({
+            text: optimizedText,
+            voice_settings: selectedVoice.settings,
+            model_id: modelId
+          }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`ElevenLabs API responded with status: ${response.status}, message: ${errorText}`);
+        }
+        
+        console.log("ElevenLabs API response received successfully");
+        
+        // Save the audio file
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // Check if the response is valid
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error("ElevenLabs API returned an empty response");
+        }
+        
+        // Ensure the audio directory exists
+        if (!fs.existsSync(AUDIO_DIR)) {
+          fs.mkdirSync(AUDIO_DIR, { recursive: true });
+        }
+        
+        // Write the file
+        try {
+          fs.writeFileSync(audioFilepath, Buffer.from(arrayBuffer));
+          console.log("Audio file saved successfully:", audioFilepath);
+        } catch (error) {
+          const writeError = error as Error;
+          console.error("Error writing audio file:", writeError);
+          throw new Error(`Failed to write audio file: ${writeError.message}`);
+        }
+        
+        // Create the URL path for the audio file
+        const audioUrl = `/audio/${audioFilename}`;
+        console.log("Audio URL for client:", audioUrl);
+        
+        // Cache the result
+        audioCache.set(cacheKey, {
+          data: audioUrl,
+          timestamp: Date.now(),
+        });
+        
+        return { audioUrl };
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
+      }
+    } catch (error) {
+      console.error('ElevenLabs speech synthesis error:', error);
+      return await fallbackSynthesis(optimizedText);
+    } finally {
+      // Remove from active requests when done
+      activeSynthesisRequests.delete(cacheKey);
+    }
+  })();
+  
+  // Store the promise for potential duplicate requests
+  activeSynthesisRequests.set(cacheKey, synthesisPromise);
+  
+  return synthesisPromise;
 }
 
 // Fallback to basic audio synthesis if ElevenLabs fails

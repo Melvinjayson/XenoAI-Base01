@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useKnowledgeGraph } from '@/context/knowledge-graph-context';
+import { useChat } from '@/context/chat-context';
 import ForceGraph2D from 'react-force-graph-2d';
 import ForceGraph3D from 'react-force-graph-3d';
 import { GraphNode, GraphEdge, NodeType } from '@/types/knowledge-graph';
@@ -65,6 +66,7 @@ interface GraphDisplayProps {
 
 export default function GraphDisplay({ className }: GraphDisplayProps) {
   const { state, dispatch, insights, loading, searchGraph, expandNode, clearGraph } = useKnowledgeGraph();
+  const { messages } = useChat();
   const { isDarkMode } = useTheme();
   const [query, setQuery] = useState('');
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
@@ -95,7 +97,16 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      await searchGraph(query);
+      // Get chat context from messages, excluding the welcome message
+      const chatContext = messages
+        .filter(msg => msg.id !== 'welcome')
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+      
+      // Pass both query and chat context to enhance the search
+      await searchGraph(query, chatContext.length > 0 ? chatContext : undefined);
     }
   };
   
@@ -233,8 +244,8 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
   
   return (
     <div className={cn('flex flex-col h-full w-full', className)}>
-      <div className="flex items-center justify-between mb-4 p-2">
-        <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+      <div className="flex flex-col mb-4 p-2">
+        <form onSubmit={handleSearch} className="flex-1 flex gap-2 mb-1">
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -245,9 +256,7 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
             {loading ? <LoaderIcon className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
             {!isMobile && <span className="ml-2">Search</span>}
           </Button>
-        </form>
-        
-        <div className="flex ml-2">
+          
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -263,7 +272,18 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
               <TooltipContent>Clear Graph</TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        </div>
+        </form>
+        
+        {messages.length > 1 && (
+          <div className="flex items-center text-xs text-muted-foreground">
+            <Badge variant="outline" className="mr-2 py-0 h-5">
+              Chat Context
+            </Badge>
+            <span>
+              Using {messages.length - 1} messages from conversation to enhance search results
+            </span>
+          </div>
+        )}
       </div>
       
       <Tabs defaultValue="graph" className="flex-1 flex flex-col">

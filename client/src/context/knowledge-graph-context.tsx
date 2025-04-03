@@ -201,7 +201,7 @@ interface KnowledgeGraphContextType {
   dispatch: React.Dispatch<GraphAction>;
   insights: GraphInsight[];
   loading: boolean;
-  searchGraph: (query: string) => Promise<void>;
+  searchGraph: (query: string, chatContext?: { role: string; content: string }[]) => Promise<void>;
   analyzeGraph: () => void;
   expandNode: (nodeId: string) => Promise<void>;
   clearGraph: () => void;
@@ -224,7 +224,7 @@ export function KnowledgeGraphProvider({ children }: KnowledgeGraphProviderProps
   const [loading, setLoading] = useState(false);
 
   // Function to search and build a knowledge graph
-  const searchGraph = async (query: string) => {
+  const searchGraph = async (query: string, chatContext?: { role: string; content: string }[]) => {
     try {
       setLoading(true);
       
@@ -239,7 +239,7 @@ export function KnowledgeGraphProvider({ children }: KnowledgeGraphProviderProps
       
       dispatch({ type: 'add_node', payload: queryNode });
       
-      // Call API to get search results with graph data
+      // Call API to get search results with graph data, including chat context if available
       const response = await apiRequest<{
         graph: KnowledgeGraph;
         query: string;
@@ -247,7 +247,10 @@ export function KnowledgeGraphProvider({ children }: KnowledgeGraphProviderProps
       }>({
         endpoint: '/api/knowledge-graph/search',
         method: 'POST',
-        data: { query }
+        data: { 
+          query,
+          chatContext // Include chat context for enhanced search
+        }
       });
       
       if (response && response.graph) {

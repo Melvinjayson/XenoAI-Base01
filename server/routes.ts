@@ -103,13 +103,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint for knowledge graph search
   app.post("/api/knowledge-graph/search", async (req, res) => {
     try {
-      const { query } = req.body;
+      const { query, chatContext } = req.body;
       
       if (!query) {
         return res.status(400).json({ error: "Query is required" });
       }
 
-      const result = await createKnowledgeGraphFromSearch(query);
+      // Use chat context to enhance the search if provided
+      let enhancedQuery = query;
+      let relatedTerms: string[] = [];
+      
+      if (chatContext && Array.isArray(chatContext) && chatContext.length > 0) {
+        console.log("Enhancing search with chat context");
+        
+        // Extract key phrases from the chat context
+        const contextText = chatContext
+          .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+          .map(msg => msg.content)
+          .join(" ");
+        
+        // Extract keywords and related phrases (simple implementation)
+        const words = contextText.toLowerCase()
+          .replace(/[^\w\s]/g, '')
+          .split(/\s+/)
+          .filter(word => word.length > 3 && !['this', 'that', 'what', 'when', 'where', 'which', 'with', 'would', 'could', 'should'].includes(word));
+        
+        // Create a frequency map
+        const wordFreq = words.reduce((acc, word) => {
+          acc[word] = (acc[word] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        // Get top related terms (excluding words already in the query)
+        const queryTerms = query.toLowerCase().split(/\s+/);
+        
+        relatedTerms = Object.entries(wordFreq)
+          .filter(([word]) => !queryTerms.includes(word))
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([word]) => word);
+        
+        // Only enhance if we found good related terms
+        if (relatedTerms.length > 0) {
+          enhancedQuery = `${query} related to ${relatedTerms.join(', ')}`;
+          console.log(`Enhanced query: ${enhancedQuery}`);
+        }
+      }
+
+      const result = await createKnowledgeGraphFromSearch(enhancedQuery);
+      
+      // Add the related terms as nodes if they don't exist yet
+      if (relatedTerms.length > 0) {
+        // Find the query node (first node)
+        const queryNode = result.graph.nodes.find(node => node.type === 'query');
+        
+        if (queryNode) {
+          for (const term of relatedTerms) {
+            const termId = `related-term-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            
+            // Check if a similar node already exists
+            const existingNode = result.graph.nodes.find(
+              node => node.label.toLowerCase() === term.toLowerCase()
+            );
+            
+            if (!existingNode) {
+              // Add the related term node
+              const termNode = {
+                id: termId,
+                label: term,
+                type: 'concept' as NodeType,
+                description: `Related term from conversation context`,
+                score: 0.7,
+                createdAt: Date.now()
+              };
+              
+              result.graph.nodes.push(termNode);
+              
+              // Connect to the query node
+              result.graph.edges.push({
+                id: `edge-query-related-${Math.random().toString(36).substring(7)}`,
+                source: queryNode.id,
+                target: termId,
+                type: 'conceptually_related',
+                weight: 0.7
+              });
+            }
+          }
+          
+          // Re-analyze the enhanced graph
+          result.insights = await analyzeKnowledgeGraph(result.graph);
+        }
+      }
+
       return res.json(result);
     } catch (error) {
       console.error("Knowledge graph search API error:", error);
