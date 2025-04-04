@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import KnowledgeGraphPage from "@/pages/knowledge-graph";
+import EnhancedKnowledgeGraphPage from "@/pages/enhanced-knowledge-graph";
 import SplashPage from "@/pages/splash-page";
 import OnboardingPage from "@/pages/onboarding-page";
 import VRExperience from "@/pages/vr-experience";
@@ -14,6 +15,8 @@ import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
 import { GestureProvider } from "@/context/gesture-context";
 import { OfflineProvider, useOfflineContext } from "@/context/offline-context";
+import { UserProfileProvider } from "@/context/user-profile-context";
+import { ColorPaletteProvider } from "@/context/color-palette-context";
 import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 import OfflineModeBanner from "@/components/offline-mode-banner";
@@ -87,6 +90,7 @@ function Router() {
           <Route path="/onboarding" component={OnboardingPage} />
           <Route path="/" component={Home} />
           <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
+          <Route path="/enhanced-knowledge-graph" component={EnhancedKnowledgeGraphPage} />
           <Route path="/vr-experience" component={VRExperience} />
           <Route path="/canvas" component={CanvasPage} />
           <Route path="/canvas/:id" component={CanvasPage} />
@@ -106,14 +110,18 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <LanguageProvider>
-          <ChatProvider>
-            <GestureProvider>
-              <OfflineProvider>
-                <Router />
-                <Toaster />
-              </OfflineProvider>
-            </GestureProvider>
-          </ChatProvider>
+          <UserProfileProvider>
+            <ColorPaletteProvider>
+              <ChatProvider>
+                <GestureProvider>
+                  <OfflineProvider>
+                    <Router />
+                    <Toaster />
+                  </OfflineProvider>
+                </GestureProvider>
+              </ChatProvider>
+            </ColorPaletteProvider>
+          </UserProfileProvider>
         </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
