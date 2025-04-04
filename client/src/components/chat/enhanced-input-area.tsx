@@ -31,19 +31,18 @@ export default function EnhancedInputArea({
   
   const handleSend = async () => {
     if (inputValue.trim()) {
-      await onSend(inputValue, activeFilters || undefined);
-      setInputValue("");
+      try {
+        await onSend(inputValue, activeFilters || undefined);
+        setInputValue("");
+      } catch (error) {
+        console.error("Error sending message:", error);
+      }
     } else {
       onMicClick();
     }
   };
 
-  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      await handleSend();
-    }
-  };
+  // Function removed as we're using inline onKeyDown handler
 
   // Clear input if listening is active
   useEffect(() => {
@@ -147,7 +146,12 @@ export default function EnhancedInputArea({
               className="w-full bg-muted rounded-full pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
               disabled={isListening}
             />
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
@@ -202,7 +206,7 @@ export default function EnhancedInputArea({
               "text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors",
               isListening ? "bg-destructive" : "bg-primary"
             )}
-            onClick={async () => await handleSend()}
+            onClick={() => handleSend()}
             aria-label={isListening ? "Stop listening" : inputValue ? "Send message" : "Start voice recording"}
           >
             {inputValue ? <Send className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
