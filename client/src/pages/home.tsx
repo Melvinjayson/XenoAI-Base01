@@ -210,8 +210,15 @@ export default function Home() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center">
-          <div className="rounded-full bg-primary w-8 h-8 flex items-center justify-center mr-2">
-            <Mic className="w-4 h-4 text-primary-foreground" />
+          <div className="relative mr-2">
+            <div className="rounded-full bg-primary/20 w-8 h-8 animate-pulse backdrop-blur-sm" />
+            <div className="absolute inset-0 rounded-full bg-primary/40 w-8 h-8 animate-ping" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="rounded-full bg-primary w-6 h-6 flex items-center justify-center">
+                <Mic className="w-3 h-3 text-primary-foreground" />
+              </div>
+            </div>
+            <div className="absolute -inset-1 bg-primary/10 rounded-full blur-md" />
           </div>
           <h1 className="text-lg font-semibold">Xeno AI</h1>
         </div>
