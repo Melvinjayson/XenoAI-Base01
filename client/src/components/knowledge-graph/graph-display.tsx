@@ -554,6 +554,9 @@ export default function GraphDisplay({
           <TabsTrigger value="insights" onClick={() => setSelectedView('insights')}>
             Insights {insights.length > 0 && `(${insights.length})`}
           </TabsTrigger>
+          <TabsTrigger value="canvas" onClick={() => window.location.href = '/canvas'}>
+            Canvas
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="graph" className="flex-1 relative">
@@ -926,6 +929,10 @@ export default function GraphDisplay({
         
         <TabsContent value="insights" className="flex-1 overflow-auto">
           <InsightsPanel />
+        </TabsContent>
+        
+        <TabsContent value="canvas" className="flex-1 overflow-auto">
+          {/* This will not be visible as it redirects, but needed for proper tab structure */}
         </TabsContent>
       </Tabs>
     </div>

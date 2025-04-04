@@ -33,7 +33,7 @@ function Router() {
   
   useEffect(() => {
     // Only show the voice widget on main pages, not splash or onboarding
-    const isMainPage = location === "/" || location === "/knowledge-graph";
+    const isMainPage = location === "/" || location === "/knowledge-graph" || location.startsWith("/canvas");
     setShowVoiceWidget(isMainPage);
     
     // Show gesture tutorial when first arriving at main pages from onboarding
