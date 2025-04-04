@@ -138,7 +138,7 @@ const TabBar = ({
 // Wrapper component to provide context for all components
 const EnhancedKnowledgeGraphContent = () => {
   const { createKnowledgeGraphFromConversation } = useChat();
-  const { importGraphFromConversation, searchGraph, expandNode, clearGraph, loading: graphLoading } = useKnowledgeGraph();
+  const { state, importGraphFromConversation, searchGraph, expandNode, clearGraph, loading: graphLoading } = useKnowledgeGraph();
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -371,8 +371,9 @@ const EnhancedKnowledgeGraphContent = () => {
     <div className="flex flex-col h-full">
       {isImmersiveMode && (
         <ImmersiveView 
-          visualCommands={currentVisualCommands || []} 
+          graph={state.graph} 
           onClose={toggleImmersiveMode} 
+          onNodeSelect={(node) => console.log('Selected node:', node)}
         />
       )}
       

@@ -7,6 +7,8 @@ import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal } f
 import { useChat } from "@/context/chat-context";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
+import { useAIProcessingState } from "@/hooks/use-ai-processing-state";
+import { AIProcessingIndicator } from "@/components/ui/ai-processing-indicator";
 import { Message } from "@/types";
 import { Button } from "@/components/ui/button";
 import { SettingsPanel } from "@/components/settings/settings-panel";
@@ -40,19 +42,40 @@ export default function Home() {
   const {
     speak,
     isSpeaking,
-    stopSpeaking,
-    hasSpeechSupport
+    stopSpeaking
   } = useTextToSpeech();
+  
+  // AI processing state management
+  const {
+    processingState,
+    statusMessage,
+    isPaused,
+    setAIState,
+    resetState,
+    togglePause
+  } = useAIProcessingState();
 
+  // Update AI state based on application state
+  useEffect(() => {
+    if (isLoading) {
+      setAIState('thinking', 'Considering options...', 0); // No auto-reset
+    } else if (isSpeaking) {
+      setAIState('speaking', 'Speaking...', 0); // No auto-reset
+    } else if (processingState !== 'idle' && !isLoading && !isSpeaking) {
+      resetState(); // Reset if no active processes
+    }
+  }, [isLoading, isSpeaking, setAIState, resetState]);
+  
   // Automatically speak the latest assistant message
   useEffect(() => {
     if (messages.length > 0 && !isMuteEnabled) {
       const latestMessage = messages[messages.length - 1];
       if (latestMessage.role === 'assistant') {
         speak(latestMessage.content, voiceId);
+        setAIState('speaking', 'Speaking...', 0); // No auto-reset
       }
     }
-  }, [messages, isMuteEnabled, speak, voiceId]);
+  }, [messages, isMuteEnabled, speak, voiceId, setAIState]);
 
   const handleSendVoiceMessage = () => {
     if (transcript.trim()) {
@@ -265,6 +288,14 @@ export default function Home() {
 
       {/* Voice Recording Indicator */}
       {isListening && <VoiceIndicator transcript={transcript} />}
+      
+      {/* AI Processing Indicator */}
+      <AIProcessingIndicator 
+        state={processingState} 
+        message={statusMessage} 
+        isPaused={isPaused}
+        onPauseToggle={processingState === 'speaking' ? togglePause : undefined}
+      />
 
       {/* Input Area */}
       <EnhancedInputArea 
@@ -279,7 +310,19 @@ export default function Home() {
             location: filters.location
           } : undefined;
 
-          await sendMessage(message, searchFilters);
+          // Show thinking state when sending a message
+          setAIState('thinking', 'Processing your request...');
+          
+          try {
+            await sendMessage(message, searchFilters);
+          } catch (error) {
+            setAIState('idle');
+            toast({
+              title: "Error",
+              description: "Failed to send message. Please try again.",
+              variant: "destructive",
+            });
+          }
         }} 
         onMicClick={handleVoiceButtonClick} 
         onHelpClick={handleHelpClick}
