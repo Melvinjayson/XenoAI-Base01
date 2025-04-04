@@ -136,7 +136,7 @@ export function AIProcessingIndicator({
   if (state === 'idle') return null;
 
   return (
-    <div className={`fixed bottom-14 left-1/2 transform -translate-x-1/2 z-50 ${className}`} style={{ maxWidth: '85%' }}>
+    <div className={`fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 ${className}`} style={{ maxWidth: '85%' }}>
       <div className="bg-[#F5F0FF] dark:bg-[#2D2065] text-primary shadow-md
         flex items-center gap-2 rounded-lg px-2.5 py-1.5 animate-in slide-in-from-bottom duration-300
         border border-primary/10 dark:border-primary/30 hover:shadow-primary/10 hover:shadow-sm
