@@ -189,27 +189,49 @@ export function SplashScreen() {
           {/* Logo would go here if we had one */}
         </motion.div>
         
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="w-64 bg-muted rounded-full h-2 overflow-hidden"
-        >
-          <motion.div
-            initial={{ width: "0%" }}
-            animate={{ width: `${progress}%` }}
-            className="h-full bg-primary rounded-full"
-          />
-        </motion.div>
-        
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="text-muted-foreground text-sm"
-        >
-          {progress === 100 ? "Ready!" : "Loading intelligent search..."}
-        </motion.p>
+        <div className="flex flex-col items-center gap-4">
+          <motion.div 
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="flex items-center gap-4 w-full"
+          >
+            <motion.div className="w-64 bg-muted rounded-full h-2 overflow-hidden">
+              <motion.div
+                initial={{ width: "0%" }}
+                animate={{ width: `${progress}%` }}
+                className="h-full bg-primary rounded-full"
+              />
+            </motion.div>
+            
+            {progress === 100 && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                onClick={() => {
+                  if (firstVisit) {
+                    setLocation("/onboarding");
+                    setFirstVisit(false);
+                  } else {
+                    setLocation("/");
+                  }
+                }}
+              >
+                Continue
+              </motion.button>
+            )}
+          </motion.div>
+          
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-muted-foreground text-sm"
+          >
+            {progress === 100 ? "Ready!" : "Loading intelligent search..."}
+          </motion.p>
+        </div>
       </div>
     </div>
   );
