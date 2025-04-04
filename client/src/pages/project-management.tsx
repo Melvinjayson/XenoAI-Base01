@@ -414,7 +414,7 @@ export default function ProjectManagementPage() {
       
       <div className="container mx-auto py-6 px-4 md:px-6 flex-grow">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Project List Sidebar */}
+          {/* Project List Sidebar */}
         <div className="lg:col-span-1">
           <Card>
             <CardHeader className="pb-3">

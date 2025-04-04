@@ -301,7 +301,6 @@ export default function Home() {
                     <span>Workbench</span>
                   </Link>
                 </DropdownMenuItem>
-              <DropdownMenuContent>
                 <DropdownMenuItem asChild>
                   <Link href="/canvas" className="flex items-center gap-2">
                     <GripHorizontal className="w-4 h-4" />
