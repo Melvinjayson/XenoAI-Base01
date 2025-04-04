@@ -4,11 +4,12 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Canvas, CanvasElement } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Save, Trash2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Save, Trash2, Plus } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
 import { TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
+import EnhancedCanvas from '@/components/canvas/enhanced-canvas';
 import FloatingCanvasTools from '@/components/canvas/floating-canvas-tools';
 import AICanvasAssistant from '@/components/canvas/ai-canvas-assistant';
 
@@ -345,7 +346,7 @@ const CanvasPage = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <div className="flex items-center justify-between bg-white border-b border-gray-200 px-4 py-2">
+      <div className="flex items-center bg-white border-b border-gray-200 px-4 py-2">
         <div className="flex items-center gap-2">
           <Link href={sessionId ? `/?sessionId=${sessionId}` : '/'}>
             <Button variant="ghost" size="icon">
@@ -354,169 +355,101 @@ const CanvasPage = () => {
           </Link>
           <h1 className="text-xl font-semibold">{canvas?.title || 'Interactive Canvas'}</h1>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleSaveCanvas} disabled={!canvasId}>
-                  <Save className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Save Canvas</TooltipContent>
-            </Tooltip>
+      </div>
+      
+      {/* Enhanced Canvas */}
+      <div className="flex-1 relative">
+        <EnhancedCanvas
+          canvasId={canvasId || undefined}
+          elements={elements.map(element => ({
+            id: element.id,
+            type: element.type,
+            content: element.content,
+            x: element.x,
+            y: element.y,
+            width: element.width,
+            height: element.height,
+            zIndex: element.zIndex,
+            style: element.style,
+            metadata: element.metadata
+          }))}
+          connections={[]}
+          onSave={(elements, connections) => {
+            if (!canvasId) return;
             
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleDeleteCanvas} disabled={!canvasId}>
-                  <Trash2 className="h-5 w-5 text-red-500" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete Canvas</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </div>
-      
-      {/* Toolbar */}
-      <div className="flex items-center bg-white border-b border-gray-200 px-4 py-2">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleCreateTextElement}
-                disabled={!canvasId}
-                className="mr-2"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Text
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Add Text Element</TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleCreateShapeElement}
-                disabled={!canvasId}
-                className="mr-2"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Shape
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Add Shape</TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleCreateNodeElement}
-                disabled={!canvasId}
-              >
-                <Plus className="h-4 w-4 mr-1" /> Knowledge Node
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Add Knowledge Node</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-      
-      {/* Canvas Area */}
-      <div className="flex-1 relative overflow-auto bg-white">
-        <div className="absolute inset-0 p-4">
-          {/* Floating canvas tools */}
-          <FloatingCanvasTools 
-            onCreateText={handleCreateTextElement}
-            onCreateShape={handleCreateShapeElement}
-            onCreateNode={handleCreateNodeElement}
-            position="left"
-          />
-          
-          {/* AI Canvas Assistant */}
-          <AICanvasAssistant
-            position="bottom-right"
-            onSuggestIdeas={(ideas) => {
-              // Handle AI suggestions
-              console.log('AI suggested ideas:', ideas);
-            }}
-          />
-          
-          {/* Canvas elements will be rendered here */}
-          {elements.map((element) => (
-            <div
-              key={element.id}
-              className={`absolute border rounded shadow-sm ${selectedElementId === element.id ? 'ring-2 ring-primary' : ''}`}
-              style={{
-                left: `${element.x}px`,
-                top: `${element.y}px`,
-                width: element.width ? `${element.width}px` : 'auto',
-                height: element.height ? `${element.height}px` : 'auto',
-                zIndex: element.zIndex,
-                backgroundColor: element.style?.backgroundColor || 'white',
-                color: element.style?.color || 'black',
-                borderColor: element.style?.borderColor || '#ddd',
-                borderWidth: `${element.style?.borderWidth || 1}px`,
-                transform: element.style?.rotation ? `rotate(${element.style.rotation}deg)` : undefined,
-                opacity: element.style?.opacity || 1,
-                padding: '8px',
-                cursor: 'move'
-              }}
-              onClick={() => setSelectedElementId(element.id)}
-            >
-              {element.type === 'text' && (
-                <div 
-                  style={{
-                    fontSize: `${element.style?.fontSize || 16}px`,
-                    fontFamily: element.style?.fontFamily || 'inherit',
-                  }}
-                >
-                  {element.content}
-                </div>
-              )}
+            // Save canvas title
+            updateCanvasMutation.mutate({
+              id: canvasId,
+              data: {
+                title: canvas?.title || 'Interactive Canvas'
+              }
+            });
+            
+            // For each element, update or create as needed
+            elements.forEach(element => {
+              const existingElement = canvasElements?.find(e => e.id === element.id);
               
-              {element.type === 'shape' && (
-                <div className="w-full h-full flex items-center justify-center">
-                  {element.content === 'rect' && <div className="w-full h-full"></div>}
-                  {element.content === 'circle' && <div className="w-full h-full rounded-full"></div>}
-                  {element.content === 'triangle' && <div className="triangle"></div>}
-                </div>
-              )}
-              
-              {element.type === 'node' && (
-                <div 
-                  className="w-full h-full flex items-center justify-center font-semibold"
-                  style={{
-                    fontSize: `${element.style?.fontSize || 14}px`,
-                    fontFamily: element.style?.fontFamily || 'inherit',
-                  }}
-                >
-                  {element.content}
-                </div>
-              )}
-              
-              {/* Delete button - only visible when element is selected */}
-              {selectedElementId === element.id && (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-3 -right-3 h-6 w-6 rounded-full"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteElementMutation.mutate(element.id);
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
+              if (existingElement) {
+                // Update existing element
+                updateElementMutation.mutate({
+                  id: existingElement.id as number,
+                  data: {
+                    content: element.content,
+                    x: element.x,
+                    y: element.y,
+                    width: element.width,
+                    height: element.height,
+                    zIndex: element.zIndex,
+                    style: element.style,
+                    metadata: element.metadata
+                  }
+                });
+              } else {
+                // Create new element
+                createElementMutation.mutate({
+                  type: element.type,
+                  content: element.content,
+                  canvasId,
+                  x: element.x,
+                  y: element.y,
+                  width: element.width,
+                  height: element.height,
+                  zIndex: element.zIndex,
+                  style: element.style,
+                  metadata: element.metadata
+                });
+              }
+            });
+            
+            // In the future, implement connection saving as well
+          }}
+          onShare={() => {
+            const shareUrl = `${window.location.origin}/canvas/${canvasId}${sessionId ? `?sessionId=${sessionId}` : ''}`;
+            
+            if (navigator.share) {
+              navigator.share({
+                title: canvas?.title || 'Interactive Canvas',
+                text: 'Check out my canvas!',
+                url: shareUrl,
+              });
+            } else {
+              navigator.clipboard.writeText(shareUrl);
+              toast({
+                title: "Link copied",
+                description: "Canvas link has been copied to clipboard.",
+              });
+            }
+          }}
+          onExport={(format) => {
+            toast({
+              title: `Exporting as ${format.toUpperCase()}`,
+              description: "Your canvas is being prepared for export.",
+            });
+            
+            // In the future, implement actual export functionality
+          }}
+          sessionId={sessionId || undefined}
+        />
       </div>
     </div>
   );
