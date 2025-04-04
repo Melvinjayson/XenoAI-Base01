@@ -210,6 +210,13 @@ interface KnowledgeGraphContextType {
     insights: AppGraphInsight[];
     query: string;
   }) => void;
+  addUserFeedback: (feedback: {
+    nodeId?: string;
+    type: 'correction' | 'enhancement' | 'contradiction' | 'confirmation';
+    content: string;
+    confidence?: number;
+  }) => Promise<void>;
+  enhanceGraphWithConversation: (conversationHistory: { role: string; content: string }[], searchResults?: any) => Promise<void>;
 }
 
 const KnowledgeGraphContext = createContext<KnowledgeGraphContextType | undefined>(undefined);

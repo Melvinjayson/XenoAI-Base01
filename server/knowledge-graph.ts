@@ -7,8 +7,8 @@ import axios from 'axios';
 // based on search results and content analysis
 
 // Define node types
-export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 'person' | 'organization' | 'location' | 'time' | 'statistic';
-export type EdgeType = 'search_result' | 'contains' | 'relates' | 'expansion' | 'search' | 'conversation' | 'related_to' | 'context_source' | 'affiliated_with' | 'conceptually_related' | 'includes' | 'located_near' | 'time_related' | 'expanded_by';
+export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 'person' | 'organization' | 'location' | 'time' | 'statistic' | 'feedback' | 'correction';
+export type EdgeType = 'search_result' | 'contains' | 'relates' | 'expansion' | 'search' | 'conversation' | 'related_to' | 'context_source' | 'affiliated_with' | 'conceptually_related' | 'includes' | 'located_near' | 'time_related' | 'expanded_by' | 'corrects' | 'enhances' | 'user_feedback' | 'ai_generated';
 
 export interface KnowledgeGraphNode {
   id: string;
@@ -1150,5 +1150,346 @@ Return your response in the following JSON format:
   } catch (error) {
     console.error("Error in AI insight generation:", error);
     return [];
+  }
+}
+
+// New function to update the knowledge graph based on user feedback
+export async function updateGraphWithFeedback(
+  graph: KnowledgeGraph,
+  feedback: {
+    nodeId?: string; // The node being commented on or corrected
+    type: 'correction' | 'enhancement' | 'contradiction' | 'confirmation'; 
+    content: string; // The feedback content
+    confidence?: number; // How confident the user or AI is about this feedback (0-1)
+    source?: 'user' | 'ai'; // Who provided this feedback
+  }
+): Promise<KnowledgeGraph> {
+  try {
+    // Create a working copy of the graph
+    const updatedGraph: KnowledgeGraph = {
+      nodes: [...graph.nodes],
+      edges: [...graph.edges]
+    };
+    
+    const feedbackId = `feedback-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    
+    // Create a feedback node
+    const feedbackNode: KnowledgeGraphNode = {
+      id: feedbackId,
+      label: feedback.content.substring(0, 50) + (feedback.content.length > 50 ? '...' : ''),
+      type: feedback.type === 'correction' ? 'correction' : 'feedback',
+      description: feedback.content,
+      score: feedback.confidence || 0.8,
+      createdAt: Date.now(),
+      data: {
+        source: feedback.source || 'user',
+        type: feedback.type,
+        fullContent: feedback.content
+      }
+    };
+    
+    updatedGraph.nodes.push(feedbackNode);
+    
+    // Connect feedback to target node if specified
+    if (feedback.nodeId) {
+      const targetNode = updatedGraph.nodes.find(node => node.id === feedback.nodeId);
+      
+      if (targetNode) {
+        // Create an edge between feedback and target node
+        const edgeType: EdgeType = feedback.type === 'correction' ? 'corrects' : 
+                                  feedback.type === 'enhancement' ? 'enhances' : 
+                                  feedback.type === 'contradiction' ? 'corrects' : 'related_to';
+        
+        updatedGraph.edges.push({
+          id: `edge-feedback-${feedback.nodeId}-${Date.now()}`,
+          source: feedbackId,
+          target: feedback.nodeId,
+          type: feedback.source === 'user' ? 'user_feedback' : 'ai_generated',
+          label: feedback.type,
+          weight: feedback.confidence || 0.8
+        });
+        
+        // For corrections and contradictions, reduce the confidence score of the target node
+        if (feedback.type === 'correction' || feedback.type === 'contradiction') {
+          const nodeIndex = updatedGraph.nodes.findIndex(node => node.id === feedback.nodeId);
+          if (nodeIndex >= 0) {
+            // Adjust the node's score down
+            if (updatedGraph.nodes[nodeIndex].score !== undefined) {
+              updatedGraph.nodes[nodeIndex].score = Math.max(
+                0.1, 
+                (updatedGraph.nodes[nodeIndex].score || 0.5) * 0.7
+              );
+            }
+          }
+        }
+      }
+    } else {
+      // If no specific node is targeted, connect to the query node
+      const queryNode = updatedGraph.nodes.find(node => node.type === 'query');
+      
+      if (queryNode) {
+        updatedGraph.edges.push({
+          id: `edge-feedback-general-${Date.now()}`,
+          source: feedbackId,
+          target: queryNode.id,
+          type: feedback.source === 'user' ? 'user_feedback' : 'ai_generated',
+          label: feedback.type,
+          weight: feedback.confidence || 0.7
+        });
+      }
+    }
+    
+    // Extract entities from the feedback content and add them to the graph
+    const entities = await extractEntities(feedback.content);
+    
+    for (const entity of entities) {
+      const entityId = `entity-feedback-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      
+      // Check if a similar entity already exists
+      const existingEntity = updatedGraph.nodes.find(
+        node => node.label.toLowerCase() === entity.entity.toLowerCase()
+      );
+      
+      if (existingEntity) {
+        // Connect feedback to existing entity
+        updatedGraph.edges.push({
+          id: `edge-feedback-entity-${Date.now()}`,
+          source: feedbackId,
+          target: existingEntity.id,
+          type: 'contains',
+          weight: entity.score
+        });
+      } else {
+        // Create new entity node
+        const entityNode: KnowledgeGraphNode = {
+          id: entityId,
+          label: entity.entity,
+          type: entity.type,
+          description: entity.description,
+          score: entity.score,
+          createdAt: Date.now()
+        };
+        
+        updatedGraph.nodes.push(entityNode);
+        
+        // Connect feedback to new entity
+        updatedGraph.edges.push({
+          id: `edge-feedback-new-entity-${Date.now()}`,
+          source: feedbackId,
+          target: entityId,
+          type: 'contains',
+          weight: entity.score
+        });
+      }
+    }
+    
+    return updatedGraph;
+  } catch (error) {
+    console.error("Error updating graph with feedback:", error);
+    return graph; // Return original graph on error
+  }
+}
+
+// New function for AI to autonomously update the graph based on conversation
+export async function enhanceGraphWithAI(
+  graph: KnowledgeGraph,
+  conversationHistory: { role: string; content: string }[],
+  searchResults?: { sources: { name: string; url: string; snippet?: string }[] }
+): Promise<KnowledgeGraph> {
+  try {
+    // Skip if no OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      return graph;
+    }
+    
+    // Create a working copy of the graph
+    const enhancedGraph: KnowledgeGraph = {
+      nodes: [...graph.nodes],
+      edges: [...graph.edges]
+    };
+    
+    // For ESM compatibility
+    const OpenAI = await import("openai").then(mod => mod.default);
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    
+    // Extract the most recent messages to stay within token limits
+    const recentMessages = conversationHistory.slice(-5);
+    const conversationText = recentMessages
+      .map(msg => `${msg.role}: ${msg.content}`)
+      .join('\n\n');
+    
+    // Get the existing entities and concepts in the graph for context
+    const existingEntities = graph.nodes
+      .filter(node => node.type !== 'query' && node.type !== 'document')
+      .map(node => `${node.label} (${node.type})`)
+      .join(', ');
+    
+    // Build a prompt for the AI to analyze the conversation
+    const prompt = `Analyze this conversation and identify new entities, insights, or corrections that should be added to our knowledge graph.
+
+Conversation:
+${conversationText}
+
+Existing entities in graph: ${existingEntities || 'None'}
+
+Based on this conversation, identify:
+1. New entities (people, organizations, concepts, etc.)
+2. Relationships between entities
+3. Corrections or clarifications to existing information
+4. Key insights that should be highlighted
+
+Return your analysis in JSON format with an array of "updates" that should be made to the knowledge graph. Each update should have:
+- type: "entity", "relationship", "correction", or "insight"
+- content: description of the entity, relationship, correction, or insight
+- confidence: a score from 0.1 to 1.0 indicating how confident you are
+- entityType (for entities): the type of entity (person, organization, concept, etc.)
+- source (for relationships): the source entity
+- target (for relationships): the target entity
+- relationshipType (for relationships): the type of relationship
+
+Do not include any additional text outside the JSON object.`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.3
+    });
+    
+    // Parse the response
+    let responseContent = '{"updates": []}';
+    if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+      responseContent = response.choices[0].message.content || responseContent;
+    }
+    
+    const parsedResponse = JSON.parse(responseContent);
+    const updates = parsedResponse.updates || [];
+    
+    if (updates.length === 0) {
+      console.log("AI didn't suggest any graph updates");
+      return graph;
+    }
+    
+    console.log(`AI suggested ${updates.length} graph updates`);
+    
+    // Process each update
+    for (const update of updates) {
+      const updateId = `ai-update-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      
+      switch (update.type) {
+        case 'entity':
+          // Add a new entity node
+          const entityNode: KnowledgeGraphNode = {
+            id: updateId,
+            label: update.content,
+            type: update.entityType || 'concept',
+            description: update.description || update.content,
+            score: update.confidence || 0.7,
+            createdAt: Date.now(),
+            data: { source: 'ai' }
+          };
+          
+          enhancedGraph.nodes.push(entityNode);
+          
+          // Connect to query node
+          const queryNode = enhancedGraph.nodes.find(node => node.type === 'query');
+          if (queryNode) {
+            enhancedGraph.edges.push({
+              id: `edge-query-ai-entity-${Date.now()}`,
+              source: queryNode.id,
+              target: updateId,
+              type: 'ai_generated',
+              weight: update.confidence || 0.7
+            });
+          }
+          break;
+          
+        case 'relationship':
+          // Find the source and target nodes
+          const sourceEntity = enhancedGraph.nodes.find(
+            node => node.label.toLowerCase() === update.source.toLowerCase()
+          );
+          
+          const targetEntity = enhancedGraph.nodes.find(
+            node => node.label.toLowerCase() === update.target.toLowerCase()
+          );
+          
+          if (sourceEntity && targetEntity) {
+            // Add edge between them
+            enhancedGraph.edges.push({
+              id: `edge-ai-rel-${Date.now()}`,
+              source: sourceEntity.id,
+              target: targetEntity.id,
+              type: update.relationshipType || 'related_to',
+              label: update.content,
+              weight: update.confidence || 0.7
+            });
+          }
+          break;
+          
+        case 'correction':
+          // Find node to correct
+          const nodeToCorrect = enhancedGraph.nodes.find(
+            node => node.label.toLowerCase() === update.target?.toLowerCase()
+          );
+          
+          if (nodeToCorrect) {
+            // Add correction node
+            const correctionNode: KnowledgeGraphNode = {
+              id: updateId,
+              label: `Correction: ${update.content.substring(0, 30)}...`,
+              type: 'correction',
+              description: update.content,
+              score: update.confidence || 0.7,
+              createdAt: Date.now(),
+              data: { source: 'ai' }
+            };
+            
+            enhancedGraph.nodes.push(correctionNode);
+            
+            // Connect correction to target node
+            enhancedGraph.edges.push({
+              id: `edge-ai-correction-${Date.now()}`,
+              source: updateId,
+              target: nodeToCorrect.id,
+              type: 'corrects',
+              weight: update.confidence || 0.7
+            });
+          }
+          break;
+          
+        case 'insight':
+          // Add insight node
+          const insightNode: KnowledgeGraphNode = {
+            id: updateId,
+            label: update.content.substring(0, 50) + (update.content.length > 50 ? '...' : ''),
+            type: 'insight',
+            description: update.content,
+            score: update.confidence || 0.8,
+            createdAt: Date.now(),
+            data: { source: 'ai' }
+          };
+          
+          enhancedGraph.nodes.push(insightNode);
+          
+          // Connect to query node
+          const mainQueryNode = enhancedGraph.nodes.find(node => node.type === 'query');
+          if (mainQueryNode) {
+            enhancedGraph.edges.push({
+              id: `edge-query-ai-insight-${Date.now()}`,
+              source: mainQueryNode.id,
+              target: updateId,
+              type: 'ai_generated',
+              weight: update.confidence || 0.8
+            });
+          }
+          break;
+      }
+    }
+    
+    return enhancedGraph;
+  } catch (error) {
+    console.error("Error enhancing graph with AI:", error);
+    return graph; // Return original graph on error
   }
 }

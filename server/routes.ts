@@ -6,7 +6,14 @@ import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
 import { speechToText } from "./speech-to-text";
-import { createKnowledgeGraphFromSearch, expandGraphNode, analyzeKnowledgeGraph, type NodeType } from "./knowledge-graph";
+import { 
+  createKnowledgeGraphFromSearch, 
+  expandGraphNode, 
+  analyzeKnowledgeGraph, 
+  updateGraphWithFeedback,
+  enhanceGraphWithAI,
+  type NodeType 
+} from "./knowledge-graph";
 import { WebSocketServer } from "ws";
 import path from "path";
 import multer from "multer";
@@ -505,6 +512,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Knowledge graph export API error:", error);
       return res.status(500).json({ 
         error: "Failed to export knowledge graph insights", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // API endpoint for updating the knowledge graph with user feedback
+  app.post("/api/knowledge-graph/feedback", async (req, res) => {
+    try {
+      const { graph, feedback } = req.body;
+      
+      if (!graph || !feedback) {
+        return res.status(400).json({ error: "Graph and feedback are required" });
+      }
+      
+      if (!feedback.content || !feedback.type) {
+        return res.status(400).json({ error: "Feedback must include content and type" });
+      }
+      
+      // Valid feedback types
+      const validTypes = ['correction', 'enhancement', 'contradiction', 'confirmation'];
+      if (!validTypes.includes(feedback.type)) {
+        return res.status(400).json({ 
+          error: `Invalid feedback type. Must be one of: ${validTypes.join(', ')}` 
+        });
+      }
+      
+      // Update the graph with feedback
+      const updatedGraph = await updateGraphWithFeedback(graph, feedback);
+      
+      // Re-analyze for new insights
+      const insights = await analyzeKnowledgeGraph(updatedGraph);
+      
+      res.json({
+        graph: updatedGraph,
+        insights,
+        feedback: {
+          status: 'success',
+          message: `Graph updated with ${feedback.type} feedback`
+        }
+      });
+    } catch (error) {
+      console.error("Error updating graph with feedback:", error);
+      return res.status(500).json({ 
+        error: "Failed to update graph with feedback", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // API endpoint for AI to enhance knowledge graph based on conversation
+  app.post("/api/knowledge-graph/enhance-with-ai", async (req, res) => {
+    try {
+      const { graph, conversationHistory, searchResults } = req.body;
+      
+      if (!graph || !conversationHistory || !Array.isArray(conversationHistory)) {
+        return res.status(400).json({ error: "Graph and conversationHistory array are required" });
+      }
+      
+      // Enhance graph with AI analysis of conversation
+      const enhancedGraph = await enhanceGraphWithAI(graph, conversationHistory, searchResults);
+      
+      // Generate insights based on enhanced graph
+      const insights = await analyzeKnowledgeGraph(enhancedGraph);
+      
+      res.json({
+        graph: enhancedGraph,
+        insights,
+        enhancement: {
+          status: 'success',
+          nodeCountBefore: graph.nodes.length,
+          nodeCountAfter: enhancedGraph.nodes.length,
+          edgeCountBefore: graph.edges.length,
+          edgeCountAfter: enhancedGraph.edges.length
+        }
+      });
+    } catch (error) {
+      console.error("Error enhancing graph with AI:", error);
+      return res.status(500).json({ 
+        error: "Failed to enhance graph with AI", 
         details: error instanceof Error ? error.message : "Unknown error" 
       });
     }
