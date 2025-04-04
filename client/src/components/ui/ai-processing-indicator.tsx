@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Brain, Mic, Radio, BarChart } from 'lucide-react';
+
+import { Brain, Mic, Radio, BarChart } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 export type ProcessingState = 'thinking' | 'speaking' | 'processing' | 'analyzing' | 'idle';
 
@@ -19,9 +21,19 @@ export function AIProcessingIndicator({
   onPauseToggle
 }: AIProcessingIndicatorProps) {
   const [displayMessage, setDisplayMessage] = useState(message || getDefaultMessage(state));
+  const [audioLevel, setAudioLevel] = useState(0);
   
   useEffect(() => {
     setDisplayMessage(message || getDefaultMessage(state));
+    
+    // Simulate audio level changes for visualization
+    if (state === 'speaking' || state === 'listening') {
+      const interval = setInterval(() => {
+        setAudioLevel(Math.random());
+      }, 100);
+      
+      return () => clearInterval(interval);
+    }
   }, [message, state]);
 
   if (state === 'idle') return null;
@@ -29,10 +41,39 @@ export function AIProcessingIndicator({
   return (
     <div className={`fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 ${className}`}>
       <div className="bg-primary/90 backdrop-blur-sm text-primary-foreground rounded-full px-4 py-2.5 shadow-lg flex items-center gap-3 border border-primary/20 animate-in slide-in-from-bottom duration-300">
-        <div className="flex-shrink-0">
-          {getIconForState(state)}
+        <div className="flex-shrink-0 relative">
+          <div className={cn(
+            "w-8 h-8 rounded-full flex items-center justify-center",
+            "transition-all duration-300",
+            state === 'speaking' && "bg-primary animate-pulse",
+            state === 'listening' && "bg-destructive"
+          )}>
+            {getIconForState(state)}
+            
+            {/* Voice activity visualization rings */}
+            {(state === 'speaking' || state === 'listening') && (
+              <>
+                <div className={cn(
+                  "absolute inset-0 rounded-full border-2",
+                  "animate-[ripple_2s_infinite]",
+                  state === 'speaking' ? "border-primary/40" : "border-destructive/40"
+                )} style={{
+                  transform: `scale(${1 + audioLevel * 0.5})`
+                }} />
+                <div className={cn(
+                  "absolute inset-0 rounded-full border-2",
+                  "animate-[ripple_2s_infinite_500ms]",
+                  state === 'speaking' ? "border-primary/30" : "border-destructive/30"
+                )} style={{
+                  transform: `scale(${1 + audioLevel * 0.3})`
+                }} />
+              </>
+            )}
+          </div>
         </div>
+        
         <span className="text-sm font-medium">{displayMessage}</span>
+        
         {onPauseToggle && (
           <button 
             onClick={onPauseToggle} 
@@ -57,8 +98,7 @@ export function AIProcessingIndicator({
 }
 
 function getIconForState(state: ProcessingState) {
-  // Base animation styles for all icons
-  const baseAnimationClass = "w-5 h-5 transition-opacity";
+  const baseAnimationClass = "w-5 h-5 transition-opacity text-primary-foreground";
   
   switch (state) {
     case 'thinking':
@@ -69,12 +109,7 @@ function getIconForState(state: ProcessingState) {
         </div>
       );
     case 'speaking':
-      return (
-        <div className="relative flex items-center justify-center">
-          <div className="absolute w-8 h-8 bg-primary-foreground/10 rounded-full animate-ping opacity-75"></div>
-          <Mic className={`${baseAnimationClass} relative`} />
-        </div>
-      );
+      return <BarChart className={`${baseAnimationClass} animate-pulse`} />;
     case 'processing':
       return (
         <div className="relative">
@@ -89,6 +124,8 @@ function getIconForState(state: ProcessingState) {
           <BarChart className={`${baseAnimationClass} relative`} />
         </div>
       );
+    case 'listening':
+      return <Mic className={`${baseAnimationClass} animate-pulse`} />;
     default:
       return null;
   }
@@ -104,6 +141,8 @@ function getDefaultMessage(state: ProcessingState): string {
       return 'Processing request...';
     case 'analyzing':
       return 'Analyzing information...';
+    case 'listening':
+      return 'Listening...';
     default:
       return '';
   }
