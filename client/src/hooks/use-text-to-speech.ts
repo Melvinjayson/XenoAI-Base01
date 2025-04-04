@@ -53,7 +53,7 @@ export function useTextToSpeech() {
       console.log('Synthesizing speech with voice:', voiceId, 'language:', language);
       
       // Request speech synthesis from server
-      const data = await apiRequest('POST', '/api/synthesize', {
+      const data = await apiRequest('/api/synthesize', 'POST', {
         text,
         voiceId,
         language,
@@ -109,7 +109,11 @@ export function useTextToSpeech() {
           
           if (audioElement) {
             const newCacheBust = `?t=${Date.now()}`;
-            audioElement.src = `${baseUrl}${data.audioUrl}${newCacheBust}`;
+            // Use the original URL format for consistency
+            const audioUrl = data.audioUrl.startsWith('http') 
+              ? data.audioUrl 
+              : `${baseUrl}${data.audioUrl}${newCacheBust}`;
+            audioElement.src = audioUrl;
             
             try {
               await audioElement.play();
