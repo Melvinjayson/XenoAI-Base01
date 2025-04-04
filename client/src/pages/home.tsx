@@ -243,47 +243,74 @@ export default function Home() {
       }
 
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center">
-          <div className="relative mr-2">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm w-8 h-8" />
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75 w-8 h-8" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 py-3 border-b border-border">
+        {/* Logo and Brand */}
+        <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+          <div className="relative flex items-center justify-center w-9 h-9">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm" />
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75" />
+            <div className="relative z-10 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white drop-shadow-sm" fill="currentColor">
                 <path d="M13.5 1.5a1.5 1.5 0 0 0-3 0v5.25a1.5 1.5 0 0 0 3 0V1.5zM12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2.25a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5zm7.5-4.25a1.5 1.5 0 0 0 0-3h-5.25a1.5 1.5 0 0 0 0 3h5.25zM1.5 11.5a1.5 1.5 0 0 0 0 3h5.25a1.5 1.5 0 0 0 0-3H1.5z" />
               </svg>
             </div>
           </div>
-          <h1 className="text-lg font-semibold">Xeno AI</h1>
-        </div>
-        <div className="flex space-x-1">
-          <Link href="/knowledge-graph">
-            <button 
-              className="p-2 rounded-full hover:bg-muted" 
-              aria-label="Knowledge Graph"
-            >
-              <Network className="w-5 h-5" />
-            </button>
-          </Link>
-          <Link href="/enhanced-knowledge-graph">
-            <button 
-              className="p-2 rounded-full hover:bg-muted" 
-              aria-label="Enhanced Knowledge Graph"
-            >
-              <Network className="w-5 h-5 text-primary" />
-              <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-              </span>
-            </button>
-          </Link>
-          <button 
-            className="p-2 rounded-full hover:bg-muted" 
+          <h1 className="text-lg font-semibold tracking-tight">Xeno AI</h1>
+        </Link>
+
+        {/* Navigation and Controls */}
+        <nav className="flex items-center gap-2">
+          {/* Knowledge Graph Navigation with Tooltips */}
+          <div className="hidden sm:flex items-center gap-3 mr-2 border-r border-border pr-4">
+            <Link href="/knowledge-graph">
+              <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
+                <Network className="w-4 h-4" />
+                <span className="font-medium">Knowledge Graph</span>
+              </Button>
+            </Link>
+            <Link href="/enhanced-knowledge-graph">
+              <Button variant="ghost" size="sm" className="relative flex items-center gap-2 h-9 px-3 text-primary">
+                <Network className="w-4 h-4" />
+                <span className="font-medium">Workbench</span>
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+              </Button>
+            </Link>
+          </div>
+
+          {/* Mobile Navigation */}
+          <div className="sm:hidden flex items-center gap-1 mr-1">
+            <Link href="/knowledge-graph">
+              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Knowledge Graph">
+                <Network className="w-5 h-5" />
+              </Button>
+            </Link>
+            <Link href="/enhanced-knowledge-graph">
+              <Button variant="ghost" size="icon" className="rounded-full relative h-9 w-9" aria-label="Workbench">
+                <Network className="w-5 h-5 text-primary" />
+                <span className="absolute top-1 right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+              </Button>
+            </Link>
+          </div>
+
+          {/* Voice Controls */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-full h-9 w-9 relative" 
             aria-label={isMuteEnabled ? "Enable voice" : "Mute voice"} 
             onClick={handleToggleMute}
+            title={isMuteEnabled ? "Enable voice" : "Mute voice"}
           >
             {isMuteEnabled ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-          </button>
+          </Button>
+
+          {/* Settings Panel */}
           <SettingsPanel 
             voiceEnabled={!isMuteEnabled}
             setVoiceEnabled={(enabled) => setIsMuteEnabled(!enabled)}
@@ -292,7 +319,7 @@ export default function Home() {
             voiceId={voiceId}
             setVoiceId={setVoiceId}
           />
-        </div>
+        </nav>
       </header>
 
       {/* Chat Container */}
