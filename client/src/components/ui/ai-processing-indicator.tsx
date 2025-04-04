@@ -137,127 +137,118 @@ export function AIProcessingIndicator({
 
   return (
     <div className={`fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 ${className}`}>
-      <div className="bg-primary/95 backdrop-blur-lg text-primary-foreground rounded-full px-5 py-3 shadow-lg 
-        flex items-center gap-3.5 border border-primary/20 animate-in slide-in-from-bottom-5 duration-300
-        hover:shadow-xl transition-all hover:scale-[1.02]">
+      <div className="bg-[#F5F0FF] dark:bg-[#2D2065] text-primary shadow-xl
+        flex items-center gap-3 rounded-2xl px-5 py-3.5 animate-in slide-in-from-bottom duration-300
+        border border-primary/10 dark:border-primary/30 hover:shadow-primary/10 hover:shadow-lg
+        transition-all duration-300 ease-in-out">
         <div className="flex-shrink-0 relative">
           <div className={cn(
-            "w-10 h-10 rounded-full flex items-center justify-center",
-            "transition-all duration-300",
-            state === 'speaking' && "bg-primary/80",
-            state === 'listening' && "bg-destructive/90",
-            state === 'thinking' && "bg-amber-500/40",
-            state === 'analyzing' && "bg-cyan-500/40",
-            state === 'searching' && "bg-violet-500/40",
-            state === 'processing' && "bg-emerald-500/40",
-            state === 'connecting' && "bg-gray-500/40"
+            "w-10 h-10 bg-primary/10 dark:bg-primary/20 rounded-xl flex items-center justify-center",
+            "transition-all duration-300 transform",
+            state === 'speaking' && "bg-primary/20 dark:bg-primary/30",
+            state === 'listening' && "bg-destructive/20 dark:bg-destructive/30",
+            state === 'thinking' && "bg-amber-500/20 dark:bg-amber-600/30",
+            state === 'analyzing' && "bg-cyan-500/20 dark:bg-cyan-600/30",
+            state === 'searching' && "bg-primary/20 dark:bg-primary/30",
+            state === 'processing' && "bg-emerald-500/20 dark:bg-emerald-600/30",
+            state === 'connecting' && "bg-purple-500/20 dark:bg-purple-600/30"
           )} style={{ transform: `scale(${iconScale})` }}>
             {getIconForState(state)}
             
-            {/* Enhanced voice activity visualization rings */}
+            {/* Voice activity visualization for active states */}
             {(state === 'speaking' || state === 'listening') && (
               <>
                 <div className={cn(
-                  "absolute inset-0 rounded-full border-2",
-                  "animate-[ripple_1.5s_ease-out_infinite]",
-                  state === 'speaking' ? "border-primary/40" : "border-destructive/50"
+                  "absolute inset-0 rounded-xl border",
+                  "animate-[ripple_1.8s_ease-out_infinite]",
+                  state === 'speaking' ? "border-primary" : "border-destructive"
                 )} style={{
-                  transform: `scale(${1 + audioLevel * 0.8})`,
-                  opacity: 0.8 - (audioLevel * 0.3)
+                  transform: `scale(${1 + audioLevel * 0.65})`,
+                  opacity: 0.7 - (audioLevel * 0.3)
                 }} />
                 <div className={cn(
-                  "absolute inset-0 rounded-full border-2",
-                  "animate-[ripple_2s_ease-out_infinite_300ms]",
-                  state === 'speaking' ? "border-primary/30" : "border-destructive/40"
+                  "absolute inset-0 rounded-xl border",
+                  "animate-[ripple_2.2s_ease-out_infinite_300ms]",
+                  state === 'speaking' ? "border-primary" : "border-destructive"
                 )} style={{
-                  transform: `scale(${1 + audioLevel * 0.6})`,
-                  opacity: 0.7 - (audioLevel * 0.3) 
-                }} />
-                <div className={cn(
-                  "absolute inset-0 rounded-full border-1",
-                  "animate-[ripple_2.5s_ease-out_infinite_450ms]",
-                  state === 'speaking' ? "border-primary/20" : "border-destructive/30"
-                )} style={{
-                  transform: `scale(${1 + audioLevel * 1.0})`,
-                  opacity: 0.6 - (audioLevel * 0.3)
+                  transform: `scale(${1 + audioLevel * 0.5})`,
+                  opacity: 0.5 - (audioLevel * 0.2) 
                 }} />
               </>
             )}
             
-            {/* Add responsive animation rings for other states too */}
+            {/* Subtle animation rings for other states */}
             {(['thinking', 'analyzing', 'processing', 'searching', 'connecting'].includes(state)) && (
-              <>
-                <div className={cn(
-                  "absolute inset-0 rounded-full border-1 opacity-30",
-                  "animate-[pulse_2s_ease-in-out_infinite]",
-                  state === 'thinking' ? "border-amber-400" : 
-                  state === 'analyzing' ? "border-cyan-400" :
-                  state === 'searching' ? "border-violet-400" :
-                  state === 'connecting' ? "border-gray-400" :
-                  "border-emerald-400"
-                )} />
-                <div className={cn(
-                  "absolute inset-0 rounded-full border-1 opacity-20",
-                  "animate-[pulse_3s_ease-in-out_infinite_500ms]",
-                  state === 'thinking' ? "border-amber-300" : 
-                  state === 'analyzing' ? "border-cyan-300" :
-                  state === 'searching' ? "border-violet-300" :
-                  state === 'connecting' ? "border-gray-300" :
-                  "border-emerald-300"
-                )} style={{ transform: `scale(1.2)` }} />
-              </>
+              <div className={cn(
+                "absolute inset-0 rounded-xl border",
+                "animate-[pulse_2.5s_ease-in-out_infinite]",
+                state === 'thinking' ? "border-amber-500" : 
+                state === 'analyzing' ? "border-cyan-500" :
+                state === 'searching' ? "border-primary" :
+                state === 'connecting' ? "border-purple-500" :
+                "border-emerald-500"
+              )} style={{ 
+                transform: `scale(1.05)`,
+                opacity: 0.4
+              }} />
             )}
           </div>
         </div>
         
         <div className="flex flex-col">
-          <span className="text-sm font-medium transition-all duration-300">{displayMessage}</span>
+          <span className="text-sm font-medium dark:text-white transition-all duration-300">
+            {displayMessage}
+          </span>
           
-          {/* Add subtle typing indicator when thinking */}
+          {/* Dynamic visual elements based on state */}
           {state === 'thinking' && (
-            <span className="text-[8px] opacity-70 mt-0.5 flex items-center">
-              <span className="inline-block w-1 h-1 bg-primary-foreground/80 rounded-full mr-1 animate-ping" style={{animationDuration: '1.5s'}}></span>
-              <span className="inline-block w-1 h-1 bg-primary-foreground/80 rounded-full mr-1 animate-ping" style={{animationDuration: '1.5s', animationDelay: '300ms'}}></span>
-              <span className="inline-block w-1 h-1 bg-primary-foreground/80 rounded-full animate-ping" style={{animationDuration: '1.5s', animationDelay: '600ms'}}></span>
-            </span>
+            <div className="mt-1 flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 bg-primary rounded-full animate-pulse" style={{animationDuration: '1.3s'}}></span>
+              <span className="inline-block w-1.5 h-1.5 bg-primary rounded-full animate-pulse" style={{animationDuration: '1.3s', animationDelay: '300ms'}}></span>
+              <span className="inline-block w-1.5 h-1.5 bg-primary rounded-full animate-pulse" style={{animationDuration: '1.3s', animationDelay: '600ms'}}></span>
+            </div>
           )}
           
-          {/* Add waveform visualization for speaking state */}
+          {/* Audio waveform for speaking */}
           {state === 'speaking' && (
-            <span className="text-[10px] opacity-70 mt-0.5 flex items-center h-2">
+            <div className="mt-1 flex items-center h-2 gap-[2px]">
               {Array.from({length: 5}).map((_, i) => (
                 <span 
                   key={i}
-                  className="inline-block w-0.5 bg-primary-foreground/80 rounded-full mx-px animate-pulse" 
+                  className="inline-block w-[3px] bg-primary rounded-full animate-pulse" 
                   style={{
-                    height: `${5 + Math.sin((Date.now() / 200) + i) * 5 + audioLevel * 7}px`,
-                    animationDuration: `${800 + i * 50}ms`
+                    height: `${3 + Math.sin((Date.now() / 200) + i) * 3 + audioLevel * 5}px`,
+                    animationDuration: `${600 + i * 100}ms`
                   }}
                 />
               ))}
-            </span>
+            </div>
           )}
         </div>
         
-        {onPauseToggle && (
-          <button 
-            onClick={onPauseToggle} 
-            className="ml-1 p-2 hover:bg-primary-foreground/20 rounded-full transition-colors
-              hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary-foreground/30"
-            aria-label={isPaused ? "Resume" : "Pause"}
-          >
-            {isPaused ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="6" y="4" width="4" height="16"></rect>
-                <rect x="14" y="4" width="4" height="16"></rect>
-              </svg>
-            )}
-          </button>
-        )}
+        {/* Controls */}
+        <div className="flex items-center ml-1 gap-1">
+          {onPauseToggle && (
+            <button 
+              onClick={onPauseToggle} 
+              className="p-2 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-lg 
+                transition-all duration-150 hover:scale-105 active:scale-95 
+                focus:outline-none focus:ring-2 focus:ring-primary/20"
+              aria-label={isPaused ? "Resume" : "Pause"}
+            >
+              {isPaused ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                  <rect x="6" y="4" width="4" height="16"></rect>
+                  <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -291,14 +282,14 @@ function getDefaultMessage(state: ProcessingState, index: number = 0): string {
 }
 
 function getIconForState(state: ProcessingState) {
-  const baseAnimationClass = "w-6 h-6 transition-all text-primary-foreground";
+  const baseAnimationClass = "w-6 h-6 transition-all text-primary";
   
   switch (state) {
     case 'thinking':
       return (
         <div className="relative">
-          <Brain className={`${baseAnimationClass} animate-pulse absolute opacity-80`} />
-          <Sparkles className={`${baseAnimationClass} animate-ping absolute opacity-40`} style={{animationDuration: '3s'}} />
+          <Brain className={`${baseAnimationClass} animate-pulse absolute opacity-60`} />
+          <Sparkles className={`${baseAnimationClass} animate-ping absolute opacity-30`} style={{animationDuration: '3s'}} />
           <Brain className={`${baseAnimationClass} relative`} />
         </div>
       );
@@ -306,30 +297,30 @@ function getIconForState(state: ProcessingState) {
       return (
         <div className="relative">
           <BarChart className={`${baseAnimationClass}`} style={{
-            transform: `scaleY(${0.8 + Math.random() * 0.4})`, 
+            transform: `scaleY(${0.8 + Math.random() * 0.3})`, 
             transition: 'transform 100ms ease'
           }} />
           <span className="absolute inset-0 flex items-center justify-center opacity-70">
-            <span className="w-0.5 h-4 bg-primary-foreground/70 rounded-full mx-0.5 animate-[eq1_600ms_ease-in-out_infinite]" style={{animationDelay: '0ms'}}></span>
-            <span className="w-0.5 h-6 bg-primary-foreground/70 rounded-full mx-0.5 animate-[eq2_700ms_ease-in-out_infinite]" style={{animationDelay: '100ms'}}></span>
-            <span className="w-0.5 h-5 bg-primary-foreground/70 rounded-full mx-0.5 animate-[eq3_800ms_ease-in-out_infinite]" style={{animationDelay: '200ms'}}></span>
-            <span className="w-0.5 h-3 bg-primary-foreground/70 rounded-full mx-0.5 animate-[eq1_500ms_ease-in-out_infinite]" style={{animationDelay: '300ms'}}></span>
-            <span className="w-0.5 h-2 bg-primary-foreground/70 rounded-full mx-0.5 animate-[eq2_600ms_ease-in-out_infinite]" style={{animationDelay: '400ms'}}></span>
+            <span className="w-0.5 h-4 bg-primary rounded-full mx-0.5 animate-[eq1_600ms_ease-in-out_infinite]" style={{animationDelay: '0ms'}}></span>
+            <span className="w-0.5 h-6 bg-primary rounded-full mx-0.5 animate-[eq2_700ms_ease-in-out_infinite]" style={{animationDelay: '100ms'}}></span>
+            <span className="w-0.5 h-5 bg-primary rounded-full mx-0.5 animate-[eq3_800ms_ease-in-out_infinite]" style={{animationDelay: '200ms'}}></span>
+            <span className="w-0.5 h-3 bg-primary rounded-full mx-0.5 animate-[eq1_500ms_ease-in-out_infinite]" style={{animationDelay: '300ms'}}></span>
+            <span className="w-0.5 h-2 bg-primary rounded-full mx-0.5 animate-[eq2_600ms_ease-in-out_infinite]" style={{animationDelay: '400ms'}}></span>
           </span>
         </div>
       );
     case 'processing':
       return (
         <div className="relative">
-          <Radio className={`${baseAnimationClass} animate-spin absolute opacity-60`} style={{animationDuration: '3s'}} />
-          <CircleDot className={`${baseAnimationClass} animate-pulse absolute opacity-40`} style={{animationDuration: '1.5s'}} />
+          <Radio className={`${baseAnimationClass} animate-spin absolute opacity-50`} style={{animationDuration: '3s'}} />
+          <CircleDot className={`${baseAnimationClass} animate-pulse absolute opacity-30`} style={{animationDuration: '1.5s'}} />
           <Radio className={`${baseAnimationClass} relative`} />
         </div>
       );
     case 'analyzing':
       return (
         <div className="relative">
-          <SearchCheck className={`${baseAnimationClass} animate-bounce absolute opacity-60`} style={{animationDuration: '2s'}} />
+          <SearchCheck className={`${baseAnimationClass} animate-bounce absolute opacity-40`} style={{animationDuration: '2s'}} />
           <BarChart className={`${baseAnimationClass} relative`} />
         </div>
       );
@@ -338,23 +329,23 @@ function getIconForState(state: ProcessingState) {
         <div className="relative">
           <Mic className={`${baseAnimationClass} animate-pulse`} />
           <span className="absolute inset-0 flex items-center justify-center">
-            <span className="w-1 h-3 bg-destructive/60 rounded-full mx-0.5 animate-[eq1_800ms_ease-in-out_infinite]"></span>
-            <span className="w-1 h-4 bg-destructive/70 rounded-full mx-0.5 animate-[eq2_700ms_ease-in-out_infinite]"></span>
-            <span className="w-1 h-2 bg-destructive/60 rounded-full mx-0.5 animate-[eq3_750ms_ease-in-out_infinite]"></span>
+            <span className="w-1 h-3 bg-destructive rounded-full mx-0.5 animate-[eq1_800ms_ease-in-out_infinite]"></span>
+            <span className="w-1 h-4 bg-destructive rounded-full mx-0.5 animate-[eq2_700ms_ease-in-out_infinite]"></span>
+            <span className="w-1 h-2 bg-destructive rounded-full mx-0.5 animate-[eq3_750ms_ease-in-out_infinite]"></span>
           </span>
         </div>
       );
     case 'searching':
       return (
         <div className="relative">
-          <SearchCheck className={`${baseAnimationClass} animate-ping absolute opacity-40`} style={{animationDuration: '2s'}} />
+          <SearchCheck className={`${baseAnimationClass} animate-ping absolute opacity-30`} style={{animationDuration: '2s'}} />
           <SearchCheck className={`${baseAnimationClass} relative`} />
         </div>
       );
     case 'connecting':
       return (
         <div className="relative">
-          <CircleDot className={`${baseAnimationClass} animate-spin absolute opacity-70`} style={{animationDuration: '2s'}} />
+          <CircleDot className={`${baseAnimationClass} animate-spin absolute opacity-50`} style={{animationDuration: '2s'}} />
           <CircleDot className={`${baseAnimationClass} relative`} />
         </div>
       );
