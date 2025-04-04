@@ -100,6 +100,7 @@ function Router() {
           <Route path="/admin" component={AdminPage} />
           <Route path="/project-management" component={ProjectManagementPage} />
           <Route path="/color-palette" component={ColorPaletteGeneratorPage} />
+          <Route path="/workbench" component={EnhancedKnowledgeGraphPage} />
           <Route component={NotFound} />
         </Switch>
         
