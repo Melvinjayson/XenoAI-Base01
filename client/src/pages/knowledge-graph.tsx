@@ -48,13 +48,13 @@ const KnowledgeGraphContent = () => {
     <>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+          <h1 className="text-xl sm:text-2xl font-bold">Knowledge Graph Explorer</h1>
           <Link href="/">
             <Button variant="ghost" size="sm">
               <ArrowLeftIcon className="w-4 h-4 mr-2" />
               Back to Chat
             </Button>
           </Link>
-          <h1 className="text-xl sm:text-2xl font-bold">Knowledge Graph Explorer</h1>
         </div>
         
         <Button 
