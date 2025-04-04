@@ -246,13 +246,11 @@ export default function Home() {
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 py-3 border-b border-border">
         {/* Logo and Brand */}
         <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-          <div className="relative flex items-center justify-center w-9 h-9">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm" />
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75" />
+          <div className="relative flex items-center justify-center w-10 h-10">
+            <div className="absolute inset-0 bg-primary/20 rounded-xl rotate-45 animate-pulse" />
+            <div className="absolute inset-0 bg-primary/10 rounded-xl rotate-45 animate-ping opacity-75" />
             <div className="relative z-10 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white drop-shadow-sm" fill="currentColor">
-                <path d="M13.5 1.5a1.5 1.5 0 0 0-3 0v5.25a1.5 1.5 0 0 0 3 0V1.5zM12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2.25a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5zm7.5-4.25a1.5 1.5 0 0 0 0-3h-5.25a1.5 1.5 0 0 0 0 3h5.25zM1.5 11.5a1.5 1.5 0 0 0 0 3h5.25a1.5 1.5 0 0 0 0-3H1.5z" />
-              </svg>
+              <Brain className="w-5 h-5 text-primary" />
             </div>
           </div>
           <h1 className="text-lg font-semibold tracking-tight">Xeno AI</h1>
