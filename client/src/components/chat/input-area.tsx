@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Mic, Send, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,28 +20,21 @@ export default function InputArea({
 }: InputAreaProps) {
   const [inputValue, setInputValue] = useState("");
   
-  const handleSend = () => {
+  const handleSend = async () => {
     if (inputValue.trim()) {
-      onSend(inputValue);
+      await onSend(inputValue);
       setInputValue("");
-    } else {
+    } else if (!isListening) {
       onMicClick();
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      await handleSend();
     }
   };
-
-  // Clear input if listening is active
-  useEffect(() => {
-    if (isListening) {
-      setInputValue("");
-    }
-  }, [isListening]);
 
   return (
     <div className="p-3 border-t border-gray-200">
@@ -57,16 +51,17 @@ export default function InputArea({
         <button 
           className={cn(
             "absolute right-1 top-1 text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors",
-            isListening ? "bg-accent" : "bg-primary"
+            isListening ? "bg-accent" : "bg-primary",
+            "hover:opacity-90"
           )}
           onClick={handleSend}
+          disabled={isListening && !inputValue.trim()}
           aria-label={isListening ? "Stop listening" : inputValue ? "Send message" : "Start voice recording"}
         >
           {inputValue ? <Send className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
         </button>
       </div>
       
-      {/* Voice Command Indicator */}
       <div className="flex justify-center mt-3 items-center text-xs text-gray-500">
         {voiceSupported ? (
           <div className="bg-secondary rounded-full px-3 py-1 mr-1">
