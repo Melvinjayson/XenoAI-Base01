@@ -7,7 +7,7 @@
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 55%;
+    --muted-foreground: 240 5% 45%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
@@ -17,14 +17,14 @@
     --primary: 262 83.3% 65.1%;
     --primary-foreground: 355.7 100% 97.3%;
     --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary-foreground: 240 10% 3.9%;
     --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent-foreground: 240 10% 3.9%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 0 0% 100%;
     --ring: 262 83.3% 65.1%;
     --radius: 0.5rem;
-    
+
     /* Accessibility variables */
     --contrast-factor: 1;
     --motion-speed: 1;
@@ -76,56 +76,56 @@
   .conservation-high {
     color-scheme: dark;
   }
-  
+
   /* Font size accessibility */
   .text-small {
     --font-scale: 0.875;
   }
-  
+
   .text-medium {
     --font-scale: 1;
   }
-  
+
   .text-large {
     --font-scale: 1.25;
   }
-  
+
   /* Apply font scaling to all text elements */
   h1, h2, h3, h4, h5, h6, p, span, div, button, a, input, textarea, select, label {
     font-size: calc(var(--font-scale) * 1em);
   }
-  
+
   /* Reduced motion */
   .reduce-motion * {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  
+
   /* High contrast */
   .high-contrast {
     --contrast-factor: 1.5;
   }
-  
+
   .high-contrast {
     filter: contrast(var(--contrast-factor));
   }
-  
+
   .high-contrast .text-muted-foreground {
     opacity: 0.9;
   }
-  
+
   .high-contrast button,
   .high-contrast a {
     outline: 2px solid transparent;
   }
-  
+
   .high-contrast button:focus,
   .high-contrast a:focus {
     outline: 2px solid hsl(var(--primary));
     outline-offset: 2px;
   }
-  
+
   /* Improved focus styles for keyboard navigation */
   :focus-visible {
     outline: 2px solid hsl(var(--primary));
