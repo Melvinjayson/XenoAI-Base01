@@ -6,6 +6,7 @@ import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
 import { speechToText } from "./speech-to-text";
+import { queryPerplexity, perplexitySearchConversation } from "./perplexity";
 import { 
   InsertFile, 
   InsertCanvas, 
@@ -408,6 +409,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           contextWindow: 4096,
           cost: 'low',
           capabilities: ['chat', 'search']
+        },
+        'enhanced-search': {
+          id: 'enhanced-search',
+          name: 'Enhanced Search (Open Source)',
+          provider: 'xeno',
+          description: 'Open-source search enhancement with web content analysis and citations',
+          maxTokens: 4096,
+          isLightweight: true,
+          contextWindow: 8192,
+          cost: 'low',
+          capabilities: ['chat', 'search', 'knowledge', 'citations']
         }
       };
       
@@ -423,6 +435,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // API endpoint for Enhanced Search (open-source alternative to Perplexity)
+  app.post("/api/perplexity/search", async (req, res) => {
+    try {
+      const { query, sessionId = "default", options = {} } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+      
+      // Use our open-source alternative implementation
+      const result = await perplexitySearchConversation(query, sessionId, options);
+      return res.json(result);
+    } catch (error) {
+      console.error("Enhanced search API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to perform enhanced search", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // API endpoint for Enhanced Chat completions (open-source alternative to Perplexity)
+  app.post("/api/perplexity/chat", async (req, res) => {
+    try {
+      const { prompt, history = [], options = {} } = req.body;
+      
+      if (!prompt) {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+      
+      // Use our open-source alternative implementation
+      const result = await queryPerplexity(prompt, history, options);
+      return res.json(result);
+    } catch (error) {
+      console.error("Enhanced chat API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to complete enhanced chat", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
 
   // API health check endpoint
   app.get("/api/health", (_req, res) => {
@@ -434,7 +488,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timestamp: new Date().toISOString(),
       services: {
         openai: openaiApiKey,
-        elevenlabs: elevenLabsApiKey
+        elevenlabs: elevenLabsApiKey,
+        enhancedSearch: "✓" // Our open-source search alternative is always available
       }
     });
   });

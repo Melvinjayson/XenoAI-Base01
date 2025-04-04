@@ -132,3 +132,22 @@
     outline-offset: 2px;
   }
 }
+
+/* Sound wave animation for floating companion */
+@keyframes sound-wave {
+  0% { height: 3px; }
+  50% { height: 12px; }
+  100% { height: 3px; }
+}
+
+.animate-sound-wave {
+  animation: sound-wave 1s infinite;
+}
+
+.animation-delay-200 {
+  animation-delay: 0.2s;
+}
+
+.animation-delay-400 {
+  animation-delay: 0.4s;
+}

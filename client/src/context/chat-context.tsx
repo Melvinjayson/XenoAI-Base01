@@ -180,11 +180,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Add a message to the chat (for internal use)
+  const addMessage = (message: { role: "user" | "assistant", content: string }) => {
+    const newMessage: Message = {
+      id: `${message.role}-${Date.now()}`,
+      role: message.role,
+      content: message.content,
+      timestamp: Date.now(),
+    };
+    
+    setMessages((prev) => [...prev, newMessage]);
+    
+    // If it's a user message, automatically trigger the AI response
+    if (message.role === "user") {
+      sendMessage(message.content);
+    }
+  };
+
   return (
     <ChatContext.Provider value={{ 
       messages, 
       isLoading, 
-      sendMessage, 
+      sendMessage,
+      addMessage, 
       clearConversation,
       createKnowledgeGraphFromConversation,
       lastSearchResult

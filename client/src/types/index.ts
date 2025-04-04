@@ -107,6 +107,7 @@ export interface ChatContextType {
   messages: Message[];
   isLoading: boolean;
   sendMessage: (message: string, filters?: SearchFilters) => Promise<void>;
+  addMessage: (message: { role: "user" | "assistant", content: string }) => void;
   clearConversation: () => void;
   createKnowledgeGraphFromConversation: () => Promise<{
     graph: KnowledgeGraph;
