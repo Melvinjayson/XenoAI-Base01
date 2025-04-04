@@ -74,35 +74,47 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             {message.relatedQueries && message.relatedQueries.length > 0 && (
               <div className="mt-4">
                 <h4 className="text-xs font-medium text-gray-500 mb-2">RELATED QUESTIONS</h4>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 max-w-full">
                   {message.relatedQueries.map((query, index) => (
                     <Button 
                       key={index} 
                       variant="outline" 
                       size="sm"
-                      className="text-xs py-1 h-auto"
+                      className="text-xs py-1 h-auto flex-shrink-0 max-w-full truncate"
                       onClick={() => handleRelatedQueryClick(query)}
                     >
-                      <MessageSquare className="w-3 h-3 mr-1" />
-                      {query}
+                      <MessageSquare className="w-3 h-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{query}</span>
                     </Button>
                   ))}
                 </div>
               </div>
             )}
             
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-xs text-gray-500">
-                Updated: {time}
-              </span>
-              <Button 
-                onClick={handleSpeak} 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 px-2 text-xs text-primary"
-              >
-                {isSpeaking ? "Stop" : "Listen"} 
-              </Button>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">
+                  Updated: {time}
+                </span>
+                <Button 
+                  onClick={handleSpeak} 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 px-2 text-xs text-primary"
+                >
+                  {isSpeaking ? "Stop" : "Listen"} 
+                </Button>
+              </div>
+              <Link href="/knowledge-graph">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                >
+                  <Network className="w-3 h-3 mr-1" />
+                  View Graph
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
