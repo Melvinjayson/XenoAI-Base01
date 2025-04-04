@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Card,
@@ -9,6 +9,24 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from '@/components/ui/button';
 import {
   AlertCircle,
@@ -26,6 +44,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from '@/lib/queryClient';
 // Define custom interfaces for demo data
 interface Project {
   id: number;
@@ -291,52 +311,136 @@ function formatDate(dateString: string | null | undefined) {
   return new Date(dateString).toLocaleDateString();
 }
 
+// Task Update Dialog Component
+interface TaskUpdateDialogProps {
+  task: Task;
+  onClose: () => void;
+  onUpdate: (taskId: number, data: Partial<Task>) => void;
+  isUpdating: boolean;
+}
+
+function TaskUpdateDialog({ task, onClose, onUpdate, isUpdating }: TaskUpdateDialogProps) {
+  const [status, setStatus] = useState(task.status);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const updatedTask: Partial<Task> = {
+      status,
+      // If task is marked as done, set completedDate to now
+      ...(status === 'done' && { completedDate: new Date().toISOString() }),
+    };
+    
+    onUpdate(task.id, updatedTask);
+  };
+  
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Update Task Status</DialogTitle>
+        <DialogDescription>
+          Change the status of "{task.title}"
+        </DialogDescription>
+      </DialogHeader>
+      
+      <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        <div className="grid gap-2">
+          <label htmlFor="status" className="text-sm font-medium">Status</label>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Status</SelectLabel>
+                <SelectItem value="todo">To Do</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="in_review">In Review</SelectItem>
+                <SelectItem value="done">Done</SelectItem>
+                <SelectItem value="blocked">Blocked</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isUpdating}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isUpdating}>
+            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Changes
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
 export default function ProjectManagementPage() {
   const [activeProject, setActiveProject] = useState<number | null>(null);
+  const [taskToUpdate, setTaskToUpdate] = useState<Task | null>(null);
+  const { toast } = useToast();
   
   const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ['/api/projects'],
     queryFn: async () => {
-      // When the API is ready, uncomment this code:
-      // const response = await fetch('/api/projects');
-      // if (!response.ok) throw new Error('Failed to fetch projects');
-      // return response.json();
-      
-      // Use demo data for now
-      return demoProjects;
+      // Connect to the real API
+      const response = await fetch('/api/projects');
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      return response.json();
     },
   });
   
   const { data: tasks, isLoading: tasksLoading } = useQuery({
     queryKey: ['/api/tasks', activeProject],
     queryFn: async () => {
-      // When the API is ready, uncomment this code:
-      // const response = await fetch(`/api/tasks${activeProject ? `?projectId=${activeProject}` : ''}`);
-      // if (!response.ok) throw new Error('Failed to fetch tasks');
-      // return response.json();
-      
-      // Use demo data for now
-      return activeProject 
-        ? demoTasks.filter(task => task.projectId === activeProject)
-        : demoTasks;
+      // Connect to the real API
+      const response = await fetch(`/api/tasks${activeProject ? `?projectId=${activeProject}` : ''}`);
+      if (!response.ok) throw new Error('Failed to fetch tasks');
+      return response.json();
     },
     enabled: !!activeProject,
   });
   
   const { data: insights, isLoading: insightsLoading } = useQuery({
-    queryKey: ['/api/insights', activeProject],
+    queryKey: ['/api/research-insights', activeProject],
     queryFn: async () => {
-      // When the API is ready, uncomment this code:
-      // const response = await fetch(`/api/insights${activeProject ? `?projectId=${activeProject}` : ''}`);
-      // if (!response.ok) throw new Error('Failed to fetch insights');
-      // return response.json();
-      
-      // Use demo data for now
-      return activeProject 
-        ? demoInsights.filter(insight => insight.projectId === activeProject)
-        : demoInsights;
+      // Connect to the real API
+      const response = await fetch(`/api/research-insights${activeProject ? `?projectId=${activeProject}` : ''}`);
+      if (!response.ok) throw new Error('Failed to fetch insights');
+      return response.json();
     },
     enabled: !!activeProject,
+  });
+  
+  // Task update mutation
+  const taskUpdateMutation = useMutation({
+    mutationFn: async ({ taskId, data }: { taskId: number; data: Partial<Task> }) => {
+      const response = await apiRequest(`/api/tasks/${taskId}`, 'PATCH', data);
+      return response;
+    },
+    onSuccess: () => {
+      // Close the dialog and show success message
+      setTaskToUpdate(null);
+      toast({
+        title: 'Task updated',
+        description: 'The task status has been updated successfully.',
+      });
+      
+      // Invalidate the tasks query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', activeProject] });
+      
+      // Also invalidate the projects query to refresh progress
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error updating task',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 
   useEffect(() => {
@@ -551,7 +655,13 @@ export default function ProjectManagementPage() {
                               </div>
                               <div className="flex items-center gap-2 mt-3 md:mt-0">
                                 {task.status !== 'done' && (
-                                  <Button variant="outline" size="sm">Update</Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => setTaskToUpdate(task)}
+                                  >
+                                    Update
+                                  </Button>
                                 )}
                                 {insights?.some(i => i.metadata && 'relevantTasks' in i.metadata && Array.isArray(i.metadata.relevantTasks) && i.metadata.relevantTasks.includes(task.id)) && (
                                   <Button variant="outline" size="icon" className="h-8 w-8" title="View linked insights">
@@ -674,6 +784,18 @@ export default function ProjectManagementPage() {
           )}
         </div>
       </div>
+
+      {/* Task Update Dialog */}
+      {taskToUpdate && (
+        <Dialog open={!!taskToUpdate} onOpenChange={(open) => !open && setTaskToUpdate(null)}>
+          <TaskUpdateDialog
+            task={taskToUpdate}
+            onClose={() => setTaskToUpdate(null)}
+            onUpdate={(taskId, data) => taskUpdateMutation.mutate({ taskId, data })}
+            isUpdating={taskUpdateMutation.isPending}
+          />
+        </Dialog>
+      )}
     </div>
   );
 }
