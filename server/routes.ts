@@ -11,6 +11,19 @@ import { uploadAndAnalyzeImage, extractColorsFromUrl } from "./color-analyzer";
 import { hexToRgb, rgbToHex } from "../client/src/lib/color-utils";
 import { apiQuotaManager } from "./api-quota-manager";
 import { 
+  analyzeConversationContext, 
+  suggestResearchComponents,
+  generateResearchInsights,
+  parseNaturalLanguageCommand,
+  type DetectedContext
+} from "./context-agent";
+import {
+  generateMindMap,
+  expandMindMapTopic,
+  mergeMindMaps,
+  type MindMap
+} from "./mind-map-manager";
+import { 
   InsertFile, 
   InsertCanvas, 
   insertCanvasSchema, 
