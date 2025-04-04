@@ -38,7 +38,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className={cn("flex flex-col mb-6", isUser && "items-end w-full")}>
+    <div className={cn("flex flex-col mb-4 sm:mb-6 w-full", isUser && "items-end")}>
       {isUser ? (
         <div className="bg-primary text-white rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%] w-full">
           <p className="text-sm">{message.content}</p>

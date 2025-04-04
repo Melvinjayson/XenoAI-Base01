@@ -15,7 +15,7 @@ export default function ChatContainer({ messages, onMessageTap }: ChatContainerP
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-6" role="log" aria-live="polite">
+    <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-4 sm:py-6 w-full" role="log" aria-live="polite">
       {messages.map((message) => (
         <div 
           key={message.id} 
