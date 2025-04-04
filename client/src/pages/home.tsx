@@ -3,7 +3,7 @@ import ChatContainer from "@/components/chat/chat-container";
 import EnhancedInputArea from "@/components/chat/enhanced-input-area";
 import VoiceIndicator from "@/components/chat/voice-indicator";
 import BottomSheet from "@/components/ui/bottom-sheet";
-import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal, Kanban } from "lucide-react";
+import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal, Kanban, Brain } from "lucide-react";
 import { useChat } from "@/context/chat-context";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
