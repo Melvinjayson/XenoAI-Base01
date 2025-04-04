@@ -192,7 +192,7 @@ export default function Home() {
   return (
     <div 
       ref={gestureRef}
-      className={`flex flex-col h-screen max-w-md mx-auto relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}
+      className={`flex flex-col h-screen w-full max-w-4xl mx-auto relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}
     >
       {/* Gesture Indicator */}
       {showGestureIndicator && 

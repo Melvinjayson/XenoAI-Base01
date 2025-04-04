@@ -28,7 +28,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
       speak(message.content, "default", language);
     }
   };
-  
+
   const handleRelatedQueryClick = (query: string) => {
     sendMessage(query);
   };
@@ -38,9 +38,9 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className={cn("flex flex-col mb-6", isUser && "items-end")}>
+    <div className={cn("flex flex-col mb-6", isUser && "items-end w-full")}> {/* Added w-full */}
       {isUser ? (
-        <div className="bg-primary text-white rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%]">
+        <div className="bg-primary text-white rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%] w-full"> {/* Added w-full */}
           <p className="text-sm">{message.content}</p>
         </div>
       ) : (
@@ -52,12 +52,12 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
-            
+
             {/* Display assets if available */}
             {message.assets && message.assets.length > 0 && (
               <InteractiveAsset assets={message.assets} className="mt-3" />
             )}
-            
+
             {/* Display sources with thumbnails and enhanced UI */}
             {message.sources && message.sources.length > 0 && (
               <div className="mt-4">
@@ -70,7 +70,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 </div>
               </div>
             )}
-            
+
             {/* Display related queries as suggested follow-up questions */}
             {message.relatedQueries && message.relatedQueries.length > 0 && (
               <div className="mt-4">
@@ -91,7 +91,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 </div>
               </div>
             )}
-            
+
             <div className="mt-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500">
@@ -126,7 +126,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
 function SourceItem({ source }: { source: any }) {
   const hasPublishDate = source.publishDate && source.publishDate.length > 0;
-  
+
   return (
     <div className="flex items-start gap-3 group hover:bg-gray-50 p-2 rounded-lg transition-colors">
       {source.thumbnail ? (
@@ -150,7 +150,7 @@ function SourceItem({ source }: { source: any }) {
           {source.name.charAt(0).toUpperCase()}
         </div>
       )}
-      
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
           <a
@@ -163,13 +163,13 @@ function SourceItem({ source }: { source: any }) {
           </a>
           <ExternalLink className="h-3 w-3 text-gray-400 flex-shrink-0 group-hover:text-primary transition-colors" />
         </div>
-        
+
         {source.snippet && (
           <p className="text-xs text-gray-600 mt-1 line-clamp-2 group-hover:line-clamp-none">
             {source.snippet}
           </p>
         )}
-        
+
         {hasPublishDate && (
           <div className="text-xs text-gray-500 mt-1">
             Published: {new Date(source.publishDate).toLocaleDateString()}
