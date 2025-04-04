@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { XIcon, ZoomInIcon, ZoomOutIcon, RotateCcwIcon, RotateCwIcon, VolumeIcon, Volume2Icon, HelpCircleIcon, QrCodeIcon } from 'lucide-react';
 import { useKnowledgeGraph } from '@/context/knowledge-graph-context';
 import GraphDisplay from './graph-display';
-import { useGestures } from '@/hooks/use-gestures';
+import { useGestureContext } from '@/context/gesture-context';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
@@ -35,7 +35,7 @@ const ImmersiveView: React.FC<ImmersiveViewProps> = ({ visualCommands = [], onCl
   const { graph, selectedNodeId, selectNode } = useKnowledgeGraph();
   
   // Initialize gesture support
-  const { registerGestureArea, unregisterGestureArea } = useGestures();
+  const { registerGestureArea, unregisterGestureArea } = useGestureContext();
   const { toast } = useToast();
   
   // Handle zoom in and out

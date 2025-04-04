@@ -170,7 +170,7 @@ export default function KnowledgeGraphPage() {
         <div className="flex flex-col h-full relative">
           {isImmersiveMode && (
             <ImmersiveView 
-              visualCommands={currentVisualCommands} 
+              visualCommands={currentVisualCommands || []} 
               onClose={toggleImmersiveMode} 
             />
           )}
