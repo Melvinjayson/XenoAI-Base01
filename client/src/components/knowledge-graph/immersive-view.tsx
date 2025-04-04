@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AIProcessingIndicator } from '@/components/ui/ai-processing-indicator';
 import { useAIProcessingState } from '@/hooks/use-ai-processing-state';
 import { toast } from '@/hooks/use-toast';
+import { useMobileDetection, useXRCapabilities, useTouchCapability } from '@/hooks/use-media-query';
 
 // Define KnowledgeGraph type
 interface KnowledgeGraphNode {
@@ -122,25 +123,29 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
           // Based on the optimized nodes and edges
           
           // Add interactive controls for VR
-          setupVRControls(session, gl, {
-            onSelectNode: (nodeId: string) => {
-              const node = graph.nodes.find(n => n.id === nodeId);
-              if (node && onNodeSelect) {
-                onNodeSelect(node);
+          if (gl) {
+            setupVRControls(session, gl, {
+              onSelectNode: (nodeId: string) => {
+                const node = graph.nodes.find(n => n.id === nodeId);
+                if (node && onNodeSelect) {
+                  onNodeSelect(node);
+                }
+              },
+              onExitVR: () => {
+                if (xrSessionRef.current) {
+                  xrSessionRef.current.end().catch(console.error);
+                }
               }
-            },
-            onExitVR: () => {
-              if (xrSessionRef.current) {
-                xrSessionRef.current.end().catch(console.error);
-              }
-            }
-          });
+            });
+          }
           
         } else {
           setAIState('thinking', 'No graph data available. Creating default visualization...');
           
           // Create a placeholder visualization when no data is available
-          createDefaultVRScene(gl);
+          if (gl) {
+            createDefaultVRScene(gl);
+          }
         }
         
         // Handle XR session events
