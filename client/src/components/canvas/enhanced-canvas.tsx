@@ -87,6 +87,9 @@ const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
   const [selectedElementId, setSelectedElementId] = useState<string | number | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [drawingTool, setDrawingTool] = useState<'pencil' | 'brush' | 'eraser' | null>(null);
+  const [drawingColor, setDrawingColor] = useState<string>('#6B4BFF');
+  const [drawingStrokeWidth, setDrawingStrokeWidth] = useState<number>(2);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isResearchPanelCollapsed, setIsResearchPanelCollapsed] = useState(false);
@@ -354,6 +357,48 @@ const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
     setCanvasConnections(updatedConnections);
     
     pushToHistory(canvasElements, updatedConnections);
+  };
+  
+  // Handle drawing tool selection
+  const handleSelectDrawingTool = (tool: string, color: string, strokeWidth: number) => {
+    if (isLocked) return;
+    
+    if (tool === 'pencil' || tool === 'brush' || tool === 'eraser') {
+      setDrawingTool(tool);
+      setDrawingColor(color);
+      setDrawingStrokeWidth(strokeWidth);
+    } else {
+      setDrawingTool(null);
+    }
+  };
+  
+  // Handle drawing completion
+  const handleDrawingComplete = (dataUrl: string) => {
+    // Convert drawing to a canvas element
+    if (!dataUrl) return;
+    
+    const newElement: CanvasElement = {
+      id: `drawing-${Date.now()}`,
+      type: 'drawing',
+      content: dataUrl,
+      x: 0,
+      y: 0,
+      width: canvasSize.width,
+      height: canvasSize.height,
+      zIndex: canvasElements.length + 1,
+      style: {
+        opacity: 1
+      },
+      metadata: {
+        tool: drawingTool,
+        color: drawingColor,
+        strokeWidth: drawingStrokeWidth
+      }
+    };
+    
+    const newElements = [...canvasElements, newElement];
+    setCanvasElements(newElements);
+    pushToHistory(newElements, canvasConnections);
   };
   
   // Handle adding research item to canvas
@@ -722,6 +767,17 @@ const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
               backgroundColor: 'white',
             }}
           >
+            {/* Drawing surface for pencil and brush tools */}
+            {drawingTool && (
+              <CanvasDrawingSurface
+                tool={drawingTool}
+                color={drawingColor}
+                strokeWidth={drawingStrokeWidth}
+                width={canvasSize.width}
+                height={canvasSize.height}
+                onComplete={handleDrawingComplete}
+              />
+            )}
             {/* Render connections */}
             <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
               {canvasConnections.map(connection => (
@@ -890,6 +946,7 @@ const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
         onCreateText={() => handleCreateElement('text', { content: 'Text Block' })}
         onCreateShape={(shape) => handleCreateElement('shape', { content: shape })}
         onCreateNode={() => handleCreateElement('mindmap', { content: 'New Concept', metadata: { type: 'concept' } })}
+        onSelectDrawingTool={handleSelectDrawingTool}
         position="left"
         isVisible={!isLocked}
       />

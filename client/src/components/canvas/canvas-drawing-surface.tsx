@@ -9,7 +9,9 @@ interface CanvasDrawingSurfaceProps {
   tool: 'pencil' | 'brush' | 'eraser' | null;
   color: string;
   strokeWidth: number;
-  onDrawingComplete?: (dataUrl: string) => void;
+  width?: number;
+  height?: number;
+  onComplete?: (dataUrl: string) => void;
   className?: string;
 }
 
@@ -17,20 +19,39 @@ const CanvasDrawingSurface = ({
   tool,
   color,
   strokeWidth,
-  onDrawingComplete,
+  width,
+  height,
+  onComplete,
   className = ''
 }: CanvasDrawingSurfaceProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [canvasSize, setCanvasSize] = useState({ 
+    width: width || 0, 
+    height: height || 0 
+  });
   
   // Initialize canvas and handle resize
   useEffect(() => {
     const handleResize = () => {
-      if (canvasRef.current && canvasRef.current.parentElement) {
-        const { width, height } = canvasRef.current.parentElement.getBoundingClientRect();
-        setCanvasSize({ width, height });
+      if (canvasRef.current) {
+        let newWidth = width;
+        let newHeight = height;
+        
+        // If width/height not provided, use parent element size
+        if (!newWidth || !newHeight) {
+          if (canvasRef.current.parentElement) {
+            const rect = canvasRef.current.parentElement.getBoundingClientRect();
+            newWidth = newWidth || rect.width;
+            newHeight = newHeight || rect.height;
+          }
+        }
+        
+        setCanvasSize({ 
+          width: newWidth || 800, 
+          height: newHeight || 600 
+        });
         
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
@@ -39,8 +60,8 @@ const CanvasDrawingSurface = ({
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           
           // Resize canvas
-          canvas.width = width;
-          canvas.height = height;
+          canvas.width = newWidth || 800;
+          canvas.height = newHeight || 600;
           
           // Restore content
           ctx.putImageData(imageData, 0, 0);
@@ -54,7 +75,7 @@ const CanvasDrawingSurface = ({
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [width, height]);
   
   // Set up canvas drawing context
   useEffect(() => {
@@ -138,9 +159,9 @@ const CanvasDrawingSurface = ({
   };
   
   const stopDrawing = () => {
-    if (isDrawing && onDrawingComplete && canvasRef.current) {
+    if (isDrawing && onComplete && canvasRef.current) {
       const dataUrl = canvasRef.current.toDataURL();
-      onDrawingComplete(dataUrl);
+      onComplete(dataUrl);
     }
     
     setIsDrawing(false);
@@ -157,8 +178,8 @@ const CanvasDrawingSurface = ({
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    if (onDrawingComplete) {
-      onDrawingComplete(canvas.toDataURL());
+    if (onComplete) {
+      onComplete(canvas.toDataURL());
     }
   };
   

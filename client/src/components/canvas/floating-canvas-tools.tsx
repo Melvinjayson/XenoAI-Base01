@@ -68,7 +68,13 @@ const FloatingCanvasTools = ({
   };
   
   const selectTool = (tool: string) => {
-    setActiveTool(tool === activeTool ? null : tool);
+    const newTool = tool === activeTool ? null : tool;
+    setActiveTool(newTool);
+    
+    // Call the callback when a drawing tool is selected
+    if (onSelectDrawingTool && ['pencil', 'brush', 'eraser'].includes(tool)) {
+      onSelectDrawingTool(tool, selectedColor, strokeWidth);
+    }
   };
   
   // Position styles
@@ -281,7 +287,13 @@ const FloatingCanvasTools = ({
                     selectedColor === color ? 'ring-2 ring-primary' : 'border-gray-300'
                   }`}
                   style={{ backgroundColor: color }}
-                  onClick={() => setSelectedColor(color)}
+                  onClick={() => {
+                    setSelectedColor(color);
+                    // Update drawing tool with new color if a drawing tool is active
+                    if (onSelectDrawingTool && activeTool && ['pencil', 'brush', 'eraser'].includes(activeTool)) {
+                      onSelectDrawingTool(activeTool, color, strokeWidth);
+                    }
+                  }}
                 />
               ))}
             </div>
@@ -294,7 +306,14 @@ const FloatingCanvasTools = ({
                   min={1}
                   max={20}
                   step={1}
-                  onValueChange={(value) => setStrokeWidth(value[0])}
+                  onValueChange={(value) => {
+                    const newWidth = value[0];
+                    setStrokeWidth(newWidth);
+                    // Update drawing tool with new stroke width if a drawing tool is active
+                    if (onSelectDrawingTool && activeTool && ['pencil', 'brush', 'eraser'].includes(activeTool)) {
+                      onSelectDrawingTool(activeTool, selectedColor, newWidth);
+                    }
+                  }}
                   className="py-1"
                 />
               </div>
