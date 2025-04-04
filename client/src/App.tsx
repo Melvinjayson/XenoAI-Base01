@@ -7,6 +7,7 @@ import Home from "@/pages/home";
 import KnowledgeGraphPage from "@/pages/knowledge-graph";
 import SplashPage from "@/pages/splash-page";
 import OnboardingPage from "@/pages/onboarding-page";
+import VRExperience from "@/pages/vr-experience";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -55,6 +56,7 @@ function Router() {
         <Route path="/onboarding" component={OnboardingPage} />
         <Route path="/" component={Home} />
         <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
+        <Route path="/vr-experience" component={VRExperience} />
         <Route component={NotFound} />
       </Switch>
       

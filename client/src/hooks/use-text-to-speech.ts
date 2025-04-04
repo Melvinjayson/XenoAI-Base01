@@ -1,21 +1,46 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 
+// Enhanced interface with visualization command support
 interface TextToSpeechResult {
-  speak: (text: string, voiceId?: string, language?: string) => void;
+  speak: (text: string, voiceId?: string, language?: string, visualCommands?: VisualizationCommand[]) => void;
   isSpeaking: boolean;
   stopSpeaking: () => void;
   hasSpeechSupport: boolean;
+  currentVisualCommands: VisualizationCommand[] | null;
+}
+
+// Types for data visualization commands
+export type VisualizationCommandType = 
+  | 'zoom' 
+  | 'focus' 
+  | 'highlight' 
+  | 'filter' 
+  | 'expand' 
+  | 'collapse'
+  | 'rotate'
+  | 'changeLayout'
+  | 'showDetails'
+  | 'compareNodes';
+
+export interface VisualizationCommand {
+  type: VisualizationCommandType;
+  target?: string | string[];      // Node ID(s) or area to apply command to
+  value?: number | string | any;   // Command parameter (zoom level, filter value, etc.)
+  duration?: number;               // How long the command should take (in ms)
+  delay?: number;                  // Delay before executing command (in ms)
 }
 
 interface PendingAudio {
   text: string;
   voiceId: string;
   language: string;
+  visualCommands?: VisualizationCommand[];
 }
 
 export function useTextToSpeech(): TextToSpeechResult {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentVisualCommands, setCurrentVisualCommands] = useState<VisualizationCommand[] | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
   const audioQueueRef = useRef<PendingAudio[]>([]);
@@ -59,11 +84,17 @@ export function useTextToSpeech(): TextToSpeechResult {
   const processNextInQueue = useCallback(async () => {
     if (audioQueueRef.current.length === 0) {
       isProcessingRef.current = false;
+      setCurrentVisualCommands(null);
       return;
     }
 
     isProcessingRef.current = true;
-    const { text, voiceId, language } = audioQueueRef.current.shift()!;
+    const { text, voiceId, language, visualCommands } = audioQueueRef.current.shift()!;
+    
+    // Update visualization commands if provided
+    if (visualCommands && visualCommands.length > 0) {
+      setCurrentVisualCommands(visualCommands);
+    }
 
     try {
       console.log("Synthesizing speech with voice:", voiceId, "language:", language);
@@ -131,7 +162,12 @@ export function useTextToSpeech(): TextToSpeechResult {
     }
   }, []);
 
-  const speak = useCallback(async (text: string, voiceId: string = "default", language: string = "en") => {
+  const speak = useCallback(async (
+    text: string, 
+    voiceId: string = "default", 
+    language: string = "en",
+    visualCommands?: VisualizationCommand[]
+  ) => {
     if (!text) return;
 
     // Sanitize voiceId to ensure it's valid
@@ -139,8 +175,13 @@ export function useTextToSpeech(): TextToSpeechResult {
       ? voiceId 
       : 'default';
 
-    // Add to queue with validated voice ID and language
-    audioQueueRef.current.push({ text, voiceId: validVoiceId, language });
+    // Add to queue with validated voice ID, language and visual commands
+    audioQueueRef.current.push({ 
+      text, 
+      voiceId: validVoiceId, 
+      language,
+      visualCommands 
+    });
     
     // If we're not currently processing the queue, start processing
     if (!isProcessingRef.current) {
@@ -200,6 +241,7 @@ export function useTextToSpeech(): TextToSpeechResult {
     speak,
     isSpeaking,
     stopSpeaking,
-    hasSpeechSupport
+    hasSpeechSupport,
+    currentVisualCommands
   };
 }

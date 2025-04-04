@@ -4,11 +4,13 @@ import { useChat } from '@/context/chat-context';
 import GraphDisplay from '@/components/knowledge-graph/graph-display';
 import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
-import { ArrowLeftIcon, MessageSquareTextIcon, LoaderIcon, Download, Pin, FilePlus, ExternalLink, Maximize, Minimize } from 'lucide-react';
+import { ArrowLeftIcon, MessageSquareTextIcon, LoaderIcon, Download, Pin, FilePlus, ExternalLink, Maximize, Minimize, Glasses, MonitorIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ImmersiveView from '@/components/knowledge-graph/immersive-view';
+import { useTextToSpeech, VisualizationCommand } from '@/hooks/use-text-to-speech';
 
 // Wrapper component to access both contexts
 const KnowledgeGraphContent = () => {
@@ -88,6 +90,9 @@ type ExportFormat = 'pdf' | 'csv' | 'json' | 'png' | 'excel';
 
 export default function KnowledgeGraphPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false);
+  const { speak, currentVisualCommands, stopSpeaking } = useTextToSpeech();
+  const { toast } = useToast();
   
   // Toggle fullscreen mode
   const toggleFullscreen = () => {
@@ -108,6 +113,28 @@ export default function KnowledgeGraphPage() {
     }
   };
   
+  // Enter immersive mode
+  const toggleImmersiveMode = () => {
+    if (!isImmersiveMode) {
+      // Entering immersive mode
+      setIsImmersiveMode(true);
+      // Optional voice guidance when entering immersive mode
+      speak(
+        "Entering immersive knowledge exploration mode. You can navigate and interact with the knowledge graph using the on-screen controls or voice commands.", 
+        "default", 
+        "en",
+        [
+          { type: 'zoom', value: 1.5, duration: 1500 },
+          { type: 'rotate', value: 15, delay: 1000, duration: 1500 }
+        ]
+      );
+    } else {
+      // Exiting immersive mode
+      setIsImmersiveMode(false);
+      stopSpeaking();
+    }
+  };
+  
   // Exit fullscreen when component unmounts
   useEffect(() => {
     return () => {
@@ -116,25 +143,38 @@ export default function KnowledgeGraphPage() {
           console.error(`Error exiting fullscreen: ${err.message}`);
         });
       }
+      stopSpeaking();
     };
-  }, []);
+  }, [stopSpeaking]);
   
   // Effect to listen for fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
+      
+      // If user exits fullscreen using ESC key, also exit immersive mode
+      if (!document.fullscreenElement && isImmersiveMode) {
+        setIsImmersiveMode(false);
+      }
     };
     
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
+  }, [isImmersiveMode]);
   
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-background p-2' : 'container mx-auto p-2 md:p-4'} flex flex-col h-[calc(100vh-2rem)]`}>
       <KnowledgeGraphProvider>
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full relative">
+          {isImmersiveMode && (
+            <ImmersiveView 
+              visualCommands={currentVisualCommands} 
+              onClose={toggleImmersiveMode} 
+            />
+          )}
+          
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2">
               <Link href="/">
@@ -160,9 +200,24 @@ export default function KnowledgeGraphPage() {
                 </SelectContent>
               </Select>
               
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="hidden md:flex"
+              >
                 <Download className="w-4 h-4 mr-2" />
                 Export
+              </Button>
+              
+              <Button 
+                variant="secondary" 
+                size="sm"
+                onClick={toggleImmersiveMode}
+                className="hidden md:flex"
+                title="Immersive Learning Mode"
+              >
+                <Glasses className="w-4 h-4 mr-2" />
+                Immersive
               </Button>
               
               <Button 
