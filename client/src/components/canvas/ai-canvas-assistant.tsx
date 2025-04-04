@@ -9,7 +9,9 @@ import {
   PencilRuler, 
   Brain,
   Send,
-  Mic
+  Mic,
+  Code,
+  FileCode
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useChat } from '@/context/chat-context';
 import { useTextToSpeech } from '@/hooks/use-text-to-speech';
+import CodeSnippet from './code-snippet';
 
 // Character appearance styles
 const characterColors = {

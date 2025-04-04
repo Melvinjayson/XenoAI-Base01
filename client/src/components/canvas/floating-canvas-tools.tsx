@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Pencil, 
@@ -10,11 +10,15 @@ import {
   Paintbrush, 
   Eraser,
   Pipette,
-  Image,
+  Image as ImageIcon,
   PenTool,
   Palette,
   ChevronUp,
-  Settings
+  Settings,
+  Upload,
+  FileImage,
+  FileText,
+  File
 } from 'lucide-react';
 import { 
   Tooltip, 
@@ -45,6 +49,7 @@ interface FloatingCanvasToolsProps {
   onCreateShape: (shape: string) => void;
   onCreateNode: () => void;
   onSelectDrawingTool?: (tool: string, color: string, strokeWidth: number) => void;
+  onFileUpload?: (file: File) => void;
   position?: 'left' | 'right';
   isVisible?: boolean;
 }
@@ -54,6 +59,7 @@ const FloatingCanvasTools = ({
   onCreateShape,
   onCreateNode,
   onSelectDrawingTool,
+  onFileUpload,
   position = 'left',
   isVisible = true
 }: FloatingCanvasToolsProps) => {
@@ -62,6 +68,7 @@ const FloatingCanvasTools = ({
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [selectedColor, setSelectedColor] = useState(colors[0]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const toggleTools = () => {
     setIsOpen(!isOpen);
@@ -74,6 +81,18 @@ const FloatingCanvasTools = ({
     // Call the callback when a drawing tool is selected
     if (onSelectDrawingTool && ['pencil', 'brush', 'eraser'].includes(tool)) {
       onSelectDrawingTool(tool, selectedColor, strokeWidth);
+    }
+  };
+  
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0 && onFileUpload) {
+      onFileUpload(e.target.files[0]);
+    }
+  };
+  
+  const triggerFileUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
   
@@ -215,6 +234,30 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Add knowledge node</TooltipContent>
                 </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant={activeTool === 'upload' ? 'default' : 'outline'} 
+                      size="sm" 
+                      className="flex flex-col items-center justify-center p-2 h-14"
+                      onClick={triggerFileUpload}
+                    >
+                      <Upload className="h-5 w-5 mb-1" />
+                      <span className="text-xs">Upload</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Upload files to canvas</TooltipContent>
+                </Tooltip>
+                
+                {/* Hidden file input */}
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  onChange={handleFileInputChange}
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  style={{ display: 'none' }}
+                />
               </TooltipProvider>
             </motion.div>
           )}
