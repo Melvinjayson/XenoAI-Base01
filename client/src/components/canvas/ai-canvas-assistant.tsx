@@ -23,6 +23,7 @@ import { useChat } from '@/context/chat-context';
 import { useTextToSpeech } from '@/hooks/use-text-to-speech';
 import { useToast } from '@/hooks/use-toast';
 import CodeSnippet from './code-snippet';
+import CodeLoadingAnimation from './code-loading-animation';
 
 // Character appearance styles
 const characterColors = {
@@ -59,6 +60,8 @@ const AICanvasAssistant = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
   const [codeSnippets, setCodeSnippets] = useState<CodeSnippetData[]>([]);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [loadingCodeLanguage, setLoadingCodeLanguage] = useState<string>('javascript');
   const [currentSuggestions, setCurrentSuggestions] = useState<SuggestionItem[]>([
     { id: 1, text: "Add a central concept node" },
     { id: 2, text: "Create a flowchart for your idea" },
@@ -100,6 +103,40 @@ const AICanvasAssistant = ({
     if (!inputValue.trim() || isLoading) return;
     
     const message = `Canvas Assistant: ${inputValue}`;
+    
+    // Check if the message is requesting code
+    const isCodeRequest = inputValue.toLowerCase().includes('code') || 
+                          inputValue.toLowerCase().includes('function') || 
+                          inputValue.toLowerCase().includes('script') ||
+                          inputValue.toLowerCase().includes('class') ||
+                          inputValue.toLowerCase().includes('program');
+    
+    // If the message is about code, predict the likely language
+    if (isCodeRequest) {
+      setIsGeneratingCode(true);
+      // Detect language from the query
+      if (inputValue.toLowerCase().includes('javascript') || inputValue.toLowerCase().includes('js')) {
+        setLoadingCodeLanguage('javascript');
+      } else if (inputValue.toLowerCase().includes('typescript') || inputValue.toLowerCase().includes('ts')) {
+        setLoadingCodeLanguage('typescript');
+      } else if (inputValue.toLowerCase().includes('python') || inputValue.toLowerCase().includes('py')) {
+        setLoadingCodeLanguage('python');
+      } else if (inputValue.toLowerCase().includes('java')) {
+        setLoadingCodeLanguage('java');
+      } else if (inputValue.toLowerCase().includes('c#') || inputValue.toLowerCase().includes('csharp')) {
+        setLoadingCodeLanguage('csharp');
+      } else if (inputValue.toLowerCase().includes('html')) {
+        setLoadingCodeLanguage('html');
+      } else if (inputValue.toLowerCase().includes('css')) {
+        setLoadingCodeLanguage('css');
+      } else if (inputValue.toLowerCase().includes('sql')) {
+        setLoadingCodeLanguage('sql');
+      }
+      
+      // Automatically switch to the code tab if requesting code
+      setActiveTab('code');
+    }
+    
     await sendMessage(message);
     setInputValue('');
   };
@@ -370,7 +407,11 @@ const AICanvasAssistant = ({
                   
                   <TabsContent value="code" className="m-0 outline-none">
                     <div className="bg-gray-50 p-3 overflow-y-auto max-h-60 min-h-[200px]">
-                      {codeSnippets.length > 0 ? (
+                      {isGeneratingCode ? (
+                        <div className="flex flex-col gap-3">
+                          <CodeLoadingAnimation language={loadingCodeLanguage} title="Generating Code..." />
+                        </div>
+                      ) : codeSnippets.length > 0 ? (
                         <div className="flex flex-col gap-3">
                           {codeSnippets.map((snippet, index) => (
                             <CodeSnippet
