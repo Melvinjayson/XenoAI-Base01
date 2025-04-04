@@ -175,7 +175,16 @@ export function SplashScreen() {
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="mb-4 relative"
         >
-          {/* Logo would go here if we had one */}
+          <div className="relative w-24 h-24">
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm" />
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-12 h-12 text-white" fill="currentColor">
+                <path d="M12 2L4 7l8 5 8-5-8-5zM4 15l8 5 8-5-8-5-8 5zm8-3L4 17l8 5 8-5-8-5z"/>
+              </svg>
+            </div>
+            <div className="absolute -inset-1 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-xl blur-xl" />
+          </div>
         </motion.div>
       </div>
 

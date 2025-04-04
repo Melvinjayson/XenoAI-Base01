@@ -352,9 +352,18 @@ export function FloatingVoiceWidget() {
               <Button
                 onClick={toggleWidget}
                 size="icon"
-                className="h-12 w-12 rounded-full shadow-lg"
+                className="h-12 w-12 rounded-full shadow-lg relative overflow-hidden bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500"
               >
-                {isOpen ? <X size={20} /> : <Sparkles size={20} />}
+                {isOpen ? (
+                  <X size={20} className="text-white" />
+                ) : (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-pulse" />
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-white relative z-10" fill="currentColor">
+                      <path d="M12 2L4 7l8 5 8-5-8-5zM4 15l8 5 8-5-8-5-8 5zm8-3L4 17l8 5 8-5-8-5z"/>
+                    </svg>
+                  </div>
+                )}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
