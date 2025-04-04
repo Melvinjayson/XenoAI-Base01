@@ -377,3 +377,49 @@ export type InsertProjectComment = z.infer<typeof insertProjectCommentSchema>;
 
 export type TaskComment = typeof taskComments.$inferSelect;
 export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+
+// Color Palette management for Adaptive Color Palette Generator
+export const colorPalettes = pgTable('color_palettes', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  userId: text('user_id'),
+  primary: text('primary').notNull(),
+  primaryLight: text('primary_light').notNull(),
+  primaryDark: text('primary_dark').notNull(),
+  secondary: text('secondary').notNull(),
+  secondaryLight: text('secondary_light').notNull(),
+  secondaryDark: text('secondary_dark').notNull(),
+  accent: text('accent').notNull(),
+  background: text('background').notNull(),
+  surface: text('surface').notNull(),
+  text: text('text').notNull(),
+  textSecondary: text('text_secondary').notNull(),
+  success: text('success').notNull(),
+  warning: text('warning').notNull(),
+  error: text('error').notNull(),
+  sourceType: text('source_type').notNull(), // 'image', 'theme', 'custom'
+  sourceImage: text('source_image'), // URL or path to source image if applicable
+  isDefault: boolean('is_default').default(false),
+  metadata: json('metadata').$type<{
+    theme?: string;
+    tags?: string[];
+    harmony?: string;
+    colorSpace?: string;
+    accessibility?: {
+      wcagLevel?: string;
+      contrastRatio?: number;
+    };
+  }>(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const insertColorPaletteSchema = createInsertSchema(colorPalettes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ColorPalette = typeof colorPalettes.$inferSelect;
+export type InsertColorPalette = z.infer<typeof insertColorPaletteSchema>;

@@ -12,6 +12,7 @@ import VRExperience from "@/pages/vr-experience";
 import CanvasPage from "@/pages/canvas-page";
 import AdminPage from "@/pages/admin-page";
 import ProjectManagementPage from "@/pages/project-management";
+import ColorPaletteGeneratorPage from "@/pages/color-palette-generator";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -98,6 +99,7 @@ function Router() {
           <Route path="/canvas/:id" component={CanvasPage} />
           <Route path="/admin" component={AdminPage} />
           <Route path="/project-management" component={ProjectManagementPage} />
+          <Route path="/color-palette" component={ColorPaletteGeneratorPage} />
           <Route component={NotFound} />
         </Switch>
         

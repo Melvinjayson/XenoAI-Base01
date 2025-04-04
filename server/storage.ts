@@ -1,5 +1,5 @@
 import { 
-  users, messages, sessions, bookmarks, files, insights, preferences, canvases, canvasElements,
+  users, messages, sessions, bookmarks, files, insights, preferences, canvases, canvasElements, colorPalettes,
   type User, type InsertUser, 
   type Message, type InsertMessage, 
   type Session, type InsertSession,
@@ -8,7 +8,8 @@ import {
   type Insight, type InsertInsight,
   type Preference, type InsertPreference,
   type Canvas, type InsertCanvas,
-  type CanvasElement, type InsertCanvasElement
+  type CanvasElement, type InsertCanvasElement,
+  type ColorPalette, type InsertColorPalette
 } from "@shared/schema";
 
 // Memory types for enhanced context awareness
@@ -100,6 +101,15 @@ export interface IStorage {
   updateCanvasElement(elementId: number, data: Partial<InsertCanvasElement>): Promise<CanvasElement | undefined>;
   deleteCanvasElement(elementId: number): Promise<boolean>;
   deleteCanvasElements(canvasId: number): Promise<boolean>;
+  
+  // Color palette methods
+  createColorPalette(palette: InsertColorPalette): Promise<ColorPalette>;
+  getColorPalettes(userId?: string): Promise<ColorPalette[]>;
+  getColorPaletteById(paletteId: number): Promise<ColorPalette | undefined>;
+  updateColorPalette(paletteId: number, data: Partial<InsertColorPalette>): Promise<ColorPalette | undefined>;
+  deleteColorPalette(paletteId: number): Promise<boolean>;
+  getDefaultColorPalette(): Promise<ColorPalette | undefined>;
+  setDefaultColorPalette(paletteId: number): Promise<ColorPalette | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -117,6 +127,7 @@ export class MemStorage implements IStorage {
   private preferences: Map<string, Preference[]>; // Key is userId
   private canvases: Map<number, Canvas>;
   private canvasElements: Map<number, CanvasElement[]>; // Key is canvasId
+  private colorPalettes: Map<number, ColorPalette>; // For adaptive color palette generator
   
   private userCurrentId: number;
   private messageCurrentId: number;
@@ -127,6 +138,7 @@ export class MemStorage implements IStorage {
   private preferenceCurrentId: number;
   private canvasCurrentId: number;
   private canvasElementCurrentId: number;
+  private colorPaletteCurrentId: number;
 
   constructor() {
     this.users = new Map();
@@ -143,6 +155,7 @@ export class MemStorage implements IStorage {
     this.preferences = new Map();
     this.canvases = new Map();
     this.canvasElements = new Map();
+    this.colorPalettes = new Map();
     
     this.userCurrentId = 1;
     this.messageCurrentId = 1;
@@ -153,6 +166,7 @@ export class MemStorage implements IStorage {
     this.preferenceCurrentId = 1;
     this.canvasCurrentId = 1;
     this.canvasElementCurrentId = 1;
+    this.colorPaletteCurrentId = 1;
   }
 
   // User methods
@@ -834,6 +848,89 @@ export class MemStorage implements IStorage {
       }
     }
     return exists;
+  }
+
+  // Color palette methods
+  async createColorPalette(palette: InsertColorPalette): Promise<ColorPalette> {
+    const id = this.colorPaletteCurrentId++;
+    const now = new Date();
+    
+    const newPalette: ColorPalette = {
+      ...palette,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.colorPalettes.set(id, newPalette);
+    return newPalette;
+  }
+  
+  async getColorPalettes(userId?: string): Promise<ColorPalette[]> {
+    const allPalettes = Array.from(this.colorPalettes.values());
+    
+    if (userId) {
+      return allPalettes.filter(palette => palette.userId === userId);
+    }
+    
+    return allPalettes;
+  }
+  
+  async getColorPaletteById(paletteId: number): Promise<ColorPalette | undefined> {
+    return this.colorPalettes.get(paletteId);
+  }
+  
+  async updateColorPalette(paletteId: number, data: Partial<InsertColorPalette>): Promise<ColorPalette | undefined> {
+    const palette = this.colorPalettes.get(paletteId);
+    
+    if (!palette) {
+      return undefined;
+    }
+    
+    const updatedPalette: ColorPalette = {
+      ...palette,
+      ...data,
+      updatedAt: new Date()
+    };
+    
+    this.colorPalettes.set(paletteId, updatedPalette);
+    return updatedPalette;
+  }
+  
+  async deleteColorPalette(paletteId: number): Promise<boolean> {
+    return this.colorPalettes.delete(paletteId);
+  }
+  
+  async getDefaultColorPalette(): Promise<ColorPalette | undefined> {
+    const allPalettes = Array.from(this.colorPalettes.values());
+    return allPalettes.find(palette => palette.isDefault);
+  }
+  
+  async setDefaultColorPalette(paletteId: number): Promise<ColorPalette | undefined> {
+    const palette = this.colorPalettes.get(paletteId);
+    
+    if (!palette) {
+      return undefined;
+    }
+    
+    // First, set all palettes to non-default
+    const allPalettes = Array.from(this.colorPalettes.values());
+    for (const p of allPalettes) {
+      if (p.isDefault) {
+        const updated = { ...p, isDefault: false, updatedAt: new Date() };
+        this.colorPalettes.set(p.id, updated);
+      }
+    }
+    
+    // Then set the selected palette as default
+    const updatedPalette: ColorPalette = {
+      ...palette,
+      isDefault: true,
+      updatedAt: new Date()
+    };
+    
+    this.colorPalettes.set(paletteId, updatedPalette);
+    return updatedPalette;
   }
 }
 

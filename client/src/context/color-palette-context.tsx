@@ -1,163 +1,235 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import {
-  ColorPalette,
-  generatePaletteFromColor,
-  generateThemePalette,
-  generatePaletteFromImage,
-} from '@/lib/color-utils';
-
-type ColorTheme = 'light' | 'dark' | 'system' | 'nature' | 'ocean' | 'sunset' | 'monochrome';
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import { ColorPalette } from '@shared/schema';
 
 interface ColorPaletteContextType {
-  palette: ColorPalette;
-  currentTheme: ColorTheme;
-  setPrimaryColor: (color: string) => void;
-  setTheme: (theme: ColorTheme) => void;
-  generateFromImage: (imageUrl: string) => Promise<ColorPalette>;
-  resetToDefault: () => void;
-  applyToCss: () => void;
+  palettes: ColorPalette[];
+  currentPalette: ColorPalette;
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  generateFromImage: (imageData: string, name: string, brightness?: number, hue?: number) => Promise<void>;
+  generateFromUrl: (imageUrl: string, name: string, brightness?: number, hue?: number) => Promise<void>;
+  setCurrentPalette: (palette: ColorPalette) => void;
+  setDefaultPalette: (paletteId: number) => Promise<void>;
 }
 
-const defaultPrimaryColor = '#6B4BFF'; // Xeno AI's primary purple
-const defaultTheme: ColorTheme = 'system';
+const ColorPaletteContext = createContext<ColorPaletteContextType | null>(null);
 
-const defaultPalette = generateThemePalette(defaultPrimaryColor, defaultTheme);
+export function ColorPaletteProvider({ children }: { children: ReactNode }) {
+  const [palettes, setPalettes] = useState<ColorPalette[]>([]);
+  const [currentPalette, setCurrentPalette] = useState<ColorPalette | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
-const ColorPaletteContext = createContext<ColorPaletteContextType>({
-  palette: defaultPalette,
-  currentTheme: defaultTheme,
-  setPrimaryColor: () => {},
-  setTheme: () => {},
-  generateFromImage: async (imageUrl: string) => defaultPalette,
-  resetToDefault: () => {},
-  applyToCss: () => {},
-});
-
-export const useColorPalette = () => useContext(ColorPaletteContext);
-
-interface ColorPaletteProviderProps {
-  children: ReactNode;
-}
-
-export const ColorPaletteProvider: React.FC<ColorPaletteProviderProps> = ({ children }) => {
-  const [palette, setPalette] = useState<ColorPalette>(defaultPalette);
-  const [primaryColor, setPrimaryColor] = useState<string>(defaultPrimaryColor);
-  const [currentTheme, setCurrentTheme] = useState<ColorTheme>(defaultTheme);
-  
-  // Update the palette when primary color or theme changes
   useEffect(() => {
-    const newPalette = generateThemePalette(primaryColor, currentTheme);
-    setPalette(newPalette);
-    applyPaletteToCss(newPalette);
-  }, [primaryColor, currentTheme]);
-  
-  // Apply palette colors to CSS variables
-  const applyPaletteToCss = useCallback((palette: ColorPalette) => {
-    const root = document.documentElement;
-    
-    // Set CSS variables
-    root.style.setProperty('--color-primary', palette.primary);
-    root.style.setProperty('--color-primary-light', palette.primaryLight);
-    root.style.setProperty('--color-primary-dark', palette.primaryDark);
-    
-    root.style.setProperty('--color-secondary', palette.secondary);
-    root.style.setProperty('--color-secondary-light', palette.secondaryLight);
-    root.style.setProperty('--color-secondary-dark', palette.secondaryDark);
-    
-    root.style.setProperty('--color-accent', palette.accent);
-    
-    root.style.setProperty('--color-background', palette.background);
-    root.style.setProperty('--color-surface', palette.surface);
-    root.style.setProperty('--color-text', palette.text);
-    root.style.setProperty('--color-text-secondary', palette.textSecondary);
-    
-    root.style.setProperty('--color-success', palette.success);
-    root.style.setProperty('--color-warning', palette.warning);
-    root.style.setProperty('--color-error', palette.error);
-    
-    // Update theme color meta tag
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', palette.primary);
-    } else {
-      const newMeta = document.createElement('meta');
-      newMeta.name = 'theme-color';
-      newMeta.content = palette.primary;
-      document.head.appendChild(newMeta);
-    }
+    fetchPalettes();
   }, []);
-  
-  // Generate palette from an image
-  const generateFromImage = useCallback(async (imageUrl: string) => {
+
+  const fetchPalettes = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const newPalette = await generatePaletteFromImage(imageUrl);
-      setPalette(newPalette);
-      setPrimaryColor(newPalette.primary);
-      applyPaletteToCss(newPalette);
-      return newPalette;
-    } catch (error) {
-      console.error('Error generating palette from image:', error);
-      throw error;
-    }
-  }, [applyPaletteToCss]);
-  
-  // Reset to default palette
-  const resetToDefault = useCallback(() => {
-    setPrimaryColor(defaultPrimaryColor);
-    setCurrentTheme(defaultTheme);
-    setPalette(defaultPalette);
-    applyPaletteToCss(defaultPalette);
-  }, [applyPaletteToCss]);
-  
-  // Set primary color
-  const handleSetPrimaryColor = useCallback((color: string) => {
-    setPrimaryColor(color);
-  }, []);
-  
-  // Set theme
-  const handleSetTheme = useCallback((theme: ColorTheme) => {
-    setCurrentTheme(theme);
-  }, []);
-  
-  // Apply current palette to CSS
-  const applyToCss = useCallback(() => {
-    applyPaletteToCss(palette);
-  }, [applyPaletteToCss, palette]);
-  
-  // Apply initial palette
-  useEffect(() => {
-    applyPaletteToCss(palette);
-  }, [applyPaletteToCss, palette]);
-  
-  // Listen for system theme changes if using system theme
-  useEffect(() => {
-    if (currentTheme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const response = await apiRequest('GET', '/api/color-palettes');
+      const data = await response.json();
+      setPalettes(data);
       
-      const handleChange = () => {
-        const newPalette = generateThemePalette(primaryColor, 'system');
-        setPalette(newPalette);
-        applyPaletteToCss(newPalette);
+      // Find default palette or use the first one if available
+      const defaultPalette = data.find((p: ColorPalette) => p.isDefault === true);
+      if (defaultPalette) {
+        setCurrentPalette(defaultPalette);
+      } else if (data.length > 0) {
+        setCurrentPalette(data[0]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch color palettes:', err);
+      setError('Failed to load color palettes. Please try again.');
+      toast({
+        title: 'Error',
+        description: 'Failed to load color palettes',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateFromImage = async (imageData: string, name: string, brightness: number = 0, hue: number = 0) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      
+      // Convert base64 data URL to a blob
+      const fetchResponse = await fetch(imageData);
+      const blob = await fetchResponse.blob();
+      
+      formData.append('image', blob);
+      formData.append('name', name);
+      formData.append('brightness', brightness.toString());
+      formData.append('hue', hue.toString());
+      
+      const response = await fetch('/api/color-palettes/generate-from-upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+      
+      const palette = await response.json();
+      setPalettes(prev => [palette, ...prev]);
+      setCurrentPalette(palette);
+      
+      toast({
+        title: 'Success',
+        description: 'New color palette created from image',
+      });
+    } catch (err) {
+      console.error('Error generating palette from image:', err);
+      setError('Failed to generate palette from image');
+      toast({
+        title: 'Error',
+        description: 'Failed to generate palette from image',
+        variant: 'destructive',
+      });
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const generateFromUrl = async (imageUrl: string, name: string, brightness: number = 0, hue: number = 0) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await apiRequest('POST', '/api/color-palettes/generate-from-url', {
+        imageUrl,
+        name,
+        brightness,
+        hue
+      });
+      
+      const palette = await response.json();
+      setPalettes(prev => [palette, ...prev]);
+      setCurrentPalette(palette);
+      
+      toast({
+        title: 'Success',
+        description: 'New color palette created from URL',
+      });
+    } catch (err) {
+      console.error('Error generating palette from URL:', err);
+      setError('Failed to generate palette from URL');
+      toast({
+        title: 'Error',
+        description: 'Failed to generate palette from URL',
+        variant: 'destructive',
+      });
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSetCurrentPalette = (palette: ColorPalette) => {
+    setCurrentPalette(palette);
+    
+    toast({
+      title: 'Palette Preview',
+      description: `Now previewing ${palette.name}`,
+    });
+  };
+
+  const setDefaultPalette = async (paletteId: number) => {
+    try {
+      const response = await apiRequest('PUT', `/api/color-palettes/${paletteId}/set-default`);
+      const updatedPalette = await response.json();
+      
+      // Update palettes with the new default
+      setPalettes(prev => prev.map(p => ({
+        ...p,
+        isDefault: p.id === paletteId
+      })));
+      
+      // Also update current palette if it's the one being changed
+      if (currentPalette && currentPalette.id === paletteId) {
+        setCurrentPalette({
+          ...currentPalette,
+          isDefault: true
+        });
+      }
+      
+      toast({
+        title: 'Default Updated',
+        description: `${updatedPalette.name} is now the default palette`,
+      });
+    } catch (err) {
+      console.error('Error setting default palette:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to set default palette',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Provide default palette if none is available yet
+  useEffect(() => {
+    if (!loading && palettes.length === 0 && !currentPalette) {
+      const defaultPalette: ColorPalette = {
+        id: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        name: 'Default Palette',
+        description: 'System default color palette',
+        primary: '#6B4BFF',
+        primaryLight: '#8F7AFF',
+        primaryDark: '#4A2BD9',
+        secondary: '#F0F3FF',
+        secondaryLight: '#FFFFFF',
+        secondaryDark: '#DCDFE6',
+        accent: '#00C2FF',
+        background: '#FFFFFF',
+        text: '#1A1A1A',
+        error: '#FF3B30',
+        warning: '#FF9500',
+        success: '#34C759',
+        isDefault: true,
+        metadata: null
       };
       
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
+      setCurrentPalette(defaultPalette);
     }
-  }, [applyPaletteToCss, currentTheme, primaryColor]);
-  
-  const value = {
-    palette,
-    currentTheme,
-    setPrimaryColor: handleSetPrimaryColor,
-    setTheme: handleSetTheme,
-    generateFromImage,
-    resetToDefault,
-    applyToCss,
-  };
-  
+  }, [loading, palettes, currentPalette]);
+
   return (
-    <ColorPaletteContext.Provider value={value}>
+    <ColorPaletteContext.Provider
+      value={{
+        palettes,
+        currentPalette: currentPalette as ColorPalette,
+        loading,
+        saving,
+        error,
+        generateFromImage,
+        generateFromUrl,
+        setCurrentPalette: handleSetCurrentPalette,
+        setDefaultPalette,
+      }}
+    >
       {children}
     </ColorPaletteContext.Provider>
   );
-};
+}
+
+export function useColorPalette() {
+  const context = useContext(ColorPaletteContext);
+  if (!context) {
+    throw new Error('useColorPalette must be used within a ColorPaletteProvider');
+  }
+  return context;
+}

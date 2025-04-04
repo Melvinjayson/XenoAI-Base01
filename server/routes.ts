@@ -8,13 +8,15 @@ import { synthesizeSpeech } from "./voice";
 import { speechToText } from "./speech-to-text";
 import { queryPerplexity, perplexitySearchConversation } from "./perplexity";
 import { uploadAndAnalyzeImage, extractColorsFromUrl } from "./color-analyzer";
+import { hexToRgb, rgbToHex } from "../client/src/lib/color-utils";
 import { apiQuotaManager } from "./api-quota-manager";
 import { 
   InsertFile, 
   InsertCanvas, 
   insertCanvasSchema, 
   InsertCanvasElement, 
-  insertCanvasElementSchema 
+  insertCanvasElementSchema,
+  InsertColorPalette
 } from "../shared/schema";
 import { 
   createKnowledgeGraphFromSearch, 
@@ -30,6 +32,90 @@ import path from "path";
 import multer from "multer";
 import fs from "fs";
 import crypto from "crypto";
+
+// Helper functions for color palette generation
+function adjustBrightness(hex: string, amount: number): string {
+  if (!hex) return '#FFFFFF';
+  
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  
+  const [r, g, b] = rgb;
+  
+  // Adjust brightness
+  const adjustedR = Math.min(Math.max(Math.round(r + r * amount), 0), 255);
+  const adjustedG = Math.min(Math.max(Math.round(g + g * amount), 0), 255);
+  const adjustedB = Math.min(Math.max(Math.round(b + b * amount), 0), 255);
+  
+  return rgbToHex(adjustedR, adjustedG, adjustedB);
+}
+
+function adjustHue(hex: string, degrees: number): string {
+  if (!hex) return '#FFFFFF';
+  
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  
+  const [r, g, b] = rgb;
+  
+  // Convert RGB to HSL
+  const r1 = r / 255;
+  const g1 = g / 255;
+  const b1 = b / 255;
+  
+  const max = Math.max(r1, g1, b1);
+  const min = Math.min(r1, g1, b1);
+  
+  let h = 0, s = 0, l = (max + min) / 2;
+  
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    
+    switch (max) {
+      case r1: h = (g1 - b1) / d + (g1 < b1 ? 6 : 0); break;
+      case g1: h = (b1 - r1) / d + 2; break;
+      case b1: h = (r1 - g1) / d + 4; break;
+    }
+    
+    h = h / 6;
+  }
+  
+  // Adjust hue
+  h = (h * 360 + degrees) % 360;
+  if (h < 0) h += 360;
+  h = h / 360;
+  
+  // Convert back to RGB
+  let r2, g2, b2;
+  
+  if (s === 0) {
+    r2 = g2 = b2 = l;
+  } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    
+    r2 = hue2rgb(p, q, h + 1/3);
+    g2 = hue2rgb(p, q, h);
+    b2 = hue2rgb(p, q, h - 1/3);
+  }
+  
+  // Convert back to 0-255 range
+  const adjustedR = Math.round(r2 * 255);
+  const adjustedG = Math.round(g2 * 255);
+  const adjustedB = Math.round(b2 * 255);
+  
+  return rgbToHex(adjustedR, adjustedG, adjustedB);
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static audio files
@@ -659,6 +745,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Get preferences API error:", error);
       return res.status(500).json({ 
         error: "Failed to get preferences", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Color Palette API endpoints
+  app.post("/api/color-palettes", async (req, res) => {
+    try {
+      const { userId, name, colors, description } = req.body;
+      
+      if (!colors || !Array.isArray(colors) || colors.length === 0) {
+        return res.status(400).json({ error: "Colors array is required" });
+      }
+      
+      const palette = await storage.createColorPalette({
+        userId: userId || null,
+        name: name || "Untitled Palette",
+        colors,
+        description: description || "",
+        isDefault: false
+      });
+      
+      return res.status(201).json(palette);
+    } catch (error) {
+      console.error("Create color palette API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to create color palette", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/color-palettes", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      const palettes = await storage.getColorPalettes(userId);
+      return res.json(palettes);
+    } catch (error) {
+      console.error("Get color palettes API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get color palettes", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/color-palettes/:id", async (req, res) => {
+    try {
+      const paletteId = parseInt(req.params.id);
+      if (isNaN(paletteId)) {
+        return res.status(400).json({ error: "Invalid palette ID" });
+      }
+      
+      const palette = await storage.getColorPaletteById(paletteId);
+      if (!palette) {
+        return res.status(404).json({ error: "Color palette not found" });
+      }
+      
+      return res.json(palette);
+    } catch (error) {
+      console.error("Get color palette API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get color palette", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.patch("/api/color-palettes/:id", async (req, res) => {
+    try {
+      const paletteId = parseInt(req.params.id);
+      if (isNaN(paletteId)) {
+        return res.status(400).json({ error: "Invalid palette ID" });
+      }
+      
+      const updateData = req.body;
+      const updatedPalette = await storage.updateColorPalette(paletteId, updateData);
+      
+      if (!updatedPalette) {
+        return res.status(404).json({ error: "Color palette not found" });
+      }
+      
+      return res.json(updatedPalette);
+    } catch (error) {
+      console.error("Update color palette API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to update color palette", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.delete("/api/color-palettes/:id", async (req, res) => {
+    try {
+      const paletteId = parseInt(req.params.id);
+      if (isNaN(paletteId)) {
+        return res.status(400).json({ error: "Invalid palette ID" });
+      }
+      
+      const success = await storage.deleteColorPalette(paletteId);
+      if (!success) {
+        return res.status(404).json({ error: "Color palette not found" });
+      }
+      
+      return res.status(204).send();
+    } catch (error) {
+      console.error("Delete color palette API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to delete color palette", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.post("/api/color-palettes/:id/set-default", async (req, res) => {
+    try {
+      const paletteId = parseInt(req.params.id);
+      if (isNaN(paletteId)) {
+        return res.status(400).json({ error: "Invalid palette ID" });
+      }
+      
+      const updatedPalette = await storage.setDefaultColorPalette(paletteId);
+      if (!updatedPalette) {
+        return res.status(404).json({ error: "Color palette not found" });
+      }
+      
+      return res.json(updatedPalette);
+    } catch (error) {
+      console.error("Set default color palette API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to set default color palette", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/color-palettes/default", async (req, res) => {
+    try {
+      const defaultPalette = await storage.getDefaultColorPalette();
+      
+      if (!defaultPalette) {
+        return res.status(404).json({ error: "No default color palette found" });
+      }
+      
+      return res.json(defaultPalette);
+    } catch (error) {
+      console.error("Get default color palette API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get default color palette", 
         details: error instanceof Error ? error.message : "Unknown error" 
       });
     }
@@ -1481,6 +1716,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         message: "Failed to extract colors from image",
         details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Create a color palette from extracted colors
+  app.post("/api/colors/generate-palette", async (req, res) => {
+    try {
+      const { colors, name, userId, description } = req.body;
+      
+      if (!colors || !Array.isArray(colors) || colors.length < 2) {
+        return res.status(400).json({ 
+          success: false,
+          message: "At least 2 colors are required"
+        });
+      }
+      
+      // Extract primary color (usually the first one from analyzer)
+      const primary = colors[0];
+      
+      // Generate a palette with these colors
+      const palette: InsertColorPalette = {
+        userId: userId || null,
+        name: name || "Generated Palette",
+        description: description || null,
+        primary,
+        primaryLight: adjustBrightness(primary, 0.15),
+        primaryDark: adjustBrightness(primary, -0.15),
+        secondary: colors[1],
+        secondaryLight: adjustBrightness(colors[1], 0.15),
+        secondaryDark: adjustBrightness(colors[1], -0.15),
+        accent: colors.length > 2 ? colors[2] : adjustHue(primary, 180),
+        background: "#FFFFFF",
+        surface: "#F8F9FA",
+        text: "#1A1A1A",
+        textSecondary: "#757575",
+        success: "#00C853",
+        warning: "#FFC107",
+        error: "#F44336",
+        sourceType: "image",
+        sourceImage: null,
+        isDefault: false,
+        metadata: {
+          theme: "generated",
+          tags: ["generated", "adaptive", "image-based"],
+          harmony: "complementary",
+          colorSpace: "rgb"
+        }
+      };
+      
+      // Save the palette
+      const savedPalette = await storage.createColorPalette(palette);
+      
+      return res.status(201).json({
+        success: true,
+        palette: savedPalette,
+        message: "Color palette generated and saved successfully"
+      });
+    } catch (error) {
+      console.error("Generate color palette error:", error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Failed to generate color palette", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Get color palettes
+  app.get("/api/colors/palettes", async (req, res) => {
+    try {
+      // Get userId from query if provided
+      const userId = req.query.userId as string | undefined;
+      
+      // Get the palettes
+      const palettes = await storage.getColorPalettes(userId);
+      
+      return res.json({
+        success: true,
+        palettes,
+        count: palettes.length,
+      });
+    } catch (error) {
+      console.error("Get color palettes error:", error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Failed to get color palettes", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Get default color palette (for app theme)
+  app.get("/api/colors/default-palette", async (_req, res) => {
+    try {
+      const defaultPalette = await storage.getDefaultColorPalette();
+      
+      if (!defaultPalette) {
+        // If no default palette exists, return a standard one
+        return res.status(404).json({
+          success: false,
+          message: "No default palette found",
+          palette: {
+            name: "Default",
+            primary: "#6B4BFF",
+            primaryLight: "#9C85FF",
+            primaryDark: "#4935CC",
+            secondary: "#F0F3FF",
+            secondaryLight: "#FFFFFF", 
+            secondaryDark: "#D6DEFF",
+            accent: "#00C2FF",
+            background: "#FFFFFF",
+            surface: "#F8F9FA",
+            text: "#1A1A1A",
+            textSecondary: "#757575",
+            success: "#00C853",
+            warning: "#FFC107",
+            error: "#F44336",
+          }
+        });
+      }
+      
+      return res.json({
+        success: true,
+        palette: defaultPalette
+      });
+    } catch (error) {
+      console.error("Get default color palette error:", error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Failed to get default color palette", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Set a color palette as default
+  app.post("/api/colors/set-default", async (req, res) => {
+    try {
+      const { paletteId } = req.body;
+      
+      if (!paletteId) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Palette ID is required"
+        });
+      }
+      
+      const updatedPalette = await storage.setDefaultColorPalette(paletteId);
+      
+      if (!updatedPalette) {
+        return res.status(404).json({
+          success: false,
+          message: "Palette not found"
+        });
+      }
+      
+      return res.json({
+        success: true,
+        palette: updatedPalette,
+        message: "Default palette updated successfully"
+      });
+    } catch (error) {
+      console.error("Set default color palette error:", error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Failed to set default color palette", 
+        details: error instanceof Error ? error.message : "Unknown error" 
       });
     }
   });
