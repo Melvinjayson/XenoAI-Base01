@@ -285,9 +285,13 @@ export default function Home() {
           <div className="hidden sm:flex items-center gap-3 mr-2 border-r border-border pr-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
-                  <Kanban className="w-4 h-4" />
-                  <span className="font-medium">Workbench</span>
+                <Button variant="ghost" size="sm" className="relative flex items-center gap-2 h-9 px-3 text-primary">
+                  <Brain className="w-4 h-4" />
+                  <span className="font-medium">Creative Suite</span>
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
@@ -311,16 +315,6 @@ export default function Home() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Link href="/workbench">
-              <Button variant="ghost" size="sm" className="relative flex items-center gap-2 h-9 px-3 text-primary">
-                <Network className="w-4 h-4" />
-                <span className="font-medium">Workbench</span>
-                <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                </span>
-              </Button>
-            </Link>
             <Link href="/project-management">
               <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
                 <Kanban className="w-4 h-4" />
@@ -339,8 +333,8 @@ export default function Home() {
           <div className="sm:hidden flex items-center gap-1 mr-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Workbench">
-                  <Kanban className="w-5 h-5" />
+                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Creative Suite">
+                  <Brain className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
