@@ -45,8 +45,13 @@ export default function ChatMessage({ message }: ChatMessageProps) {
         </div>
       ) : (
         <div className="flex items-start mb-2 w-full">
-          <div className="rounded-full bg-primary w-8 h-8 flex items-center justify-center mr-2 flex-shrink-0">
-            <Mic className="w-4 h-4 text-white" />
+          <div className="relative mr-2 flex-shrink-0">
+            <div className="rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 w-8 h-8" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="currentColor">
+                <path d="M12 2L4 7l8 5 8-5-8-5zM4 15l8 5 8-5-8-5-8 5zm8-3L4 17l8 5 8-5-8-5z"/>
+              </svg>
+            </div>
           </div>
           <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full dark:text-white">
             <div className="prose prose-sm dark:prose-invert max-w-none">

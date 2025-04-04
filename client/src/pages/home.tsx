@@ -211,14 +211,16 @@ export default function Home() {
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center">
           <div className="relative mr-2">
-            <div className="rounded-full bg-primary/20 w-8 h-8 animate-pulse backdrop-blur-sm" />
-            <div className="absolute inset-0 rounded-full bg-primary/40 w-8 h-8 animate-ping" />
+            <div className="rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 w-8 h-8 animate-pulse backdrop-blur-sm" />
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 w-8 h-8 animate-ping opacity-75" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="rounded-full bg-primary w-6 h-6 flex items-center justify-center">
-                <Mic className="w-3 h-3 text-primary-foreground" />
+              <div className="rounded-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 w-6 h-6 flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-3 h-3 text-white" fill="currentColor">
+                  <path d="M12 2L4 7l8 5 8-5-8-5zM4 15l8 5 8-5-8-5-8 5zm8-3L4 17l8 5 8-5-8-5z"/>
+                </svg>
               </div>
             </div>
-            <div className="absolute -inset-1 bg-primary/10 rounded-full blur-md" />
+            <div className="absolute -inset-1 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-full blur-md" />
           </div>
           <h1 className="text-lg font-semibold">Xeno AI</h1>
         </div>
