@@ -387,7 +387,7 @@ export class MemStorage implements IStorage {
       typedAnalysis = {
         summary: typeof file.analysis.summary === 'string' ? file.analysis.summary : undefined,
         entities: Array.isArray(file.analysis.entities) ? file.analysis.entities : undefined,
-        keywords: Array.isArray(file.analysis.keywords) ? file.analysis.keywords.map(k => String(k)) : undefined
+        keywords: Array.isArray(file.analysis.keywords) ? file.analysis.keywords.map((k: any) => String(k)) : undefined
       };
     }
     
@@ -439,7 +439,7 @@ export class MemStorage implements IStorage {
       typedAnalysis = {
         summary: typeof analysis.summary === 'string' ? analysis.summary : undefined,
         entities: Array.isArray(analysis.entities) ? analysis.entities : undefined,
-        keywords: Array.isArray(analysis.keywords) ? analysis.keywords.map(k => String(k)) : undefined
+        keywords: Array.isArray(analysis.keywords) ? analysis.keywords.map((k: any) => String(k)) : undefined
       };
     }
     

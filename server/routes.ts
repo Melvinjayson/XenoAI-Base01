@@ -6,6 +6,7 @@ import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
 import { speechToText } from "./speech-to-text";
+import { InsertFile } from "../shared/schema";
 import { 
   createKnowledgeGraphFromSearch, 
   expandGraphNode, 
@@ -518,7 +519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Configure multer for memory storage (file uploads)
   const multerStorage = multer.memoryStorage();
-  const upload = multer({ 
+  const uploadMemory = multer({ 
     storage: multerStorage,
     limits: {
       fileSize: 10 * 1024 * 1024, // limit to 10MB
@@ -526,7 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Speech to text API endpoint
-  app.post("/api/speech-to-text", upload.single('audio'), async (req, res) => {
+  app.post("/api/speech-to-text", uploadMemory.single('audio'), async (req, res) => {
     try {
       return await speechToText(req, res);
     } catch (error) {
@@ -677,6 +678,366 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bookmark API routes
+  app.post("/api/bookmarks", async (req, res) => {
+    try {
+      const bookmarkData = req.body;
+      
+      if (!bookmarkData.sessionId || !bookmarkData.title) {
+        return res.status(400).json({ error: "SessionId and title are required" });
+      }
+      
+      const bookmark = await storage.createBookmark(bookmarkData);
+      return res.status(201).json(bookmark);
+    } catch (error) {
+      console.error("Create bookmark error:", error);
+      return res.status(500).json({ 
+        error: "Failed to create bookmark", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/bookmarks", async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      
+      const bookmarks = await storage.getBookmarks(userId);
+      return res.json(bookmarks);
+    } catch (error) {
+      console.error("Get bookmarks error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get bookmarks", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/bookmarks/:id", async (req, res) => {
+    try {
+      const bookmarkId = parseInt(req.params.id);
+      
+      if (isNaN(bookmarkId)) {
+        return res.status(400).json({ error: "Invalid bookmark ID" });
+      }
+      
+      const bookmark = await storage.getBookmarkById(bookmarkId);
+      
+      if (!bookmark) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      return res.json(bookmark);
+    } catch (error) {
+      console.error("Get bookmark error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get bookmark", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.patch("/api/bookmarks/:id", async (req, res) => {
+    try {
+      const bookmarkId = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      if (isNaN(bookmarkId)) {
+        return res.status(400).json({ error: "Invalid bookmark ID" });
+      }
+      
+      const bookmark = await storage.updateBookmark(bookmarkId, updateData);
+      
+      if (!bookmark) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      return res.json(bookmark);
+    } catch (error) {
+      console.error("Update bookmark error:", error);
+      return res.status(500).json({ 
+        error: "Failed to update bookmark", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.delete("/api/bookmarks/:id", async (req, res) => {
+    try {
+      const bookmarkId = parseInt(req.params.id);
+      
+      if (isNaN(bookmarkId)) {
+        return res.status(400).json({ error: "Invalid bookmark ID" });
+      }
+      
+      const success = await storage.deleteBookmark(bookmarkId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete bookmark error:", error);
+      return res.status(500).json({ 
+        error: "Failed to delete bookmark", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Set up file upload storage
+  const uploadDir = path.join(process.cwd(), 'temp');
+  
+  // Create upload directory if it doesn't exist
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  
+  const storage_config = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (_req, file, cb) => {
+      // Generate a unique filename with original extension
+      const uniqueId = crypto.randomBytes(16).toString('hex');
+      const ext = path.extname(file.originalname);
+      cb(null, `${uniqueId}${ext}`);
+    }
+  });
+  
+  const uploadDisk = multer({ 
+    storage: storage_config,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    } 
+  });
+  
+  // File API routes
+  app.post("/api/files/upload", uploadDisk.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      
+      const { sessionId, userId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "SessionId is required" });
+      }
+      
+      const fileData: InsertFile = {
+        path: req.file.path,
+        sessionId,
+        userId: userId || null,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size
+      };
+      
+      const file = await storage.createFile(fileData);
+      return res.status(201).json(file);
+    } catch (error) {
+      console.error("File upload error:", error);
+      return res.status(500).json({ 
+        error: "Failed to upload file", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/files", async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const sessionId = req.query.sessionId as string | undefined;
+      
+      const files = await storage.getFiles(userId, sessionId);
+      return res.json(files);
+    } catch (error) {
+      console.error("Get files error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get files", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/files/:id", async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.id);
+      
+      if (isNaN(fileId)) {
+        return res.status(400).json({ error: "Invalid file ID" });
+      }
+      
+      const file = await storage.getFileById(fileId);
+      
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      return res.json(file);
+    } catch (error) {
+      console.error("Get file error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get file", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.patch("/api/files/:id/analysis", async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.id);
+      const analysis = req.body;
+      
+      if (isNaN(fileId)) {
+        return res.status(400).json({ error: "Invalid file ID" });
+      }
+      
+      const file = await storage.updateFileAnalysis(fileId, analysis);
+      
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      return res.json(file);
+    } catch (error) {
+      console.error("Update file analysis error:", error);
+      return res.status(500).json({ 
+        error: "Failed to update file analysis", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.delete("/api/files/:id", async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.id);
+      
+      if (isNaN(fileId)) {
+        return res.status(400).json({ error: "Invalid file ID" });
+      }
+      
+      // Get file info before deleting from database
+      const file = await storage.getFileById(fileId);
+      
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      // Delete from database
+      const success = await storage.deleteFile(fileId);
+      
+      if (!success) {
+        return res.status(500).json({ error: "Failed to delete file from database" });
+      }
+      
+      // Delete the actual file from disk
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch (fsError) {
+        console.error("Failed to delete file from disk:", fsError);
+        // Continue with success response even if file deletion fails
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete file error:", error);
+      return res.status(500).json({ 
+        error: "Failed to delete file", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Insight API routes
+  app.post("/api/insights", async (req, res) => {
+    try {
+      const insightData = req.body;
+      
+      if (!insightData.sessionId || !insightData.type || !insightData.description) {
+        return res.status(400).json({ error: "SessionId, type, and description are required" });
+      }
+      
+      const insight = await storage.createInsight(insightData);
+      return res.status(201).json(insight);
+    } catch (error) {
+      console.error("Create insight error:", error);
+      return res.status(500).json({ 
+        error: "Failed to create insight", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/insights", async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const sessionId = req.query.sessionId as string | undefined;
+      
+      const insights = await storage.getInsights(userId, sessionId);
+      return res.json(insights);
+    } catch (error) {
+      console.error("Get insights error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get insights", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/insights/:id", async (req, res) => {
+    try {
+      const insightId = parseInt(req.params.id);
+      
+      if (isNaN(insightId)) {
+        return res.status(400).json({ error: "Invalid insight ID" });
+      }
+      
+      const insight = await storage.getInsightById(insightId);
+      
+      if (!insight) {
+        return res.status(404).json({ error: "Insight not found" });
+      }
+      
+      return res.json(insight);
+    } catch (error) {
+      console.error("Get insight error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get insight", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.delete("/api/insights/:id", async (req, res) => {
+    try {
+      const insightId = parseInt(req.params.id);
+      
+      if (isNaN(insightId)) {
+        return res.status(400).json({ error: "Invalid insight ID" });
+      }
+      
+      const success = await storage.deleteInsight(insightId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Insight not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete insight error:", error);
+      return res.status(500).json({ 
+        error: "Failed to delete insight", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
   // Create HTTP server
   const httpServer = createServer(app);
 
