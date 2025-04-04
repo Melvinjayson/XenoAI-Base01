@@ -3,7 +3,7 @@ import ChatContainer from "@/components/chat/chat-container";
 import EnhancedInputArea from "@/components/chat/enhanced-input-area";
 import VoiceIndicator from "@/components/chat/voice-indicator";
 import BottomSheet from "@/components/ui/bottom-sheet";
-import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal } from "lucide-react";
+import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal, Kanban } from "lucide-react";
 import { useChat } from "@/context/chat-context";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
@@ -278,6 +278,12 @@ export default function Home() {
                 </span>
               </Button>
             </Link>
+            <Link href="/project-management">
+              <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
+                <Kanban className="w-4 h-4" />
+                <span className="font-medium">Projects</span>
+              </Button>
+            </Link>
             <Link href="/admin">
               <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
                 <Settings className="w-4 h-4" />
@@ -300,6 +306,11 @@ export default function Home() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
+              </Button>
+            </Link>
+            <Link href="/project-management">
+              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Projects">
+                <Kanban className="w-5 h-5" />
               </Button>
             </Link>
             <Link href="/admin">

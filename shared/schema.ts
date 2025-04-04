@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, json, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, json, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -207,3 +207,173 @@ export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit
 
 export type InsertCanvasElement = z.infer<typeof insertCanvasElementSchema>;
 export type CanvasElement = typeof canvasElements.$inferSelect;
+
+// Project Management Module
+
+// Project Status Enum
+export const projectStatusEnum = pgEnum('project_status', ['not_started', 'in_progress', 'on_track', 'at_risk', 'off_track', 'completed', 'on_hold']);
+
+// Priority Enum
+export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high', 'critical']);
+
+// Projects table
+export const projects = pgTable('projects', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  status: projectStatusEnum('status').default('not_started').notNull(),
+  priority: priorityEnum('priority').default('medium').notNull(),
+  startDate: timestamp('start_date'),
+  dueDate: timestamp('due_date'),
+  completedDate: timestamp('completed_date'),
+  progress: integer('progress').default(0),
+  owner: text('owner').notNull(), // userId
+  metadata: json('metadata').$type<{ tags?: string[]; color?: string }>(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Milestones table
+export const milestones = pgTable('milestones', {
+  id: serial('id').primaryKey(),
+  projectId: integer('project_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  dueDate: timestamp('due_date'),
+  completedDate: timestamp('completed_date'),
+  status: projectStatusEnum('status').default('not_started').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Task Status Enum
+export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'in_review', 'done', 'blocked']);
+
+// Tasks table
+export const tasks = pgTable('tasks', {
+  id: serial('id').primaryKey(),
+  projectId: integer('project_id').notNull(),
+  milestoneId: integer('milestone_id'),
+  title: text('title').notNull(),
+  description: text('description'),
+  status: taskStatusEnum('status').default('todo').notNull(),
+  priority: priorityEnum('priority').default('medium').notNull(),
+  startDate: timestamp('start_date'),
+  dueDate: timestamp('due_date'),
+  completedDate: timestamp('completed_date'),
+  assignee: text('assignee'), // userId
+  estimatedHours: integer('estimated_hours'),
+  actualHours: integer('actual_hours'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Research Insights table
+export const researchInsights = pgTable('research_insights', {
+  id: serial('id').primaryKey(),
+  projectId: integer('project_id').notNull(),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  source: text('source'),
+  confidence: integer('confidence').default(50),
+  tags: json('tags').$type<string[]>().default([]),
+  metadata: json('metadata'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Insight-Task Relationships table
+export const insightTaskRelations = pgTable('insight_task_relations', {
+  id: serial('id').primaryKey(),
+  insightId: integer('insight_id').notNull(),
+  taskId: integer('task_id').notNull(),
+  relevanceScore: integer('relevance_score').default(50),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Project Comments
+export const projectComments = pgTable('project_comments', {
+  id: serial('id').primaryKey(),
+  projectId: integer('project_id').notNull(),
+  userId: text('user_id').notNull(),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Task Comments
+export const taskComments = pgTable('task_comments', {
+  id: serial('id').primaryKey(),
+  taskId: integer('task_id').notNull(),
+  userId: text('user_id').notNull(),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Insert schemas for Project Management
+export const insertProjectSchema = createInsertSchema(projects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMilestoneSchema = createInsertSchema(milestones).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertResearchInsightSchema = createInsertSchema(researchInsights).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInsightTaskRelationSchema = createInsertSchema(insightTaskRelations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectCommentSchema = createInsertSchema(projectComments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types for Project Management
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+
+export type Milestone = typeof milestones.$inferSelect;
+export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+export type ResearchInsight = typeof researchInsights.$inferSelect;
+export type InsertResearchInsight = z.infer<typeof insertResearchInsightSchema>;
+
+export type InsightTaskRelation = typeof insightTaskRelations.$inferSelect;
+export type InsertInsightTaskRelation = z.infer<typeof insertInsightTaskRelationSchema>;
+
+export type ProjectComment = typeof projectComments.$inferSelect;
+export type InsertProjectComment = z.infer<typeof insertProjectCommentSchema>;
+
+export type TaskComment = typeof taskComments.$inferSelect;
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
