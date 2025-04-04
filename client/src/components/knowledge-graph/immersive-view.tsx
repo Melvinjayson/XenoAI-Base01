@@ -64,9 +64,6 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
       try {
         setAIState('processing', 'Initializing VR environment...');
         
-        // Log the graph data for debugging
-        console.log('Graph data for VR visualization:', graph);
-        
         // Check if WebXR is supported
         if (!navigator.xr) {
           throw new Error('WebXR not supported in this browser');
@@ -78,16 +75,38 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
           throw new Error('Immersive VR not supported on this device');
         }
         
-        // Request an immersive VR session
-        const session = await navigator.xr.requestSession('immersive-vr', {
+        // Check for mobile device and adjust settings accordingly
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Adjust session options based on device capabilities
+        const sessionOptions: any = {
           requiredFeatures: ['local-floor'],
           optionalFeatures: ['hand-tracking']
-        });
+        };
         
+        // For mobile devices, add specific optimizations
+        if (isMobile) {
+          // Use orientation tracking for mobile devices
+          sessionOptions.optionalFeatures.push('hit-test');
+          
+          // Set lower quality for better performance on mobile
+          setAIState('thinking', 'Optimizing for mobile VR experience...');
+        } else {
+          // On desktop/high-end devices, add more features
+          sessionOptions.optionalFeatures.push('mesh-detection', 'depth-sensing');
+        }
+        
+        // Request an immersive VR session
+        const session = await navigator.xr.requestSession('immersive-vr', sessionOptions);
         xrSessionRef.current = session;
         
-        // Set up the session
-        const gl = canvasRef.current.getContext('webgl', { xrCompatible: true });
+        // Set up the WebGL context
+        const gl = canvasRef.current.getContext('webgl', { 
+          xrCompatible: true,
+          antialias: !isMobile, // Disable antialiasing on mobile for performance
+          powerPreference: isMobile ? 'low-power' : 'high-performance'
+        });
+        
         if (!gl) {
           throw new Error('WebGL not supported or context creation failed');
         }
@@ -96,21 +115,42 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
         if (graph.nodes.length > 0) {
           setAIState('analyzing', `Processing ${graph.nodes.length} nodes and ${graph.edges.length} connections for VR...`);
           
-          // Further WebXR setup would go here:
-          // - Set up WebGL/Three.js scene
-          // - Create XR reference space
-          // - Set up animation loop
-          // - Create 3D representation of knowledge graph
+          // Optimize node placement for VR viewing
+          const optimizedNodes = optimizeNodesForVR(graph.nodes);
+          
+          // Implementation would continue with creating the 3D scene
+          // Based on the optimized nodes and edges
+          
+          // Add interactive controls for VR
+          setupVRControls(session, gl, {
+            onSelectNode: (nodeId: string) => {
+              const node = graph.nodes.find(n => n.id === nodeId);
+              if (node && onNodeSelect) {
+                onNodeSelect(node);
+              }
+            },
+            onExitVR: () => {
+              if (xrSessionRef.current) {
+                xrSessionRef.current.end().catch(console.error);
+              }
+            }
+          });
+          
         } else {
           setAIState('thinking', 'No graph data available. Creating default visualization...');
+          
+          // Create a placeholder visualization when no data is available
+          createDefaultVRScene(gl);
         }
         
+        // Handle XR session events
         session.addEventListener('end', () => {
           setIsInitialized(false);
           xrSessionRef.current = null;
           onClose();
         });
         
+        // Session is fully initialized
         setIsInitialized(true);
         setAIState('analyzing', 'Analyzing graph structure for VR visualization...', 3000);
         
@@ -132,6 +172,25 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
       }
     };
     
+    // Helper function to optimize node placement for VR viewing
+    const optimizeNodesForVR = (nodes: KnowledgeGraphNode[]) => {
+      // This would implement algorithms to position nodes in 3D space
+      // For now, we'll just return the original nodes
+      return nodes;
+    };
+    
+    // Helper function to set up VR controls
+    const setupVRControls = (session: XRSession, gl: any, options: any) => {
+      // This would implement the VR controls and interaction
+      console.log('Setting up VR controls with options:', options);
+    };
+    
+    // Helper function to create a default VR scene
+    const createDefaultVRScene = (gl: any) => {
+      // This would create a simple default scene
+      console.log('Creating default VR scene');
+    };
+    
     initWebXR();
     
     // Cleanup function
@@ -140,7 +199,7 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
         xrSessionRef.current.end().catch(console.error);
       }
     };
-  }, [graph]);
+  }, [graph, onNodeSelect, onClose, processingState, resetState, setAIState]);
 
   // End VR session when user leaves the page
   useEffect(() => {
