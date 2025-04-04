@@ -27,6 +27,8 @@ import { useTextToSpeech } from '@/hooks/use-text-to-speech';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { InsightsPanel } from '@/components/knowledge-graph/insights-panel';
+import { DropdownMenu, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
 
 // Visualization pattern types
 type VisualizationPattern = 'force' | 'radial' | 'hierarchical' | 'ontology' | 'timeline' | 'clustered';
@@ -149,36 +151,39 @@ const EnhancedKnowledgeGraphContent = () => {
   const [exportFormat, setExportFormat] = useState<ExportFormat>('pdf');
   const [splitDirection, setSplitDirection] = useState<'horizontal' | 'vertical'>('horizontal');
   const [isSidePanelCollapsed, setIsSidePanelCollapsed] = useState(false);
-  
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [insights, setInsights] = useState([]); // Added state for insights
+  const [loading, setLoading] = useState(false); // Added loading state
+
   // User profile for contextual awareness
   const { profile } = useUserProfile();
-  
+
   // Text-to-speech hooks
   const { speak, currentVisualCommands, stopSpeaking } = useTextToSpeech();
-  
+
   // Media query for responsive design
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isMediumScreen = useMediaQuery('(max-width: 1024px)');
-  
+
   // Ref for gesture interactions
   const graphContainerRef = useRef<HTMLDivElement>(null);
-  
+
   // Browser-like tabs state
   const [tabs, setTabs] = useState([
     { id: 'tab-1', title: 'Knowledge Graph' }
   ]);
   const [activeTab, setActiveTab] = useState('tab-1');
-  
+
   // Toast for notifications
   const { toast } = useToast();
-  
+
   // Close the side panel on mobile by default
   useEffect(() => {
     if (isMobile) {
       setIsSidePanelCollapsed(true);
     }
   }, [isMobile]);
-  
+
   // Setup gesture interactions for zooming and panning
   const gestures = useGestureInteractions(graphContainerRef, {
     minScale: 0.2,
@@ -192,26 +197,26 @@ const EnhancedKnowledgeGraphContent = () => {
       }
     }
   });
-  
+
   // Handle search submit
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-    
+
     setIsSearching(true);
     try {
       // Get chat context if available
       const chatContext = undefined; // Later can be passed from the chat context if needed
-      
+
       // Do the search
       await searchGraph(query, chatContext);
-      
+
       // Update tab title to match the search
       const updatedTabs = tabs.map(tab => 
         tab.id === activeTab ? { ...tab, title: query } : tab
       );
       setTabs(updatedTabs);
-      
+
       // Remove search text after successful query
       setQuery('');
     } catch (error) {
@@ -225,28 +230,28 @@ const EnhancedKnowledgeGraphContent = () => {
       setIsSearching(false);
     }
   };
-  
+
   // Create a knowledge graph from conversation
   const handleCreateFromConversation = async () => {
     try {
       setIsSearching(true);
-      
+
       // Call our new function from the chat context
       const result = await createKnowledgeGraphFromConversation();
-      
+
       if (!result) {
         throw new Error('No conversation data available');
       }
-      
+
       // Import the graph data into our knowledge graph context
       importGraphFromConversation(result);
-      
+
       // Update tab title
       const updatedTabs = tabs.map(tab => 
         tab.id === activeTab ? { ...tab, title: 'Chat: ' + result.query } : tab
       );
       setTabs(updatedTabs);
-      
+
       toast({
         title: 'Knowledge Graph Created',
         description: `Created knowledge graph from conversation with ${result.graph.nodes.length} nodes and ${result.graph.edges.length} connections.`,
@@ -262,7 +267,7 @@ const EnhancedKnowledgeGraphContent = () => {
       setIsSearching(false);
     }
   };
-  
+
   // Toggle fullscreen mode
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -281,13 +286,13 @@ const EnhancedKnowledgeGraphContent = () => {
       }
     }
   };
-  
+
   // Toggle immersive view
   const toggleImmersiveMode = () => {
     if (!isImmersiveMode) {
       // Entering immersive mode
       setIsImmersiveMode(true);
-      
+
       // Optional voice guidance when entering immersive mode
       speak(
         "Entering immersive knowledge exploration mode. You can navigate and interact with the knowledge graph using the on-screen controls or voice commands.", 
@@ -304,19 +309,19 @@ const EnhancedKnowledgeGraphContent = () => {
       stopSpeaking();
     }
   };
-  
+
   // Enter WebXR mode
   const enterWebXRMode = () => {
     setIsWebXRMode(true);
     setIsImmersiveMode(true);
-    
+
     speak(
       "Entering WebXR virtual reality mode. You can interact with the knowledge graph using your VR controllers or gestures.", 
       "default", 
       "en"
     );
   };
-  
+
   // Handle tab management
   const addNewTab = () => {
     const newTabId = `tab-${tabs.length + 1}`;
@@ -324,29 +329,29 @@ const EnhancedKnowledgeGraphContent = () => {
     setActiveTab(newTabId);
     clearGraph(); // Clear the graph for the new tab
   };
-  
+
   const closeTab = (tabId: string) => {
     // Don't close if it's the last tab
     if (tabs.length <= 1) return;
-    
+
     const tabIndex = tabs.findIndex(tab => tab.id === tabId);
     const newTabs = tabs.filter(tab => tab.id !== tabId);
-    
+
     // If we're closing the active tab, switch to another tab
     if (activeTab === tabId) {
       // Switch to the previous tab in the list, or the first one if there is no previous
       const newActiveIndex = Math.max(0, tabIndex - 1);
       setActiveTab(newTabs[newActiveIndex].id);
     }
-    
+
     setTabs(newTabs);
   };
-  
+
   // Toggle direction of the split screen
   const toggleSplitDirection = () => {
     setSplitDirection(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
   };
-  
+
   // Export the current graph
   const handleExport = () => {
     toast({
@@ -354,7 +359,25 @@ const EnhancedKnowledgeGraphContent = () => {
       description: `Exporting knowledge graph as ${exportFormat.toUpperCase()}. This feature is in development.`,
     });
   };
-  
+
+  const analyzeGraph = async () => {
+    setLoading(true);
+    try {
+      // Placeholder for graph analysis logic
+      const newInsights = [
+        'Insight 1: Concept A is strongly related to Concept B.',
+        'Insight 2: Concept C is a central hub in the knowledge graph.',
+        'Insight 3: There is a significant cluster of concepts related to Topic X.'
+      ];
+      setInsights(newInsights);
+    } catch (error) {
+      console.error("Error analyzing graph:", error);
+      toast({ title: "Error", description: "Failed to analyze the graph.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Exit fullscreen when component unmounts
   useEffect(() => {
     return () => {
@@ -366,7 +389,7 @@ const EnhancedKnowledgeGraphContent = () => {
       stopSpeaking();
     };
   }, [stopSpeaking]);
-  
+
   return (
     <div className="flex flex-col h-full">
       {isImmersiveMode && (
@@ -376,7 +399,7 @@ const EnhancedKnowledgeGraphContent = () => {
           onNodeSelect={(node) => console.log('Selected node:', node)}
         />
       )}
-      
+
       {/* Browser-like Header */}
       <header className="flex flex-col border-b bg-card">
         {/* Top Navigation Bar */}
@@ -387,7 +410,7 @@ const EnhancedKnowledgeGraphContent = () => {
                 <Home className="h-4 w-4" />
               </Button>
             </Link>
-            
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -405,7 +428,7 @@ const EnhancedKnowledgeGraphContent = () => {
               </Tooltip>
             </TooltipProvider>
           </div>
-          
+
           {/* Search/Address Bar */}
           <AddressBar 
             query={query}
@@ -413,7 +436,7 @@ const EnhancedKnowledgeGraphContent = () => {
             onSearch={handleSearch}
             isLoading={isSearching || graphLoading}
           />
-          
+
           <div className="flex items-center gap-1">
             <Button 
               variant="ghost" 
@@ -424,7 +447,7 @@ const EnhancedKnowledgeGraphContent = () => {
             >
               <MessageSquareTextIcon className="h-4 w-4" />
             </Button>
-            
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -444,7 +467,7 @@ const EnhancedKnowledgeGraphContent = () => {
                 <TooltipContent>Toggle Split Direction</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -466,11 +489,11 @@ const EnhancedKnowledgeGraphContent = () => {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            
+
             <AvatarPersonalization />
           </div>
         </div>
-        
+
         {/* Tab Bar */}
         <TabBar 
           activeTab={activeTab}
@@ -480,7 +503,7 @@ const EnhancedKnowledgeGraphContent = () => {
           onAddTab={addNewTab}
         />
       </header>
-      
+
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction={splitDirection}>
@@ -507,7 +530,7 @@ const EnhancedKnowledgeGraphContent = () => {
                     <SelectItem value="clustered">Clustered</SelectItem>
                   </SelectContent>
                 </Select>
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -518,7 +541,7 @@ const EnhancedKnowledgeGraphContent = () => {
                   Group Entities
                 </Button>
               </div>
-              
+
               <div className="absolute top-2 right-2 z-10 flex gap-1">
                 <Button
                   variant="outline"
@@ -529,10 +552,10 @@ const EnhancedKnowledgeGraphContent = () => {
                   <Glasses className="w-3 h-3 mr-2" />
                   Immersive
                 </Button>
-                
+
                 <WebXRSupport onEnterVR={enterWebXRMode} />
               </div>
-              
+
               <div className="absolute bottom-2 right-2 z-10 flex gap-1">
                 <Button 
                   variant="outline"
@@ -542,7 +565,7 @@ const EnhancedKnowledgeGraphContent = () => {
                   <Compass className="w-3 h-3 mr-1" />
                   Reset View
                 </Button>
-                
+
                 <Drawer>
                   <DrawerTrigger asChild>
                     <Button variant="outline" size="sm">
@@ -573,7 +596,7 @@ const EnhancedKnowledgeGraphContent = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       <div>
                         <h3 className="mb-2 text-sm font-medium">Export Options</h3>
                         <div className="space-y-2">
@@ -601,7 +624,7 @@ const EnhancedKnowledgeGraphContent = () => {
                   </DrawerContent>
                 </Drawer>
               </div>
-              
+
               <div className="h-full">
                 <GraphDisplay 
                   className="h-full"
@@ -611,101 +634,146 @@ const EnhancedKnowledgeGraphContent = () => {
               </div>
             </div>
           </ResizablePanel>
-          
+
           {/* Resize Handle */}
           <ResizableHandle withHandle />
-          
+
           {/* Info Panel */}
           <ResizablePanel defaultSize={25} minSize={20} collapsible={true} collapsedSize={0} onCollapse={() => setIsSidePanelCollapsed(true)} onExpand={() => setIsSidePanelCollapsed(false)}>
             <div className="h-full border-l">
-              <Tabs defaultValue="insights" className="h-full flex flex-col">
-                <TabsList className="grid grid-cols-3 px-2 py-1">
+              <Tabs defaultValue="overview" className="h-full flex flex-col">
+                <TabsList className="grid grid-cols-4 px-2 py-1">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="insights">Insights</TabsTrigger>
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="learning">Learning</TabsTrigger>
+                  <TabsTrigger value="learn">Learning</TabsTrigger>
+                  <TabsTrigger value="actions">Actions</TabsTrigger>
                 </TabsList>
-                
-                <div className="flex-1 overflow-auto p-3">
-                  <TabsContent value="insights" className="h-full mt-0">
-                    <InsightsPanel />
-                  </TabsContent>
-                  
-                  <TabsContent value="details" className="h-full mt-0">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Node Details</h3>
-                      <p className="text-muted-foreground text-sm">
-                        Select a node in the graph to see its details.
-                      </p>
-                      
-                      <Card>
-                        <CardHeader className="p-3">
-                          <CardTitle className="text-md">Selected Node</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3 pt-0">
-                          <p className="text-sm text-muted-foreground">No node selected</p>
-                        </CardContent>
-                      </Card>
-                      
-                      <h3 className="text-md font-medium pt-2">Connections</h3>
-                      <p className="text-muted-foreground text-sm">
-                        Connected nodes will appear here.
-                      </p>
+
+                <TabsContent value="overview" className="flex-1 overflow-y-auto p-4">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-semibold">Knowledge Map</h3>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={analyzeGraph}
+                        disabled={loading || state.graph.nodes.length === 0}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Analyze
+                      </Button>
                     </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="learning" className="h-full mt-0">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Learning Resources</h3>
-                        <Button variant="ghost" size="sm" className="h-8 gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          <span className="text-xs">Generate</span>
+
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="grid gap-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Total Concepts</span>
+                            <span className="font-medium">{state.graph.nodes.length}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Connections</span>
+                            <span className="font-medium">{state.graph.edges.length}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Key Insights</span>
+                            <span className="font-medium">{insights.length}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="insights" className="flex-1 overflow-y-auto p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold">Knowledge Insights</h3>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          disabled={insights.length === 0}
+                        >
+                          <Download className="h-4 w-4 mr-1" /> Export
                         </Button>
-                      </div>
-                      
-                      <p className="text-muted-foreground text-sm">
-                        {profile.adaptiveSettings.enablePersonalizedSuggestions
-                          ? `Personalized learning resources for ${profile.name} based on your ${profile.learningStyle} learning style.`
-                          : 'Personalize your learning experience by enabling adaptive features in your profile settings.'}
-                      </p>
-                      
-                      <Card>
-                        <CardHeader className="p-3">
-                          <CardTitle className="text-md">Related Concepts</CardTitle>
-                          <CardDescription>Expand your knowledge</CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-3 pt-0">
-                          <ul className="space-y-2">
-                            <li className="text-sm">
-                              <Button variant="link" className="h-auto p-0 text-primary">
-                                <span>Knowledge representation techniques</span>
-                                <ExternalLink className="ml-1 w-3 h-3" />
-                              </Button>
-                            </li>
-                            <li className="text-sm">
-                              <Button variant="link" className="h-auto p-0 text-primary">
-                                <span>Graph theory fundamentals</span>
-                                <ExternalLink className="ml-1 w-3 h-3" />
-                              </Button>
-                            </li>
-                            <li className="text-sm">
-                              <Button variant="link" className="h-auto p-0 text-primary">
-                                <span>Entity relationship modeling</span>
-                                <ExternalLink className="ml-1 w-3 h-3" />
-                              </Button>
-                            </li>
-                          </ul>
-                        </CardContent>
-                      </Card>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem>
+                          Export as PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          Export as CSV
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <ul className="space-y-2">
+                    {insights.map((insight, index) => (
+                      <li key={index} className="text-sm">
+                        {insight}
+                      </li>
+                    ))}
+                  </ul>
+                </TabsContent>
+
+                <TabsContent value="learn" className="flex-1 overflow-y-auto p-4">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium">Learning Resources</h3>
+                      <Button variant="ghost" size="sm" className="h-8 gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        <span className="text-xs">Generate</span>
+                      </Button>
                     </div>
-                  </TabsContent>
-                </div>
+
+                    <p className="text-muted-foreground text-sm">
+                      {profile.adaptiveSettings.enablePersonalizedSuggestions
+                        ? `Personalized learning resources for ${profile.name} based on your ${profile.learningStyle} learning style.`
+                        : 'Personalize your learning experience by enabling adaptive features in your profile settings.'}
+                    </p>
+
+                    <Card>
+                      <CardHeader className="p-3">
+                        <CardTitle className="text-md">Related Concepts</CardTitle>
+                        <CardDescription>Expand your knowledge</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0">
+                        <ul className="space-y-2">
+                          <li className="text-sm">
+                            <Button variant="link" className="h-auto p-0 text-primary">
+                              <span>Knowledge representation techniques</span>
+                              <ExternalLink className="ml-1 w-3 h-3" />
+                            </Button>
+                          </li>
+                          <li className="text-sm">
+                            <Button variant="link" className="h-auto p-0 text-primary">
+                              <span>Graph theory fundamentals</span>
+                              <ExternalLink className="ml-1 w-3 h-3" />
+                            </Button>
+                          </li>
+                          <li className="text-sm">
+                            <Button variant="link" className="h-auto p-0 text-primary">
+                              <span>Entity relationship modeling</span>
+                              <ExternalLink className="ml-1 w-3 h-3" />
+                            </Button>
+                          </li>
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="actions" className="flex-1 overflow-y-auto p-4">
+                  {/* Add action items here */}
+                  <p>Action items will be displayed here.</p>
+                </TabsContent>
               </Tabs>
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </main>
-      
+
       {/* Mobile Bottom Navigation */}
       {isMobile && (
         <div className="border-t bg-card p-1 flex justify-around items-center">
