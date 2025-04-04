@@ -1,5 +1,6 @@
 import { 
   users, messages, sessions, bookmarks, files, insights, preferences, canvases, canvasElements, colorPalettes,
+  projects, milestones, tasks, researchInsights, insightTaskRelations, projectComments, taskComments,
   type User, type InsertUser, 
   type Message, type InsertMessage, 
   type Session, type InsertSession,
@@ -9,7 +10,14 @@ import {
   type Preference, type InsertPreference,
   type Canvas, type InsertCanvas,
   type CanvasElement, type InsertCanvasElement,
-  type ColorPalette, type InsertColorPalette
+  type ColorPalette, type InsertColorPalette,
+  type Project, type InsertProject,
+  type Milestone, type InsertMilestone,
+  type Task, type InsertTask,
+  type ResearchInsight, type InsertResearchInsight,
+  type InsightTaskRelation, type InsertInsightTaskRelation,
+  type ProjectComment, type InsertProjectComment,
+  type TaskComment, type InsertTaskComment
 } from "@shared/schema";
 
 // Memory types for enhanced context awareness
@@ -110,6 +118,56 @@ export interface IStorage {
   deleteColorPalette(paletteId: number): Promise<boolean>;
   getDefaultColorPalette(): Promise<ColorPalette | undefined>;
   setDefaultColorPalette(paletteId: number): Promise<ColorPalette | undefined>;
+  
+  // Color extraction utility for color palette generator
+  extractColorsFromImage(imagePath: string, maxColors?: number): Promise<string[]>;
+  extractColorsFromUrl(imageUrl: string, maxColors?: number): Promise<string[]>;
+  
+  // Project Management Methods
+  
+  // Project methods
+  createProject(project: InsertProject): Promise<Project>;
+  getProjects(userId?: string): Promise<Project[]>;
+  getProjectById(projectId: number): Promise<Project | undefined>;
+  updateProject(projectId: number, data: Partial<InsertProject>): Promise<Project | undefined>;
+  deleteProject(projectId: number): Promise<boolean>;
+  getProjectProgress(projectId: number): Promise<number>;
+  
+  // Milestone methods
+  createMilestone(milestone: InsertMilestone): Promise<Milestone>;
+  getMilestones(projectId: number): Promise<Milestone[]>;
+  getMilestoneById(milestoneId: number): Promise<Milestone | undefined>;
+  updateMilestone(milestoneId: number, data: Partial<InsertMilestone>): Promise<Milestone | undefined>;
+  deleteMilestone(milestoneId: number): Promise<boolean>;
+  
+  // Task methods
+  createTask(task: InsertTask): Promise<Task>;
+  getTasks(projectId?: number, milestoneId?: number): Promise<Task[]>;
+  getTaskById(taskId: number): Promise<Task | undefined>;
+  updateTask(taskId: number, data: Partial<InsertTask>): Promise<Task | undefined>;
+  deleteTask(taskId: number): Promise<boolean>;
+  
+  // Research Insight methods
+  createResearchInsight(insight: InsertResearchInsight): Promise<ResearchInsight>;
+  getResearchInsights(projectId: number): Promise<ResearchInsight[]>;
+  getResearchInsightById(insightId: number): Promise<ResearchInsight | undefined>;
+  updateResearchInsight(insightId: number, data: Partial<InsertResearchInsight>): Promise<ResearchInsight | undefined>;
+  deleteResearchInsight(insightId: number): Promise<boolean>;
+  
+  // Insight-Task Relation methods
+  createInsightTaskRelation(relation: InsertInsightTaskRelation): Promise<InsightTaskRelation>;
+  getInsightTaskRelations(insightId?: number, taskId?: number): Promise<InsightTaskRelation[]>;
+  deleteInsightTaskRelation(relationId: number): Promise<boolean>;
+  
+  // Project Comment methods
+  createProjectComment(comment: InsertProjectComment): Promise<ProjectComment>;
+  getProjectComments(projectId: number): Promise<ProjectComment[]>;
+  deleteProjectComment(commentId: number): Promise<boolean>;
+  
+  // Task Comment methods
+  createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
+  getTaskComments(taskId: number): Promise<TaskComment[]>;
+  deleteTaskComment(commentId: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -129,6 +187,15 @@ export class MemStorage implements IStorage {
   private canvasElements: Map<number, CanvasElement[]>; // Key is canvasId
   private colorPalettes: Map<number, ColorPalette>; // For adaptive color palette generator
   
+  // Project management maps
+  private projects: Map<number, Project>;
+  private milestones: Map<number, Milestone>;
+  private tasks: Map<number, Task>;
+  private researchInsights: Map<number, ResearchInsight>;
+  private insightTaskRelations: Map<number, InsightTaskRelation>;
+  private projectComments: Map<number, ProjectComment>;
+  private taskComments: Map<number, TaskComment>;
+  
   private userCurrentId: number;
   private messageCurrentId: number;
   private sessionCurrentId: number;
@@ -139,6 +206,13 @@ export class MemStorage implements IStorage {
   private canvasCurrentId: number;
   private canvasElementCurrentId: number;
   private colorPaletteCurrentId: number;
+  private projectCurrentId: number;
+  private milestoneCurrentId: number;
+  private taskCurrentId: number;
+  private researchInsightCurrentId: number;
+  private insightTaskRelationCurrentId: number;
+  private projectCommentCurrentId: number;
+  private taskCommentCurrentId: number;
 
   constructor() {
     this.users = new Map();
@@ -148,7 +222,7 @@ export class MemStorage implements IStorage {
     this.conversationMemories = new Map();
     this.conversationSummaries = new Map();
     
-    // Initialize new maps
+    // Initialize feature maps
     this.bookmarks = new Map();
     this.files = new Map();
     this.insights = new Map();
@@ -157,6 +231,16 @@ export class MemStorage implements IStorage {
     this.canvasElements = new Map();
     this.colorPalettes = new Map();
     
+    // Initialize project management maps
+    this.projects = new Map();
+    this.milestones = new Map();
+    this.tasks = new Map();
+    this.researchInsights = new Map();
+    this.insightTaskRelations = new Map();
+    this.projectComments = new Map();
+    this.taskComments = new Map();
+    
+    // Initialize IDs
     this.userCurrentId = 1;
     this.messageCurrentId = 1;
     this.sessionCurrentId = 1;
@@ -167,6 +251,15 @@ export class MemStorage implements IStorage {
     this.canvasCurrentId = 1;
     this.canvasElementCurrentId = 1;
     this.colorPaletteCurrentId = 1;
+    
+    // Initialize project management IDs
+    this.projectCurrentId = 1;
+    this.milestoneCurrentId = 1;
+    this.taskCurrentId = 1;
+    this.researchInsightCurrentId = 1;
+    this.insightTaskRelationCurrentId = 1;
+    this.projectCommentCurrentId = 1;
+    this.taskCommentCurrentId = 1;
   }
 
   // User methods
@@ -931,6 +1024,579 @@ export class MemStorage implements IStorage {
     
     this.colorPalettes.set(paletteId, updatedPalette);
     return updatedPalette;
+  }
+  
+  // Color extraction utility methods
+  async extractColorsFromImage(imagePath: string, maxColors: number = 8): Promise<string[]> {
+    // This is just a stub implementation - in a real scenario, we'd use a library like node-vibrant or color-thief
+    // Mock colors for testing
+    const mockColors = [
+      "#6B4BFF", // primary
+      "#F0F3FF", // secondary
+      "#00C2FF", // accent
+      "#FFFFFF", // background
+      "#F8F8F8", // surface
+      "#1A1A1A", // text
+      "#757575", // text secondary
+      "#34C759"  // success
+    ];
+    
+    return mockColors.slice(0, maxColors);
+  }
+  
+  async extractColorsFromUrl(imageUrl: string, maxColors: number = 8): Promise<string[]> {
+    // This is also a stub implementation
+    return this.extractColorsFromImage("", maxColors);
+  }
+  
+  // Project Management Methods Implementation
+  
+  // Project methods
+  async createProject(project: InsertProject): Promise<Project> {
+    const id = this.projectCurrentId++;
+    const now = new Date();
+    
+    // Process metadata if present
+    let processedMetadata: { tags?: string[]; color?: string } | null = null;
+    if (project.metadata) {
+      processedMetadata = {
+        tags: Array.isArray(project.metadata.tags) ? project.metadata.tags : undefined,
+        color: typeof project.metadata.color === 'string' ? project.metadata.color : undefined
+      };
+    }
+    
+    const newProject: Project = {
+      id,
+      name: project.name,
+      description: project.description || null,
+      status: project.status || 'not_started',
+      priority: project.priority || 'medium',
+      startDate: project.startDate || null,
+      dueDate: project.dueDate || null,
+      completedDate: project.completedDate || null,
+      progress: project.progress || 0,
+      owner: project.owner,
+      metadata: processedMetadata,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.projects.set(id, newProject);
+    return newProject;
+  }
+  
+  async getProjects(userId?: string): Promise<Project[]> {
+    const allProjects = Array.from(this.projects.values());
+    
+    if (userId) {
+      return allProjects.filter(project => project.owner === userId);
+    }
+    
+    return allProjects;
+  }
+  
+  async getProjectById(projectId: number): Promise<Project | undefined> {
+    return this.projects.get(projectId);
+  }
+  
+  async updateProject(projectId: number, data: Partial<InsertProject>): Promise<Project | undefined> {
+    const project = this.projects.get(projectId);
+    
+    if (!project) {
+      return undefined;
+    }
+    
+    // Process metadata if present
+    let processedMetadata = project.metadata;
+    if (data.metadata) {
+      processedMetadata = {
+        ...processedMetadata,
+        tags: Array.isArray(data.metadata.tags) ? data.metadata.tags : processedMetadata?.tags,
+        color: typeof data.metadata.color === 'string' ? data.metadata.color : processedMetadata?.color
+      };
+    }
+    
+    const updatedProject: Project = {
+      ...project,
+      name: data.name || project.name,
+      description: data.description !== undefined ? data.description : project.description,
+      status: data.status || project.status,
+      priority: data.priority || project.priority,
+      startDate: data.startDate !== undefined ? data.startDate : project.startDate,
+      dueDate: data.dueDate !== undefined ? data.dueDate : project.dueDate,
+      completedDate: data.completedDate !== undefined ? data.completedDate : project.completedDate,
+      progress: data.progress !== undefined ? data.progress : project.progress,
+      owner: data.owner || project.owner,
+      metadata: processedMetadata,
+      updatedAt: new Date()
+    };
+    
+    this.projects.set(projectId, updatedProject);
+    return updatedProject;
+  }
+  
+  async deleteProject(projectId: number): Promise<boolean> {
+    // First delete all related items
+    this.deleteMilestonesByProjectId(projectId);
+    this.deleteTasksByProjectId(projectId);
+    this.deleteResearchInsightsByProjectId(projectId);
+    this.deleteProjectCommentsByProjectId(projectId);
+    
+    return this.projects.delete(projectId);
+  }
+  
+  async getProjectProgress(projectId: number): Promise<number> {
+    const project = this.projects.get(projectId);
+    
+    if (!project) {
+      return 0;
+    }
+    
+    // If project has progress explicitly set, return that
+    if (project.progress !== undefined && project.progress !== null) {
+      return project.progress;
+    }
+    
+    // Otherwise calculate progress based on tasks
+    const tasks = await this.getTasks(projectId);
+    
+    if (tasks.length === 0) {
+      return 0;
+    }
+    
+    const completedTasks = tasks.filter(task => task.status === 'done');
+    return Math.round((completedTasks.length / tasks.length) * 100);
+  }
+  
+  // Helper methods for project-related deletions
+  private async deleteMilestonesByProjectId(projectId: number): Promise<void> {
+    for (const [id, milestone] of this.milestones.entries()) {
+      if (milestone.projectId === projectId) {
+        this.milestones.delete(id);
+      }
+    }
+  }
+  
+  private async deleteTasksByProjectId(projectId: number): Promise<void> {
+    for (const [id, task] of this.tasks.entries()) {
+      if (task.projectId === projectId) {
+        // Delete associated task comments
+        this.deleteTaskCommentsByTaskId(id);
+        
+        // Delete task-insight relations
+        this.deleteInsightTaskRelationsByTaskId(id);
+        
+        this.tasks.delete(id);
+      }
+    }
+  }
+  
+  private async deleteResearchInsightsByProjectId(projectId: number): Promise<void> {
+    for (const [id, insight] of this.researchInsights.entries()) {
+      if (insight.projectId === projectId) {
+        // Delete insight-task relations
+        this.deleteInsightTaskRelationsByInsightId(id);
+        
+        this.researchInsights.delete(id);
+      }
+    }
+  }
+  
+  private async deleteProjectCommentsByProjectId(projectId: number): Promise<void> {
+    for (const [id, comment] of this.projectComments.entries()) {
+      if (comment.projectId === projectId) {
+        this.projectComments.delete(id);
+      }
+    }
+  }
+  
+  private async deleteTaskCommentsByTaskId(taskId: number): Promise<void> {
+    for (const [id, comment] of this.taskComments.entries()) {
+      if (comment.taskId === taskId) {
+        this.taskComments.delete(id);
+      }
+    }
+  }
+  
+  private async deleteInsightTaskRelationsByTaskId(taskId: number): Promise<void> {
+    for (const [id, relation] of this.insightTaskRelations.entries()) {
+      if (relation.taskId === taskId) {
+        this.insightTaskRelations.delete(id);
+      }
+    }
+  }
+  
+  private async deleteInsightTaskRelationsByInsightId(insightId: number): Promise<void> {
+    for (const [id, relation] of this.insightTaskRelations.entries()) {
+      if (relation.insightId === insightId) {
+        this.insightTaskRelations.delete(id);
+      }
+    }
+  }
+  
+  // Milestone methods
+  async createMilestone(milestone: InsertMilestone): Promise<Milestone> {
+    const id = this.milestoneCurrentId++;
+    const now = new Date();
+    
+    const newMilestone: Milestone = {
+      id,
+      projectId: milestone.projectId,
+      name: milestone.name,
+      description: milestone.description || null,
+      dueDate: milestone.dueDate || null,
+      completedDate: milestone.completedDate || null,
+      status: milestone.status || 'not_started',
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.milestones.set(id, newMilestone);
+    return newMilestone;
+  }
+  
+  async getMilestones(projectId: number): Promise<Milestone[]> {
+    const allMilestones = Array.from(this.milestones.values());
+    return allMilestones.filter(milestone => milestone.projectId === projectId);
+  }
+  
+  async getMilestoneById(milestoneId: number): Promise<Milestone | undefined> {
+    return this.milestones.get(milestoneId);
+  }
+  
+  async updateMilestone(milestoneId: number, data: Partial<InsertMilestone>): Promise<Milestone | undefined> {
+    const milestone = this.milestones.get(milestoneId);
+    
+    if (!milestone) {
+      return undefined;
+    }
+    
+    const updatedMilestone: Milestone = {
+      ...milestone,
+      name: data.name || milestone.name,
+      description: data.description !== undefined ? data.description : milestone.description,
+      dueDate: data.dueDate !== undefined ? data.dueDate : milestone.dueDate,
+      completedDate: data.completedDate !== undefined ? data.completedDate : milestone.completedDate,
+      status: data.status || milestone.status,
+      updatedAt: new Date()
+    };
+    
+    this.milestones.set(milestoneId, updatedMilestone);
+    return updatedMilestone;
+  }
+  
+  async deleteMilestone(milestoneId: number): Promise<boolean> {
+    // Update tasks to remove association with this milestone
+    for (const [id, task] of this.tasks.entries()) {
+      if (task.milestoneId === milestoneId) {
+        const updatedTask = { ...task, milestoneId: null };
+        this.tasks.set(id, updatedTask);
+      }
+    }
+    
+    return this.milestones.delete(milestoneId);
+  }
+  
+  // Task methods
+  async createTask(task: InsertTask): Promise<Task> {
+    const id = this.taskCurrentId++;
+    const now = new Date();
+    
+    const newTask: Task = {
+      id,
+      projectId: task.projectId,
+      milestoneId: task.milestoneId || null,
+      title: task.title,
+      description: task.description || null,
+      status: task.status || 'todo',
+      priority: task.priority || 'medium',
+      startDate: task.startDate || null,
+      dueDate: task.dueDate || null,
+      completedDate: task.completedDate || null,
+      assignee: task.assignee || null,
+      estimatedHours: task.estimatedHours || null,
+      actualHours: task.actualHours || null,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.tasks.set(id, newTask);
+    return newTask;
+  }
+  
+  async getTasks(projectId?: number, milestoneId?: number): Promise<Task[]> {
+    const allTasks = Array.from(this.tasks.values());
+    
+    if (projectId && milestoneId) {
+      return allTasks.filter(task => task.projectId === projectId && task.milestoneId === milestoneId);
+    } else if (projectId) {
+      return allTasks.filter(task => task.projectId === projectId);
+    } else if (milestoneId) {
+      return allTasks.filter(task => task.milestoneId === milestoneId);
+    }
+    
+    return allTasks;
+  }
+  
+  async getTaskById(taskId: number): Promise<Task | undefined> {
+    return this.tasks.get(taskId);
+  }
+  
+  async updateTask(taskId: number, data: Partial<InsertTask>): Promise<Task | undefined> {
+    const task = this.tasks.get(taskId);
+    
+    if (!task) {
+      return undefined;
+    }
+    
+    const updatedTask: Task = {
+      ...task,
+      title: data.title || task.title,
+      description: data.description !== undefined ? data.description : task.description,
+      status: data.status || task.status,
+      priority: data.priority || task.priority,
+      startDate: data.startDate !== undefined ? data.startDate : task.startDate,
+      dueDate: data.dueDate !== undefined ? data.dueDate : task.dueDate,
+      completedDate: data.completedDate !== undefined ? data.completedDate : task.completedDate,
+      assignee: data.assignee !== undefined ? data.assignee : task.assignee,
+      estimatedHours: data.estimatedHours !== undefined ? data.estimatedHours : task.estimatedHours,
+      actualHours: data.actualHours !== undefined ? data.actualHours : task.actualHours,
+      milestoneId: data.milestoneId !== undefined ? data.milestoneId : task.milestoneId,
+      updatedAt: new Date()
+    };
+    
+    // If we're changing status to done, set completedDate if not already set
+    if (data.status === 'done' && !updatedTask.completedDate) {
+      updatedTask.completedDate = new Date();
+    }
+    
+    this.tasks.set(taskId, updatedTask);
+    
+    // If we've updated the task status, update the project progress
+    if (data.status !== undefined) {
+      await this.updateProjectProgressByTaskChange(task.projectId);
+    }
+    
+    return updatedTask;
+  }
+  
+  async deleteTask(taskId: number): Promise<boolean> {
+    const task = this.tasks.get(taskId);
+    
+    if (!task) {
+      return false;
+    }
+    
+    const projectId = task.projectId;
+    
+    // Delete task comments
+    this.deleteTaskCommentsByTaskId(taskId);
+    
+    // Delete task-insight relations
+    this.deleteInsightTaskRelationsByTaskId(taskId);
+    
+    const result = this.tasks.delete(taskId);
+    
+    // Update project progress
+    if (result) {
+      await this.updateProjectProgressByTaskChange(projectId);
+    }
+    
+    return result;
+  }
+  
+  private async updateProjectProgressByTaskChange(projectId: number): Promise<void> {
+    const project = this.projects.get(projectId);
+    
+    if (!project) {
+      return;
+    }
+    
+    // Only update if progress is automatically calculated
+    if (project.progress !== undefined) {
+      const progress = await this.getProjectProgress(projectId);
+      
+      const updatedProject: Project = {
+        ...project,
+        progress,
+        updatedAt: new Date()
+      };
+      
+      this.projects.set(projectId, updatedProject);
+    }
+  }
+  
+  // Research Insight methods
+  async createResearchInsight(insight: InsertResearchInsight): Promise<ResearchInsight> {
+    const id = this.researchInsightCurrentId++;
+    const now = new Date();
+    
+    // Process tags if present
+    let processedTags: string[] | null = null;
+    if (insight.tags) {
+      if (Array.isArray(insight.tags)) {
+        processedTags = insight.tags.map(tag => String(tag));
+      } else {
+        processedTags = [String(insight.tags)];
+      }
+    }
+    
+    const newInsight: ResearchInsight = {
+      id,
+      projectId: insight.projectId,
+      title: insight.title,
+      content: insight.content,
+      source: insight.source || null,
+      confidence: insight.confidence || 50,
+      tags: processedTags || [],
+      metadata: insight.metadata || null,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.researchInsights.set(id, newInsight);
+    return newInsight;
+  }
+  
+  async getResearchInsights(projectId: number): Promise<ResearchInsight[]> {
+    const allInsights = Array.from(this.researchInsights.values());
+    return allInsights.filter(insight => insight.projectId === projectId);
+  }
+  
+  async getResearchInsightById(insightId: number): Promise<ResearchInsight | undefined> {
+    return this.researchInsights.get(insightId);
+  }
+  
+  async updateResearchInsight(insightId: number, data: Partial<InsertResearchInsight>): Promise<ResearchInsight | undefined> {
+    const insight = this.researchInsights.get(insightId);
+    
+    if (!insight) {
+      return undefined;
+    }
+    
+    // Process tags if present
+    let processedTags = insight.tags;
+    if (data.tags !== undefined) {
+      if (data.tags === null) {
+        processedTags = [];
+      } else if (Array.isArray(data.tags)) {
+        processedTags = data.tags.map(tag => String(tag));
+      } else if (data.tags) {
+        processedTags = [String(data.tags)];
+      }
+    }
+    
+    const updatedInsight: ResearchInsight = {
+      ...insight,
+      title: data.title || insight.title,
+      content: data.content || insight.content,
+      source: data.source !== undefined ? data.source : insight.source,
+      confidence: data.confidence !== undefined ? data.confidence : insight.confidence,
+      tags: processedTags,
+      metadata: data.metadata !== undefined ? data.metadata : insight.metadata,
+      updatedAt: new Date()
+    };
+    
+    this.researchInsights.set(insightId, updatedInsight);
+    return updatedInsight;
+  }
+  
+  async deleteResearchInsight(insightId: number): Promise<boolean> {
+    // Delete insight-task relations
+    this.deleteInsightTaskRelationsByInsightId(insightId);
+    
+    return this.researchInsights.delete(insightId);
+  }
+  
+  // Insight-Task Relation methods
+  async createInsightTaskRelation(relation: InsertInsightTaskRelation): Promise<InsightTaskRelation> {
+    const id = this.insightTaskRelationCurrentId++;
+    const now = new Date();
+    
+    const newRelation: InsightTaskRelation = {
+      id,
+      insightId: relation.insightId,
+      taskId: relation.taskId,
+      relevanceScore: relation.relevanceScore || 50,
+      notes: relation.notes || null,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.insightTaskRelations.set(id, newRelation);
+    return newRelation;
+  }
+  
+  async getInsightTaskRelations(insightId?: number, taskId?: number): Promise<InsightTaskRelation[]> {
+    const allRelations = Array.from(this.insightTaskRelations.values());
+    
+    if (insightId && taskId) {
+      return allRelations.filter(relation => relation.insightId === insightId && relation.taskId === taskId);
+    } else if (insightId) {
+      return allRelations.filter(relation => relation.insightId === insightId);
+    } else if (taskId) {
+      return allRelations.filter(relation => relation.taskId === taskId);
+    }
+    
+    return allRelations;
+  }
+  
+  async deleteInsightTaskRelation(relationId: number): Promise<boolean> {
+    return this.insightTaskRelations.delete(relationId);
+  }
+  
+  // Project Comment methods
+  async createProjectComment(comment: InsertProjectComment): Promise<ProjectComment> {
+    const id = this.projectCommentCurrentId++;
+    const now = new Date();
+    
+    const newComment: ProjectComment = {
+      id,
+      projectId: comment.projectId,
+      userId: comment.userId,
+      content: comment.content,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.projectComments.set(id, newComment);
+    return newComment;
+  }
+  
+  async getProjectComments(projectId: number): Promise<ProjectComment[]> {
+    const allComments = Array.from(this.projectComments.values());
+    return allComments.filter(comment => comment.projectId === projectId);
+  }
+  
+  async deleteProjectComment(commentId: number): Promise<boolean> {
+    return this.projectComments.delete(commentId);
+  }
+  
+  // Task Comment methods
+  async createTaskComment(comment: InsertTaskComment): Promise<TaskComment> {
+    const id = this.taskCommentCurrentId++;
+    const now = new Date();
+    
+    const newComment: TaskComment = {
+      id,
+      taskId: comment.taskId,
+      userId: comment.userId,
+      content: comment.content,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.taskComments.set(id, newComment);
+    return newComment;
+  }
+  
+  async getTaskComments(taskId: number): Promise<TaskComment[]> {
+    const allComments = Array.from(this.taskComments.values());
+    return allComments.filter(comment => comment.taskId === taskId);
+  }
+  
+  async deleteTaskComment(commentId: number): Promise<boolean> {
+    return this.taskComments.delete(commentId);
   }
 }
 

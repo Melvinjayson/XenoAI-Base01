@@ -16,7 +16,22 @@ import {
   insertCanvasSchema, 
   InsertCanvasElement, 
   insertCanvasElementSchema,
-  InsertColorPalette
+  InsertColorPalette,
+  // Project Management schema imports
+  InsertProject,
+  insertProjectSchema,
+  InsertMilestone,
+  insertMilestoneSchema,
+  InsertTask,
+  insertTaskSchema,
+  InsertResearchInsight,
+  insertResearchInsightSchema,
+  InsertInsightTaskRelation,
+  insertInsightTaskRelationSchema,
+  InsertProjectComment,
+  insertProjectCommentSchema,
+  InsertTaskComment,
+  insertTaskCommentSchema
 } from "../shared/schema";
 import { 
   createKnowledgeGraphFromSearch, 
@@ -1895,6 +1910,617 @@ export async function registerRoutes(app: Express): Promise<Server> {
         next();
       }
     });
+  });
+  
+  // Project Management API Routes
+  
+  // Projects
+  app.get("/api/projects", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      const projects = await storage.getProjects(userId);
+      return res.json(projects);
+    } catch (error) {
+      console.error("Projects API error:", error);
+      return res.status(500).json({
+        error: "Failed to get projects",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.get("/api/projects/:id", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+      
+      const project = await storage.getProjectById(projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      return res.json(project);
+    } catch (error) {
+      console.error("Project detail API error:", error);
+      return res.status(500).json({
+        error: "Failed to get project details",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/projects", async (req, res) => {
+    try {
+      const projectData = req.body;
+      const validatedData = insertProjectSchema.parse(projectData);
+      
+      const project = await storage.createProject(validatedData);
+      return res.status(201).json(project);
+    } catch (error) {
+      console.error("Create project API error:", error);
+      return res.status(400).json({
+        error: "Failed to create project",
+        details: error instanceof Error ? error.message : "Invalid project data"
+      });
+    }
+  });
+  
+  app.patch("/api/projects/:id", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+      
+      const projectData = req.body;
+      const project = await storage.updateProject(projectId, projectData);
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      return res.json(project);
+    } catch (error) {
+      console.error("Update project API error:", error);
+      return res.status(400).json({
+        error: "Failed to update project",
+        details: error instanceof Error ? error.message : "Invalid project data"
+      });
+    }
+  });
+  
+  app.delete("/api/projects/:id", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+      
+      const success = await storage.deleteProject(projectId);
+      if (!success) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete project API error:", error);
+      return res.status(500).json({
+        error: "Failed to delete project",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.get("/api/projects/:id/progress", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+      
+      const progress = await storage.getProjectProgress(projectId);
+      return res.json({ progress });
+    } catch (error) {
+      console.error("Project progress API error:", error);
+      return res.status(500).json({
+        error: "Failed to get project progress",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Milestones
+  app.get("/api/projects/:projectId/milestones", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+      
+      const milestones = await storage.getMilestones(projectId);
+      return res.json(milestones);
+    } catch (error) {
+      console.error("Milestones API error:", error);
+      return res.status(500).json({
+        error: "Failed to get milestones",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.get("/api/milestones/:id", async (req, res) => {
+    try {
+      const milestoneId = parseInt(req.params.id);
+      if (isNaN(milestoneId)) {
+        return res.status(400).json({ error: "Invalid milestone ID" });
+      }
+      
+      const milestone = await storage.getMilestoneById(milestoneId);
+      if (!milestone) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      
+      return res.json(milestone);
+    } catch (error) {
+      console.error("Milestone detail API error:", error);
+      return res.status(500).json({
+        error: "Failed to get milestone details",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/milestones", async (req, res) => {
+    try {
+      const milestoneData = req.body;
+      const validatedData = insertMilestoneSchema.parse(milestoneData);
+      
+      const milestone = await storage.createMilestone(validatedData);
+      return res.status(201).json(milestone);
+    } catch (error) {
+      console.error("Create milestone API error:", error);
+      return res.status(400).json({
+        error: "Failed to create milestone",
+        details: error instanceof Error ? error.message : "Invalid milestone data"
+      });
+    }
+  });
+  
+  app.patch("/api/milestones/:id", async (req, res) => {
+    try {
+      const milestoneId = parseInt(req.params.id);
+      if (isNaN(milestoneId)) {
+        return res.status(400).json({ error: "Invalid milestone ID" });
+      }
+      
+      const milestoneData = req.body;
+      const milestone = await storage.updateMilestone(milestoneId, milestoneData);
+      
+      if (!milestone) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      
+      return res.json(milestone);
+    } catch (error) {
+      console.error("Update milestone API error:", error);
+      return res.status(400).json({
+        error: "Failed to update milestone",
+        details: error instanceof Error ? error.message : "Invalid milestone data"
+      });
+    }
+  });
+  
+  app.delete("/api/milestones/:id", async (req, res) => {
+    try {
+      const milestoneId = parseInt(req.params.id);
+      if (isNaN(milestoneId)) {
+        return res.status(400).json({ error: "Invalid milestone ID" });
+      }
+      
+      const success = await storage.deleteMilestone(milestoneId);
+      if (!success) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete milestone API error:", error);
+      return res.status(500).json({
+        error: "Failed to delete milestone",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Tasks
+  app.get("/api/tasks", async (req, res) => {
+    try {
+      const projectId = req.query.projectId ? parseInt(req.query.projectId as string) : undefined;
+      const milestoneId = req.query.milestoneId ? parseInt(req.query.milestoneId as string) : undefined;
+      
+      if (projectId && isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+      
+      if (milestoneId && isNaN(milestoneId)) {
+        return res.status(400).json({ error: "Invalid milestone ID" });
+      }
+      
+      const tasks = await storage.getTasks(projectId, milestoneId);
+      return res.json(tasks);
+    } catch (error) {
+      console.error("Tasks API error:", error);
+      return res.status(500).json({
+        error: "Failed to get tasks",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.get("/api/tasks/:id", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) {
+        return res.status(400).json({ error: "Invalid task ID" });
+      }
+      
+      const task = await storage.getTaskById(taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      return res.json(task);
+    } catch (error) {
+      console.error("Task detail API error:", error);
+      return res.status(500).json({
+        error: "Failed to get task details",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/tasks", async (req, res) => {
+    try {
+      const taskData = req.body;
+      const validatedData = insertTaskSchema.parse(taskData);
+      
+      const task = await storage.createTask(validatedData);
+      return res.status(201).json(task);
+    } catch (error) {
+      console.error("Create task API error:", error);
+      return res.status(400).json({
+        error: "Failed to create task",
+        details: error instanceof Error ? error.message : "Invalid task data"
+      });
+    }
+  });
+  
+  app.patch("/api/tasks/:id", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) {
+        return res.status(400).json({ error: "Invalid task ID" });
+      }
+      
+      const taskData = req.body;
+      const task = await storage.updateTask(taskId, taskData);
+      
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      return res.json(task);
+    } catch (error) {
+      console.error("Update task API error:", error);
+      return res.status(400).json({
+        error: "Failed to update task",
+        details: error instanceof Error ? error.message : "Invalid task data"
+      });
+    }
+  });
+  
+  app.delete("/api/tasks/:id", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) {
+        return res.status(400).json({ error: "Invalid task ID" });
+      }
+      
+      const success = await storage.deleteTask(taskId);
+      if (!success) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete task API error:", error);
+      return res.status(500).json({
+        error: "Failed to delete task",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Research Insights
+  app.get("/api/projects/:projectId/insights", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+      
+      const insights = await storage.getResearchInsights(projectId);
+      return res.json(insights);
+    } catch (error) {
+      console.error("Research insights API error:", error);
+      return res.status(500).json({
+        error: "Failed to get research insights",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.get("/api/research-insights/:id", async (req, res) => {
+    try {
+      const insightId = parseInt(req.params.id);
+      if (isNaN(insightId)) {
+        return res.status(400).json({ error: "Invalid insight ID" });
+      }
+      
+      const insight = await storage.getResearchInsightById(insightId);
+      if (!insight) {
+        return res.status(404).json({ error: "Research insight not found" });
+      }
+      
+      return res.json(insight);
+    } catch (error) {
+      console.error("Research insight detail API error:", error);
+      return res.status(500).json({
+        error: "Failed to get research insight details",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/research-insights", async (req, res) => {
+    try {
+      const insightData = req.body;
+      const validatedData = insertResearchInsightSchema.parse(insightData);
+      
+      const insight = await storage.createResearchInsight(validatedData);
+      return res.status(201).json(insight);
+    } catch (error) {
+      console.error("Create research insight API error:", error);
+      return res.status(400).json({
+        error: "Failed to create research insight",
+        details: error instanceof Error ? error.message : "Invalid insight data"
+      });
+    }
+  });
+  
+  app.patch("/api/research-insights/:id", async (req, res) => {
+    try {
+      const insightId = parseInt(req.params.id);
+      if (isNaN(insightId)) {
+        return res.status(400).json({ error: "Invalid insight ID" });
+      }
+      
+      const insightData = req.body;
+      const insight = await storage.updateResearchInsight(insightId, insightData);
+      
+      if (!insight) {
+        return res.status(404).json({ error: "Research insight not found" });
+      }
+      
+      return res.json(insight);
+    } catch (error) {
+      console.error("Update research insight API error:", error);
+      return res.status(400).json({
+        error: "Failed to update research insight",
+        details: error instanceof Error ? error.message : "Invalid insight data"
+      });
+    }
+  });
+  
+  app.delete("/api/research-insights/:id", async (req, res) => {
+    try {
+      const insightId = parseInt(req.params.id);
+      if (isNaN(insightId)) {
+        return res.status(400).json({ error: "Invalid insight ID" });
+      }
+      
+      const success = await storage.deleteResearchInsight(insightId);
+      if (!success) {
+        return res.status(404).json({ error: "Research insight not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete research insight API error:", error);
+      return res.status(500).json({
+        error: "Failed to delete research insight",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Insight-Task Relations
+  app.get("/api/insight-task-relations", async (req, res) => {
+    try {
+      const insightId = req.query.insightId ? parseInt(req.query.insightId as string) : undefined;
+      const taskId = req.query.taskId ? parseInt(req.query.taskId as string) : undefined;
+      
+      if (insightId && isNaN(insightId)) {
+        return res.status(400).json({ error: "Invalid insight ID" });
+      }
+      
+      if (taskId && isNaN(taskId)) {
+        return res.status(400).json({ error: "Invalid task ID" });
+      }
+      
+      const relations = await storage.getInsightTaskRelations(insightId, taskId);
+      return res.json(relations);
+    } catch (error) {
+      console.error("Insight-task relations API error:", error);
+      return res.status(500).json({
+        error: "Failed to get insight-task relations",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/insight-task-relations", async (req, res) => {
+    try {
+      const relationData = req.body;
+      const validatedData = insertInsightTaskRelationSchema.parse(relationData);
+      
+      const relation = await storage.createInsightTaskRelation(validatedData);
+      return res.status(201).json(relation);
+    } catch (error) {
+      console.error("Create insight-task relation API error:", error);
+      return res.status(400).json({
+        error: "Failed to create insight-task relation",
+        details: error instanceof Error ? error.message : "Invalid relation data"
+      });
+    }
+  });
+  
+  app.delete("/api/insight-task-relations/:id", async (req, res) => {
+    try {
+      const relationId = parseInt(req.params.id);
+      if (isNaN(relationId)) {
+        return res.status(400).json({ error: "Invalid relation ID" });
+      }
+      
+      const success = await storage.deleteInsightTaskRelation(relationId);
+      if (!success) {
+        return res.status(404).json({ error: "Insight-task relation not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete insight-task relation API error:", error);
+      return res.status(500).json({
+        error: "Failed to delete insight-task relation",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Project Comments
+  app.get("/api/projects/:projectId/comments", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+      
+      const comments = await storage.getProjectComments(projectId);
+      return res.json(comments);
+    } catch (error) {
+      console.error("Project comments API error:", error);
+      return res.status(500).json({
+        error: "Failed to get project comments",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/project-comments", async (req, res) => {
+    try {
+      const commentData = req.body;
+      const validatedData = insertProjectCommentSchema.parse(commentData);
+      
+      const comment = await storage.createProjectComment(validatedData);
+      return res.status(201).json(comment);
+    } catch (error) {
+      console.error("Create project comment API error:", error);
+      return res.status(400).json({
+        error: "Failed to create project comment",
+        details: error instanceof Error ? error.message : "Invalid comment data"
+      });
+    }
+  });
+  
+  app.delete("/api/project-comments/:id", async (req, res) => {
+    try {
+      const commentId = parseInt(req.params.id);
+      if (isNaN(commentId)) {
+        return res.status(400).json({ error: "Invalid comment ID" });
+      }
+      
+      const success = await storage.deleteProjectComment(commentId);
+      if (!success) {
+        return res.status(404).json({ error: "Project comment not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete project comment API error:", error);
+      return res.status(500).json({
+        error: "Failed to delete project comment",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Task Comments
+  app.get("/api/tasks/:taskId/comments", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      if (isNaN(taskId)) {
+        return res.status(400).json({ error: "Invalid task ID" });
+      }
+      
+      const comments = await storage.getTaskComments(taskId);
+      return res.json(comments);
+    } catch (error) {
+      console.error("Task comments API error:", error);
+      return res.status(500).json({
+        error: "Failed to get task comments",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/task-comments", async (req, res) => {
+    try {
+      const commentData = req.body;
+      const validatedData = insertTaskCommentSchema.parse(commentData);
+      
+      const comment = await storage.createTaskComment(validatedData);
+      return res.status(201).json(comment);
+    } catch (error) {
+      console.error("Create task comment API error:", error);
+      return res.status(400).json({
+        error: "Failed to create task comment",
+        details: error instanceof Error ? error.message : "Invalid comment data"
+      });
+    }
+  });
+  
+  app.delete("/api/task-comments/:id", async (req, res) => {
+    try {
+      const commentId = parseInt(req.params.id);
+      if (isNaN(commentId)) {
+        return res.status(400).json({ error: "Invalid comment ID" });
+      }
+      
+      const success = await storage.deleteTaskComment(commentId);
+      if (!success) {
+        return res.status(404).json({ error: "Task comment not found" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete task comment API error:", error);
+      return res.status(500).json({
+        error: "Failed to delete task comment",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
   });
   
   // Create HTTP server
