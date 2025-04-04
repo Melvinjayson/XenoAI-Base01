@@ -45,7 +45,7 @@ export default function Home() {
     isSpeaking,
     stopSpeaking
   } = useTextToSpeech();
-  
+
   // AI processing state management
   const {
     processingState,
@@ -66,7 +66,7 @@ export default function Home() {
       resetState(); // Reset if no active processes
     }
   }, [isLoading, isSpeaking, setAIState, resetState]);
-  
+
   // Automatically speak the latest assistant message
   useEffect(() => {
     if (messages.length > 0 && !isMuteEnabled) {
@@ -199,7 +199,7 @@ export default function Home() {
   // Register the gesture area
   const gestureContext = useGestureArea();
   const gestureRef = useRef<HTMLDivElement>(null);
-  
+
   // Set up the gestures when the ref is available
   useEffect(() => {
     if (gestureRef.current) {
@@ -211,9 +211,9 @@ export default function Home() {
           if (direction === 'down') handleSwipeDown();
         }
       };
-      
+
       gestureContext.registerGestureArea(gestureRef.current, handlers);
-      
+
       return () => {
         if (gestureRef.current) {
           gestureContext.unregisterGestureArea(gestureRef.current);
@@ -349,7 +349,7 @@ export default function Home() {
 
       {/* Voice Recording Indicator */}
       {isListening && <VoiceIndicator transcript={transcript} />}
-      
+
       {/* AI Processing Indicator */}
       <AIProcessingIndicator 
         state={processingState} 
@@ -373,7 +373,7 @@ export default function Home() {
 
           // Show thinking state when sending a message
           setAIState('thinking', 'Processing your request...');
-          
+
           try {
             await sendMessage(message, searchFilters);
           } catch (error) {

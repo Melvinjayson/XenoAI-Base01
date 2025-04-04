@@ -72,7 +72,7 @@ export function SplashScreen() {
         <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-primary/10 rounded-full blur-3xl animate-pulse delay-1000" />
       </div>
 
-      <div className="z-10 flex flex-col items-center max-w-4xl w-full gap-12">
+      <div className="z-10 flex flex-col items-center max-w-4xl w-full gap-6 md:gap-12 px-4">
         {/* Logo and Title */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -83,17 +83,17 @@ export function SplashScreen() {
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", duration: 1 }}
-            className="w-24 h-24 mb-6 mx-auto relative"
+            className="w-20 h-20 md:w-24 md:h-24 mb-4 md:mb-6 mx-auto relative"
           >
             <div className="absolute inset-0 bg-primary/20 rounded-2xl rotate-45 animate-pulse" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Brain className="w-12 h-12 text-primary" />
+              <Brain className="w-10 h-10 md:w-12 md:h-12 text-primary" />
             </div>
           </motion.div>
-          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
+          <h1 className="text-3xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
             XENO AI
           </h1>
-          <p className="mt-4 text-muted-foreground max-w-md mx-auto">
+          <p className="mt-3 md:mt-4 text-sm md:text-base text-muted-foreground max-w-[280px] md:max-w-md mx-auto">
             Your intelligent companion for knowledge discovery and learning
           </p>
         </motion.div>
