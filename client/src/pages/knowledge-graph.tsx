@@ -46,21 +46,21 @@ const KnowledgeGraphContent = () => {
   
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
           <Link href="/">
-            <Button variant="ghost" size="sm" className="mr-4">
+            <Button variant="ghost" size="sm">
               <ArrowLeftIcon className="w-4 h-4 mr-2" />
               Back to Chat
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold">Knowledge Graph Explorer</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Knowledge Graph Explorer</h1>
         </div>
         
         <Button 
           variant="outline" 
-          size="sm" 
-          className="ml-auto"
+          size="sm"
+          className="w-full sm:w-auto"
           onClick={handleCreateFromConversation}
           disabled={loadingConversation}
         >
