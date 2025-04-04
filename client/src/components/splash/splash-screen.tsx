@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useLanguage } from "@/context/language-context";
@@ -32,10 +32,10 @@ class Particle {
   update() {
     this.x += this.speedX;
     this.y += this.speedY;
-    
+
     // Fade in and then out
     if (this.size > 0.2) this.size -= 0.05;
-    
+
     if (this.alpha < 0.8 && this.size > this.size / 2) {
       this.alpha += this.deltaAlpha;
     } else {
@@ -62,37 +62,37 @@ export function SplashScreen() {
   const requestRef = useRef<number | null>(null);
   const { translate } = useLanguage();
   const logoTextRef = useRef<string>("XENO AI");
-  
+
   // Effect for particle animation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     // Set canvas size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
-    
+
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    
+
     // Initialize particles in X pattern
     const initParticles = () => {
       particlesRef.current = [];
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
-      
+
       // Create "X" shape for the logo
       for (let i = 0; i < 200; i++) {
         const x = centerX + (Math.random() - 0.5) * 100;
         const y = centerY + (Math.random() - 0.5) * 100;
         particlesRef.current.push(new Particle(ctx, x, y));
       }
-      
+
       // Add diagonal line particles (left to right)
       for (let i = 0; i < 100; i++) {
         const offsetX = (Math.random() - 0.5) * 40;
@@ -101,7 +101,7 @@ export function SplashScreen() {
         const y = centerY - 100 + i * 2 + offsetY;
         particlesRef.current.push(new Particle(ctx, x, y));
       }
-      
+
       // Add diagonal line particles (right to left)
       for (let i = 0; i < 100; i++) {
         const offsetX = (Math.random() - 0.5) * 40;
@@ -111,32 +111,32 @@ export function SplashScreen() {
         particlesRef.current.push(new Particle(ctx, x, y));
       }
     };
-    
+
     initParticles();
-    
+
     // Animation function
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       // Update and draw particles
       for (let i = 0; i < particlesRef.current.length; i++) {
         particlesRef.current[i].update();
         particlesRef.current[i].draw();
       }
-      
+
       // Draw XENO AI text
       ctx.font = "bold 32px 'SF Pro Display', 'Inter', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#6B4BFF";
       ctx.fillText(logoTextRef.current, canvas.width / 2, canvas.height / 2);
-      
+
       requestRef.current = requestAnimationFrame(animate);
     };
-    
+
     // Start animation
     requestRef.current = requestAnimationFrame(animate);
-    
+
     // Simulate loading progress
     const loadingInterval = setInterval(() => {
       setProgress((prev) => {
@@ -147,7 +147,7 @@ export function SplashScreen() {
         return prev + 5;
       });
     }, 100);
-    
+
     // Clean up
     return () => {
       if (requestRef.current) {
@@ -157,17 +157,17 @@ export function SplashScreen() {
       window.removeEventListener('resize', resizeCanvas);
     };
   }, []);
-  
+
   // Removed automatic navigation to fix infinite loop
   // Now navigation only happens when user clicks Continue button
-  
+
   return (
     <div className="fixed inset-0 bg-background flex flex-col items-center justify-center overflow-hidden">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 z-0"
       />
-      
+
       <div className="z-10 flex flex-col items-center gap-6">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -178,34 +178,43 @@ export function SplashScreen() {
           {/* Logo would go here if we had one */}
         </motion.div>
       </div>
-      
+
       {/* Language selector in top-right corner */}
       <div className="z-10 absolute top-4 right-4">
         <LanguageSelector />
       </div>
-      
+
       {/* Progress bar at the bottom of the page */}
       <div className="z-10 absolute bottom-10 left-0 right-0 flex flex-col items-center gap-4">
-        <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="flex items-center gap-4 w-64 mx-auto"
-        >
-          <motion.div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <motion.div
-              initial={{ width: "0%" }}
-              animate={{ width: `${progress}%` }}
-              className="h-full bg-primary rounded-full"
-            />
-          </motion.div>
-          
-          {progress === 100 && (
+        <AnimatePresence mode="wait">
+          {progress < 100 ? (
+            <motion.div 
+              key="progress"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-64 bg-muted rounded-full h-2 overflow-hidden"
+            >
+              <motion.div
+                initial={{ width: "0%" }}
+                animate={{ width: `${progress}%` }}
+                className="h-full bg-primary rounded-full"
+              />
+            </motion.div>
+          ) : (
             <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+              key="button"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
+              className="px-6 py-3 bg-primary text-primary-foreground rounded-md font-medium shadow-lg hover:bg-primary/90 hover:shadow-xl"
               onClick={() => {
+                // Play click sound
+                const audio = new Audio("/audio/click.mp3");
+                audio.volume = 0.3;
+                audio.play();
+
                 if (firstVisit) {
                   setLocation("/onboarding");
                   setFirstVisit(false);
@@ -214,18 +223,28 @@ export function SplashScreen() {
                 }
               }}
             >
-              {translate("button.continue")}
+              Let's Start Exploring
             </motion.button>
           )}
-        </motion.div>
-        
+        </AnimatePresence>
+
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
           className="text-muted-foreground text-sm"
         >
-          {progress === 100 ? translate("splash.ready") : translate("splash.loading")}
+          {progress === 100 ? (
+            <motion.span
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", delay: 0.2 }}
+            >
+              Ready!
+            </motion.span>
+          ) : (
+            "Loading intelligent search..."
+          )}
         </motion.p>
       </div>
     </div>
