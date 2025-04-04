@@ -97,7 +97,7 @@ function Router() {
           <Route path="/canvas" component={CanvasPage} />
           <Route path="/canvas/:id" component={CanvasPage} />
           <Route path="/admin" component={AdminPage} />
-          <Route path="/projects" component={ProjectManagementPage} />
+          <Route path="/project-management" component={ProjectManagementPage} />
           <Route component={NotFound} />
         </Switch>
         
