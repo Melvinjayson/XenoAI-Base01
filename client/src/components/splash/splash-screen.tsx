@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useLanguage } from "@/context/language-context";
 import { LanguageSelector } from "@/components/language-selector";
+import { SparklesIcon, RocketIcon, BrainIcon } from "lucide-react";
 
 // Particle animation class
 class Particle {

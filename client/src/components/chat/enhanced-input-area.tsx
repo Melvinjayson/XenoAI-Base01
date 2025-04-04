@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
-import { Mic, Send, Info, Filter, Search } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Mic, Send, Info, Filter, Search, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchFilters, SearchFilterOptions } from "@/components/search-filters";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 interface EnhancedInputAreaProps {
   onSend: (message: string, filters?: SearchFilterOptions) => Promise<void>;
@@ -24,6 +25,9 @@ export default function EnhancedInputArea({
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<SearchFilterOptions | null>(null);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
   
   const handleSend = async () => {
     if (inputValue.trim()) {
@@ -67,6 +71,54 @@ export default function EnhancedInputArea({
     setActiveFilters(null);
     setActiveFiltersCount(0);
   };
+  
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      // Create a FormData object to send the file
+      const formData = new FormData();
+      formData.append('file', files[0]);
+      formData.append('sessionId', 'default');
+      
+      // Upload the file
+      const response = await fetch('/api/files/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: "File uploaded successfully",
+        description: `${files[0].name} has been uploaded and will be analyzed.`,
+      });
+      
+      // Inform the user about the upload through the chat
+      await onSend(`I've uploaded a file: ${files[0].name}`, activeFilters || undefined);
+      
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   return (
     <>
@@ -103,22 +155,47 @@ export default function EnhancedInputArea({
             </div>
           </div>
           
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mx-1 rounded-full"
-            onClick={() => setIsFiltersOpen(true)}
-          >
-            <Filter className={cn(
-              "w-5 h-5", 
-              activeFiltersCount > 0 ? "text-primary" : "text-muted-foreground"
-            )} />
-            {activeFiltersCount > 0 && (
-              <span className="absolute top-0 right-0 bg-primary text-[10px] text-primary-foreground rounded-full w-4 h-4 flex items-center justify-center">
-                {activeFiltersCount}
-              </span>
-            )}
-          </Button>
+          <div className="flex">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="mx-1 rounded-full"
+              onClick={() => setIsFiltersOpen(true)}
+            >
+              <Filter className={cn(
+                "w-5 h-5", 
+                activeFiltersCount > 0 ? "text-primary" : "text-muted-foreground"
+              )} />
+              {activeFiltersCount > 0 && (
+                <span className="absolute top-0 right-0 bg-primary text-[10px] text-primary-foreground rounded-full w-4 h-4 flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </Button>
+            
+            {/* File upload button */}
+            <div className="relative mx-1">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.jpg,.jpeg,.png"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full relative"
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <div className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" />
+                ) : (
+                  <Paperclip className="w-5 h-5 text-muted-foreground" />
+                )}
+              </Button>
+            </div>
+          </div>
           
           <button 
             className={cn(
