@@ -94,7 +94,8 @@ export default function Home() {
   // Allow replaying of message speech
   const handleMessageTap = (message: Message) => {
     if (message.role === 'assistant' && !isMuteEnabled) {
-      speak(message.content, voiceId);
+      // Ensure voiceId is passed correctly
+      speak(message.content, voiceId || 'default');
     }
   };
 
