@@ -9,6 +9,8 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
+import FloatingCanvasTools from '@/components/canvas/floating-canvas-tools';
+import AICanvasAssistant from '@/components/canvas/ai-canvas-assistant';
 
 const CanvasPage = () => {
   const [location] = useLocation();
@@ -428,6 +430,23 @@ const CanvasPage = () => {
       {/* Canvas Area */}
       <div className="flex-1 relative overflow-auto bg-white">
         <div className="absolute inset-0 p-4">
+          {/* Floating canvas tools */}
+          <FloatingCanvasTools 
+            onCreateText={handleCreateTextElement}
+            onCreateShape={handleCreateShapeElement}
+            onCreateNode={handleCreateNodeElement}
+            position="left"
+          />
+          
+          {/* AI Canvas Assistant */}
+          <AICanvasAssistant
+            position="bottom-right"
+            onSuggestIdeas={(ideas) => {
+              // Handle AI suggestions
+              console.log('AI suggested ideas:', ideas);
+            }}
+          />
+          
           {/* Canvas elements will be rendered here */}
           {elements.map((element) => (
             <div
