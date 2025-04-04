@@ -16,6 +16,8 @@ export function useTextToSpeech() {
   const [currentText, setCurrentText] = useState<string | null>(null);
   const [currentVisualCommands, setCurrentVisualCommands] = useState<VisualizationCommand[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 2;
   
   // Clean up when component unmounts or on page navigation
   useEffect(() => {
@@ -36,6 +38,7 @@ export function useTextToSpeech() {
   ) => {
     try {
       setError(null);
+      setRetryCount(0);
       
       // Stop any current speech
       if (audioElement) {
@@ -50,19 +53,34 @@ export function useTextToSpeech() {
       console.log('Synthesizing speech with voice:', voiceId, 'language:', language);
       
       // Request speech synthesis from server
-      const data = await apiRequest('/api/synthesize', 'POST', {
+      const data = await apiRequest('POST', '/api/synthesize', {
         text,
         voiceId,
         language,
       });
+      
+      if (!data || !data.audioUrl) {
+        throw new Error('Invalid response from speech synthesis server');
+      }
       
       // Create and set up audio element
       audioElement = new Audio();
       
       // Add random cache-busting parameter to avoid browser caching
       const cacheBust = `?t=${Date.now()}`;
-      audioElement.src = `${data.audioUrl}${cacheBust}`;
       
+      // Get the full URL for the audio file
+      const baseUrl = window.location.origin;
+      const audioUrl = data.audioUrl.startsWith('http') 
+        ? data.audioUrl 
+        : `${baseUrl}${data.audioUrl}${cacheBust}`;
+      
+      audioElement.src = audioUrl;
+      
+      // Set up some audio element properties
+      audioElement.preload = 'auto';
+      
+      // Handle audio playback ending
       audioElement.addEventListener('ended', () => {
         setIsSpeaking(false);
         setCurrentText(null);
@@ -70,28 +88,58 @@ export function useTextToSpeech() {
         audioElement = null;
       });
       
-      audioElement.addEventListener('error', (e: ErrorEvent) => {
+      // Handle audio playback errors
+      audioElement.addEventListener('error', async (e: Event) => {
         console.error('Audio playback error:', e);
+        
         // Use the audioElement's error property directly
         if (audioElement && audioElement.error) {
           console.error('Failed to play audio:', audioElement.error);
         }
+        
         console.log('Audio src that failed:', audioElement?.src);
+        
+        // Try to recover by reloading the audio with a new cache-busting parameter
+        if (retryCount < MAX_RETRIES) {
+          console.log(`Retrying audio playback (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
+          setRetryCount(prev => prev + 1);
+          
+          // Small delay before retry
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const newCacheBust = `?t=${Date.now()}`;
+          audioElement.src = `${baseUrl}${data.audioUrl}${newCacheBust}`;
+          
+          try {
+            await audioElement.play();
+            return; // Success, no need to set error state
+          } catch (retryError) {
+            console.error('Retry failed:', retryError);
+          }
+        }
+        
+        // All retries failed or not retrying
         setIsSpeaking(false);
         setError('Failed to play audio. Please try again.');
         audioElement = null;
       });
       
       // Start playing
-      const playPromise = audioElement.play();
-      
-      if (playPromise !== undefined) {
-        playPromise.catch(e => {
-          console.error('Failed to play audio:', e);
+      try {
+        await audioElement.play();
+      } catch (playError) {
+        console.error('Failed to play audio:', playError);
+        
+        // Check if it's an autoplay policy issue
+        if (playError instanceof DOMException && playError.name === 'NotAllowedError') {
           setIsSpeaking(false);
-          setError('Failed to play audio. User interaction may be required.');
+          setError('Audio playback was blocked. Please interact with the page first.');
           audioElement = null;
-        });
+        } else {
+          setIsSpeaking(false);
+          setError('Failed to play audio. Please try again.');
+          audioElement = null;
+        }
       }
       
     } catch (e) {
@@ -101,7 +149,7 @@ export function useTextToSpeech() {
       setCurrentVisualCommands(null);
       setError(e instanceof Error ? e.message : 'Unknown error occurred');
     }
-  }, []);
+  }, [retryCount]);
   
   // Function to stop speaking
   const stopSpeaking = useCallback(() => {

@@ -926,12 +926,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Speech to text API endpoint
   app.post("/api/speech-to-text", uploadMemory.single('audio'), async (req, res) => {
     try {
+      // Make sure we have the OpenAI API key for speech transcription
+      if (!process.env.OPENAI_API_KEY) {
+        console.warn("OPENAI_API_KEY not set for speech-to-text functionality");
+      }
+      
       return await speechToText(req, res);
     } catch (error) {
       console.error("Speech-to-text API error:", error);
       return res.status(500).json({ 
         error: "Failed to process speech to text", 
-        details: error instanceof Error ? error.message : "Unknown error" 
+        details: error instanceof Error ? error.message : "Unknown error",
+        success: false
       });
     }
   });
