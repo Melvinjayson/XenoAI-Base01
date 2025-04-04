@@ -209,9 +209,20 @@ const AICanvasAssistant = ({
       
       if (newSnippets.length > 0) {
         setCodeSnippets(prevSnippets => [...prevSnippets, ...newSnippets]);
+        // If we were generating code and now have snippets, turn off the loading state
+        if (isGeneratingCode) {
+          setIsGeneratingCode(false);
+        }
+      } else if (!isLoading && isGeneratingCode) {
+        // If the loading is done but we didn't get a code snippet from a code request,
+        // turn off the loading state after a short delay
+        const timer = setTimeout(() => {
+          setIsGeneratingCode(false);
+        }, 500);
+        return () => clearTimeout(timer);
       }
     }
-  }, [messages, extractCodeSnippets]);
+  }, [messages, extractCodeSnippets, isGeneratingCode, isLoading]);
   
   useEffect(() => {
     // Generate canvas-specific suggestions based on context
