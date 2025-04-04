@@ -7,6 +7,7 @@ import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
 import { speechToText } from "./speech-to-text";
 import { queryPerplexity, perplexitySearchConversation } from "./perplexity";
+import { uploadAndAnalyzeImage, extractColorsFromUrl } from "./color-analyzer";
 import { 
   InsertFile, 
   InsertCanvas, 
@@ -1379,6 +1380,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timestamp: Date.now(),
       message: 'This is test data that can be cached for offline use',
       randomValue: Math.random()
+    });
+  });
+  
+  // API endpoint for uploading and analyzing image colors
+  app.post("/api/colors/upload", uploadAndAnalyzeImage);
+  
+  // API endpoint for extracting colors from image URL or data URL
+  app.post("/api/colors/extract", async (req, res) => {
+    try {
+      await extractColorsFromUrl(req, res);
+    } catch (error) {
+      console.error("Color extraction API error:", error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Failed to extract colors from image",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // API endpoint to serve uploaded files from public directory
+  app.use('/uploads', (req, res, next) => {
+    const filePath = path.join(process.cwd(), 'public', 'uploads', path.basename(req.url));
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        next();
+      }
     });
   });
   
