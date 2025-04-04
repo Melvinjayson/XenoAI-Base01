@@ -1,5 +1,5 @@
 import { Message } from "@/types";
-import { ExternalLink, Mic, MessageSquare, Network } from "lucide-react";
+import { ExternalLink, Mic, MessageSquare, Network, Paperclip, Filter } from "lucide-react";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,8 @@ import { Separator } from "@/components/ui/separator";
 import { useChat } from "@/context/chat-context";
 import { useLanguage } from "@/context/language-context";
 import { Link } from "wouter";
+import { useState, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessageProps {
   message: Message;
@@ -20,6 +22,9 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const { speak, isSpeaking, stopSpeaking } = useTextToSpeech();
   const { sendMessage } = useChat();
   const { language } = useLanguage();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleSpeak = () => {
     if (isSpeaking) {
@@ -31,6 +36,54 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
   const handleRelatedQueryClick = (query: string) => {
     sendMessage(query);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      // Create a FormData object to send the file
+      const formData = new FormData();
+      formData.append('file', files[0]);
+      formData.append('sessionId', 'default');
+      
+      // Upload the file
+      const response = await fetch('/api/files/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: "File uploaded successfully",
+        description: `${files[0].name} has been uploaded and will be analyzed.`,
+      });
+      
+      // You could potentially trigger analysis or send a message with the file reference
+      sendMessage(`I've uploaded a file: ${files[0].name}`);
+      
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const isUser = message.role === "user";
@@ -110,17 +163,47 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 >
                   {isSpeaking ? "Stop" : "Listen"}
                 </Button>
+                {/* Add file upload button */}
+                <div className="relative">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.jpg,.jpeg,.png"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-xs relative"
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <>
+                        <div className="animate-spin mr-1 h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Paperclip className="w-3 h-3 mr-1" />
+                        Attach
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-              <Link href="/knowledge-graph">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                >
-                  <Network className="w-3 h-3 mr-1" />
-                  View Graph
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link href="/knowledge-graph">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                  >
+                    <Network className="w-3 h-3 mr-1" />
+                    View Graph
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
