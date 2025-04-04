@@ -229,6 +229,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Text is required" });
       }
       
+      // Check if we have either ElevenLabs or OpenAI API keys for speech synthesis
+      if (!process.env.ELEVENLABS_API_KEY && !process.env.OPENAI_API_KEY) {
+        console.warn("Neither ELEVENLABS_API_KEY nor OPENAI_API_KEY are set for speech synthesis");
+      }
+      
       // Pass language parameter to synthesizeSpeech for language-specific voices
       const result = await synthesizeSpeech({ 
         text, 
@@ -236,12 +241,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         language: language || 'en' // Default to English if no language specified
       });
       
+      // Make sure we return absolute URLs for the audio files
+      if (result.audioUrl) {
+        if (!result.audioUrl.startsWith('http') && !result.audioUrl.startsWith('/')) {
+          result.audioUrl = '/' + result.audioUrl;
+        }
+      }
+      
       return res.json(result);
     } catch (error) {
       console.error("Voice synthesis API error:", error);
       return res.status(500).json({ 
         error: "Failed to synthesize speech", 
-        details: error instanceof Error ? error.message : "Unknown error" 
+        details: error instanceof Error ? error.message : "Unknown error",
+        success: false
       });
     }
   });

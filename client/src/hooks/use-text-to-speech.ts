@@ -107,14 +107,16 @@ export function useTextToSpeech() {
           // Small delay before retry
           await new Promise(resolve => setTimeout(resolve, 500));
           
-          const newCacheBust = `?t=${Date.now()}`;
-          audioElement.src = `${baseUrl}${data.audioUrl}${newCacheBust}`;
-          
-          try {
-            await audioElement.play();
-            return; // Success, no need to set error state
-          } catch (retryError) {
-            console.error('Retry failed:', retryError);
+          if (audioElement) {
+            const newCacheBust = `?t=${Date.now()}`;
+            audioElement.src = `${baseUrl}${data.audioUrl}${newCacheBust}`;
+            
+            try {
+              await audioElement.play();
+              return; // Success, no need to set error state
+            } catch (retryError) {
+              console.error('Retry failed:', retryError);
+            }
           }
         }
         
@@ -125,20 +127,22 @@ export function useTextToSpeech() {
       });
       
       // Start playing
-      try {
-        await audioElement.play();
-      } catch (playError) {
-        console.error('Failed to play audio:', playError);
-        
-        // Check if it's an autoplay policy issue
-        if (playError instanceof DOMException && playError.name === 'NotAllowedError') {
-          setIsSpeaking(false);
-          setError('Audio playback was blocked. Please interact with the page first.');
-          audioElement = null;
-        } else {
-          setIsSpeaking(false);
-          setError('Failed to play audio. Please try again.');
-          audioElement = null;
+      if (audioElement) {
+        try {
+          await audioElement.play();
+        } catch (playError) {
+          console.error('Failed to play audio:', playError);
+          
+          // Check if it's an autoplay policy issue
+          if (playError instanceof DOMException && playError.name === 'NotAllowedError') {
+            setIsSpeaking(false);
+            setError('Audio playback was blocked. Please interact with the page first.');
+            audioElement = null;
+          } else {
+            setIsSpeaking(false);
+            setError('Failed to play audio. Please try again.');
+            audioElement = null;
+          }
         }
       }
       
