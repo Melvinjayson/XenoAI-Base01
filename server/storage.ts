@@ -1,12 +1,14 @@
 import { 
-  users, messages, sessions, bookmarks, files, insights, preferences,
+  users, messages, sessions, bookmarks, files, insights, preferences, canvases, canvasElements,
   type User, type InsertUser, 
   type Message, type InsertMessage, 
   type Session, type InsertSession,
   type Bookmark, type InsertBookmark,
   type File, type InsertFile,
   type Insight, type InsertInsight,
-  type Preference, type InsertPreference
+  type Preference, type InsertPreference,
+  type Canvas, type InsertCanvas,
+  type CanvasElement, type InsertCanvasElement
 } from "@shared/schema";
 
 // Memory types for enhanced context awareness
@@ -83,6 +85,21 @@ export interface IStorage {
   createConversationMemory(memory: ConversationMemory): Promise<ConversationMemory>;
   getConversationMemories(userId: string, limit?: number): Promise<ConversationMemory[]>;
   updateConversationSummary(sessionId: string, summary: string, topics: string[]): Promise<ConversationSummary>;
+  
+  // Canvas methods
+  createCanvas(canvas: InsertCanvas): Promise<Canvas>;
+  getCanvases(userId?: string, sessionId?: string): Promise<Canvas[]>;
+  getCanvasById(canvasId: number): Promise<Canvas | undefined>;
+  updateCanvas(canvasId: number, data: Partial<InsertCanvas>): Promise<Canvas | undefined>;
+  deleteCanvas(canvasId: number): Promise<boolean>;
+  
+  // Canvas element methods
+  createCanvasElement(element: InsertCanvasElement): Promise<CanvasElement>;
+  getCanvasElements(canvasId: number): Promise<CanvasElement[]>;
+  getCanvasElementById(elementId: number): Promise<CanvasElement | undefined>;
+  updateCanvasElement(elementId: number, data: Partial<InsertCanvasElement>): Promise<CanvasElement | undefined>;
+  deleteCanvasElement(elementId: number): Promise<boolean>;
+  deleteCanvasElements(canvasId: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -98,6 +115,8 @@ export class MemStorage implements IStorage {
   private files: Map<number, File>;
   private insights: Map<number, Insight>;
   private preferences: Map<string, Preference[]>; // Key is userId
+  private canvases: Map<number, Canvas>;
+  private canvasElements: Map<number, CanvasElement[]>; // Key is canvasId
   
   private userCurrentId: number;
   private messageCurrentId: number;
@@ -106,6 +125,8 @@ export class MemStorage implements IStorage {
   private fileCurrentId: number;
   private insightCurrentId: number;
   private preferenceCurrentId: number;
+  private canvasCurrentId: number;
+  private canvasElementCurrentId: number;
 
   constructor() {
     this.users = new Map();
@@ -120,6 +141,8 @@ export class MemStorage implements IStorage {
     this.files = new Map();
     this.insights = new Map();
     this.preferences = new Map();
+    this.canvases = new Map();
+    this.canvasElements = new Map();
     
     this.userCurrentId = 1;
     this.messageCurrentId = 1;
@@ -128,6 +151,8 @@ export class MemStorage implements IStorage {
     this.fileCurrentId = 1;
     this.insightCurrentId = 1;
     this.preferenceCurrentId = 1;
+    this.canvasCurrentId = 1;
+    this.canvasElementCurrentId = 1;
   }
 
   // User methods
@@ -554,6 +579,261 @@ export class MemStorage implements IStorage {
   async getPreferenceByKey(userId: string, key: string): Promise<Preference | undefined> {
     const userPreferences = this.preferences.get(userId) || [];
     return userPreferences.find(p => p.key === key);
+  }
+  
+  // Canvas methods
+  async createCanvas(canvas: InsertCanvas): Promise<Canvas> {
+    const id = this.canvasCurrentId++;
+    const now = new Date();
+    
+    const newCanvas: Canvas = {
+      id,
+      userId: canvas.userId || null,
+      sessionId: canvas.sessionId,
+      title: canvas.title,
+      thumbnail: canvas.thumbnail || null,
+      isPublic: canvas.isPublic || false,
+      lastModified: now,
+      createdAt: now
+    };
+    
+    this.canvases.set(id, newCanvas);
+    this.canvasElements.set(id, []); // Initialize empty elements array for this canvas
+    return newCanvas;
+  }
+  
+  async getCanvases(userId?: string, sessionId?: string): Promise<Canvas[]> {
+    const allCanvases = Array.from(this.canvases.values());
+    
+    if (userId && sessionId) {
+      return allCanvases.filter(canvas => canvas.userId === userId && canvas.sessionId === sessionId);
+    } else if (userId) {
+      return allCanvases.filter(canvas => canvas.userId === userId);
+    } else if (sessionId) {
+      return allCanvases.filter(canvas => canvas.sessionId === sessionId);
+    }
+    
+    return allCanvases;
+  }
+  
+  async getCanvasById(canvasId: number): Promise<Canvas | undefined> {
+    return this.canvases.get(canvasId);
+  }
+  
+  async updateCanvas(canvasId: number, data: Partial<InsertCanvas>): Promise<Canvas | undefined> {
+    const canvas = this.canvases.get(canvasId);
+    
+    if (!canvas) {
+      return undefined;
+    }
+    
+    const updatedCanvas: Canvas = {
+      ...canvas,
+      userId: data.userId || canvas.userId,
+      sessionId: data.sessionId || canvas.sessionId,
+      title: data.title || canvas.title,
+      thumbnail: data.thumbnail !== undefined ? data.thumbnail : canvas.thumbnail,
+      isPublic: data.isPublic !== undefined ? data.isPublic : canvas.isPublic,
+      lastModified: new Date(),
+      createdAt: canvas.createdAt
+    };
+    
+    this.canvases.set(canvasId, updatedCanvas);
+    return updatedCanvas;
+  }
+  
+  async deleteCanvas(canvasId: number): Promise<boolean> {
+    // Also delete all associated elements
+    this.canvasElements.delete(canvasId);
+    return this.canvases.delete(canvasId);
+  }
+  
+  // Canvas element methods
+  async createCanvasElement(element: InsertCanvasElement): Promise<CanvasElement> {
+    const id = this.canvasElementCurrentId++;
+    const now = new Date();
+    
+    const newElement: CanvasElement = {
+      id,
+      canvasId: element.canvasId,
+      type: element.type,
+      content: element.content || null,
+      x: element.x,
+      y: element.y,
+      width: element.width || null,
+      height: element.height || null,
+      zIndex: element.zIndex || 0,
+      style: element.style || null,
+      metadata: element.metadata || null,
+      createdAt: now
+    };
+    
+    const canvasElements = this.canvasElements.get(element.canvasId) || [];
+    canvasElements.push(newElement);
+    this.canvasElements.set(element.canvasId, canvasElements);
+    
+    // Update lastModified on the canvas
+    const canvas = this.canvases.get(element.canvasId);
+    if (canvas) {
+      canvas.lastModified = now;
+      this.canvases.set(element.canvasId, canvas);
+    }
+    
+    return newElement;
+  }
+  
+  async getCanvasElements(canvasId: number): Promise<CanvasElement[]> {
+    return this.canvasElements.get(canvasId) || [];
+  }
+  
+  async getCanvasElementById(elementId: number): Promise<CanvasElement | undefined> {
+    // Since elements are stored by canvasId, we need to search all canvas elements
+    for (const elements of this.canvasElements.values()) {
+      const element = elements.find(e => e.id === elementId);
+      if (element) {
+        return element;
+      }
+    }
+    return undefined;
+  }
+  
+  async updateCanvasElement(elementId: number, data: Partial<InsertCanvasElement>): Promise<CanvasElement | undefined> {
+    // Find the element across all canvases
+    let targetCanvasId: number | null = null;
+    let targetElement: CanvasElement | undefined;
+    let targetIndex: number = -1;
+    
+    for (const [canvasId, elements] of this.canvasElements.entries()) {
+      const index = elements.findIndex(e => e.id === elementId);
+      if (index !== -1) {
+        targetCanvasId = canvasId;
+        targetElement = elements[index];
+        targetIndex = index;
+        break;
+      }
+    }
+    
+    if (!targetElement || targetCanvasId === null || targetIndex === -1) {
+      return undefined;
+    }
+    
+    const now = new Date();
+    
+    // Handle style updates
+    let updatedStyle = targetElement.style;
+    if (data.style) {
+      updatedStyle = {
+        ...updatedStyle,
+        ...data.style
+      };
+    }
+    
+    // Handle metadata updates
+    let updatedMetadata = targetElement.metadata;
+    if (data.metadata) {
+      updatedMetadata = {
+        ...updatedMetadata,
+        ...data.metadata
+      };
+    }
+    
+    const updatedElement: CanvasElement = {
+      ...targetElement,
+      type: data.type || targetElement.type,
+      content: data.content !== undefined ? data.content : targetElement.content,
+      x: data.x !== undefined ? data.x : targetElement.x,
+      y: data.y !== undefined ? data.y : targetElement.y,
+      width: data.width !== undefined ? data.width : targetElement.width,
+      height: data.height !== undefined ? data.height : targetElement.height,
+      zIndex: data.zIndex !== undefined ? data.zIndex : targetElement.zIndex,
+      style: updatedStyle,
+      metadata: updatedMetadata
+    };
+    
+    // If canvasId is changing, move the element
+    if (data.canvasId !== undefined && data.canvasId !== targetCanvasId) {
+      // Remove from old canvas
+      const oldElements = this.canvasElements.get(targetCanvasId) || [];
+      const filteredOldElements = oldElements.filter(e => e.id !== elementId);
+      this.canvasElements.set(targetCanvasId, filteredOldElements);
+      
+      // Add to new canvas
+      const newElements = this.canvasElements.get(data.canvasId) || [];
+      updatedElement.canvasId = data.canvasId;
+      newElements.push(updatedElement);
+      this.canvasElements.set(data.canvasId, newElements);
+      
+      // Update lastModified on both canvases
+      const oldCanvas = this.canvases.get(targetCanvasId);
+      if (oldCanvas) {
+        oldCanvas.lastModified = now;
+        this.canvases.set(targetCanvasId, oldCanvas);
+      }
+      
+      const newCanvas = this.canvases.get(data.canvasId);
+      if (newCanvas) {
+        newCanvas.lastModified = now;
+        this.canvases.set(data.canvasId, newCanvas);
+      }
+    } else {
+      // Just update in place
+      const elements = this.canvasElements.get(targetCanvasId) || [];
+      elements[targetIndex] = updatedElement;
+      this.canvasElements.set(targetCanvasId, elements);
+      
+      // Update lastModified on the canvas
+      const canvas = this.canvases.get(targetCanvasId);
+      if (canvas) {
+        canvas.lastModified = now;
+        this.canvases.set(targetCanvasId, canvas);
+      }
+    }
+    
+    return updatedElement;
+  }
+  
+  async deleteCanvasElement(elementId: number): Promise<boolean> {
+    // Find the element across all canvases
+    let targetCanvasId: number | null = null;
+    let found = false;
+    
+    for (const [canvasId, elements] of this.canvasElements.entries()) {
+      const index = elements.findIndex(e => e.id === elementId);
+      if (index !== -1) {
+        targetCanvasId = canvasId;
+        // Remove the element
+        elements.splice(index, 1);
+        this.canvasElements.set(canvasId, elements);
+        found = true;
+        
+        // Update lastModified on the canvas
+        const canvas = this.canvases.get(canvasId);
+        if (canvas) {
+          canvas.lastModified = new Date();
+          this.canvases.set(canvasId, canvas);
+        }
+        
+        break;
+      }
+    }
+    
+    return found;
+  }
+  
+  async deleteCanvasElements(canvasId: number): Promise<boolean> {
+    // Just clear the elements array for this canvas
+    const exists = this.canvasElements.has(canvasId);
+    if (exists) {
+      this.canvasElements.set(canvasId, []);
+      
+      // Update lastModified on the canvas
+      const canvas = this.canvases.get(canvasId);
+      if (canvas) {
+        canvas.lastModified = new Date();
+        this.canvases.set(canvasId, canvas);
+      }
+    }
+    return exists;
   }
 }
 

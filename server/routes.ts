@@ -6,7 +6,13 @@ import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
 import { speechToText } from "./speech-to-text";
-import { InsertFile } from "../shared/schema";
+import { 
+  InsertFile, 
+  InsertCanvas, 
+  insertCanvasSchema, 
+  InsertCanvasElement, 
+  insertCanvasElementSchema 
+} from "../shared/schema";
 import { 
   createKnowledgeGraphFromSearch, 
   expandGraphNode, 
@@ -949,6 +955,251 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Delete file error:", error);
       return res.status(500).json({ 
         error: "Failed to delete file", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Canvas API routes
+  app.post("/api/canvases", async (req, res) => {
+    try {
+      // Validate the request body
+      const parseResult = insertCanvasSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid canvas data", 
+          details: parseResult.error.format() 
+        });
+      }
+      
+      const canvasData = parseResult.data;
+      
+      // Create the canvas
+      const canvas = await storage.createCanvas(canvasData);
+      return res.status(201).json(canvas);
+    } catch (error) {
+      console.error("Create canvas error:", error);
+      return res.status(500).json({ 
+        error: "Failed to create canvas", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/canvases", async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const sessionId = req.query.sessionId as string | undefined;
+      
+      const canvases = await storage.getCanvases(userId, sessionId);
+      return res.json(canvases);
+    } catch (error) {
+      console.error("Get canvases error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get canvases", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/canvases/:id", async (req, res) => {
+    try {
+      const canvasId = parseInt(req.params.id);
+      
+      if (isNaN(canvasId)) {
+        return res.status(400).json({ error: "Invalid canvas ID" });
+      }
+      
+      const canvas = await storage.getCanvasById(canvasId);
+      
+      if (!canvas) {
+        return res.status(404).json({ error: "Canvas not found" });
+      }
+      
+      return res.json(canvas);
+    } catch (error) {
+      console.error("Get canvas error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get canvas", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.patch("/api/canvases/:id", async (req, res) => {
+    try {
+      const canvasId = parseInt(req.params.id);
+      
+      if (isNaN(canvasId)) {
+        return res.status(400).json({ error: "Invalid canvas ID" });
+      }
+      
+      const canvasData = req.body;
+      const canvas = await storage.updateCanvas(canvasId, canvasData);
+      
+      if (!canvas) {
+        return res.status(404).json({ error: "Canvas not found" });
+      }
+      
+      return res.json(canvas);
+    } catch (error) {
+      console.error("Update canvas error:", error);
+      return res.status(500).json({ 
+        error: "Failed to update canvas", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.delete("/api/canvases/:id", async (req, res) => {
+    try {
+      const canvasId = parseInt(req.params.id);
+      
+      if (isNaN(canvasId)) {
+        return res.status(400).json({ error: "Invalid canvas ID" });
+      }
+      
+      // Delete all canvas elements first
+      await storage.deleteCanvasElements(canvasId);
+      
+      // Then delete the canvas
+      const success = await storage.deleteCanvas(canvasId);
+      
+      if (!success) {
+        return res.status(500).json({ error: "Failed to delete canvas" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete canvas error:", error);
+      return res.status(500).json({ 
+        error: "Failed to delete canvas", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Canvas Element API routes
+  app.post("/api/canvas-elements", async (req, res) => {
+    try {
+      // Validate the request body
+      const parseResult = insertCanvasElementSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid canvas element data", 
+          details: parseResult.error.format() 
+        });
+      }
+      
+      const elementData = parseResult.data;
+      
+      // Verify canvas exists
+      const canvas = await storage.getCanvasById(elementData.canvasId);
+      if (!canvas) {
+        return res.status(404).json({ error: "Canvas not found" });
+      }
+      
+      // Create the canvas element
+      const element = await storage.createCanvasElement(elementData);
+      return res.status(201).json(element);
+    } catch (error) {
+      console.error("Create canvas element error:", error);
+      return res.status(500).json({ 
+        error: "Failed to create canvas element", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/canvas-elements", async (req, res) => {
+    try {
+      const canvasId = parseInt(req.query.canvasId as string);
+      
+      if (isNaN(canvasId)) {
+        return res.status(400).json({ error: "Valid canvasId query parameter is required" });
+      }
+      
+      const elements = await storage.getCanvasElements(canvasId);
+      return res.json(elements);
+    } catch (error) {
+      console.error("Get canvas elements error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get canvas elements", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.get("/api/canvas-elements/:id", async (req, res) => {
+    try {
+      const elementId = parseInt(req.params.id);
+      
+      if (isNaN(elementId)) {
+        return res.status(400).json({ error: "Invalid canvas element ID" });
+      }
+      
+      const element = await storage.getCanvasElementById(elementId);
+      
+      if (!element) {
+        return res.status(404).json({ error: "Canvas element not found" });
+      }
+      
+      return res.json(element);
+    } catch (error) {
+      console.error("Get canvas element error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get canvas element", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.patch("/api/canvas-elements/:id", async (req, res) => {
+    try {
+      const elementId = parseInt(req.params.id);
+      
+      if (isNaN(elementId)) {
+        return res.status(400).json({ error: "Invalid canvas element ID" });
+      }
+      
+      const elementData = req.body;
+      const element = await storage.updateCanvasElement(elementId, elementData);
+      
+      if (!element) {
+        return res.status(404).json({ error: "Canvas element not found" });
+      }
+      
+      return res.json(element);
+    } catch (error) {
+      console.error("Update canvas element error:", error);
+      return res.status(500).json({ 
+        error: "Failed to update canvas element", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.delete("/api/canvas-elements/:id", async (req, res) => {
+    try {
+      const elementId = parseInt(req.params.id);
+      
+      if (isNaN(elementId)) {
+        return res.status(400).json({ error: "Invalid canvas element ID" });
+      }
+      
+      const success = await storage.deleteCanvasElement(elementId);
+      
+      if (!success) {
+        return res.status(500).json({ error: "Failed to delete canvas element" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Delete canvas element error:", error);
+      return res.status(500).json({ 
+        error: "Failed to delete canvas element", 
         details: error instanceof Error ? error.message : "Unknown error" 
       });
     }

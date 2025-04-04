@@ -2,6 +2,9 @@ import { pgTable, text, serial, integer, json, timestamp, boolean } from "drizzl
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Canvas element types
+export type CanvasElementType = 'text' | 'shape' | 'connection' | 'node' | 'image' | 'insight';
+
 // Chat message schema
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
@@ -144,3 +147,63 @@ export const insertPreferenceSchema = createInsertSchema(preferences).omit({
 
 export type InsertPreference = z.infer<typeof insertPreferenceSchema>;
 export type Preference = typeof preferences.$inferSelect;
+
+// Canvas schema - for storing interactive whiteboard data
+export const canvases = pgTable("canvases", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id"),
+  sessionId: text("session_id").notNull(),
+  title: text("title").notNull(),
+  lastModified: timestamp("last_modified").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  thumbnail: text("thumbnail"),
+  isPublic: boolean("is_public").default(false),
+});
+
+export const insertCanvasSchema = createInsertSchema(canvases).omit({
+  id: true,
+  lastModified: true,
+  createdAt: true,
+});
+
+export type InsertCanvas = z.infer<typeof insertCanvasSchema>;
+export type Canvas = typeof canvases.$inferSelect;
+
+// Canvas elements schema - for storing objects on the canvas
+export const canvasElements = pgTable("canvas_elements", {
+  id: serial("id").primaryKey(),
+  canvasId: integer("canvas_id").notNull(),
+  type: text("type").notNull(), // text, shape, connection, node, image, insight
+  content: text("content"),
+  x: integer("x").notNull(),
+  y: integer("y").notNull(),
+  width: integer("width"),
+  height: integer("height"),
+  zIndex: integer("z_index").notNull().default(0),
+  style: json("style").$type<{
+    color?: string;
+    fontSize?: number;
+    fontFamily?: string;
+    backgroundColor?: string;
+    borderColor?: string;
+    borderWidth?: number;
+    opacity?: number;
+    rotation?: number;
+  }>(),
+  metadata: json("metadata").$type<{
+    sourceNodeId?: string;
+    sourceInsightId?: number;
+    linkedEntityIds?: string[];
+    aiGenerated?: boolean;
+    createdFromChat?: boolean;
+  }>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCanvasElement = z.infer<typeof insertCanvasElementSchema>;
+export type CanvasElement = typeof canvasElements.$inferSelect;

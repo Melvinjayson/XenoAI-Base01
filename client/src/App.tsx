@@ -8,6 +8,7 @@ import KnowledgeGraphPage from "@/pages/knowledge-graph";
 import SplashPage from "@/pages/splash-page";
 import OnboardingPage from "@/pages/onboarding-page";
 import VRExperience from "@/pages/vr-experience";
+import CanvasPage from "@/pages/canvas-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -57,6 +58,8 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
         <Route path="/vr-experience" component={VRExperience} />
+        <Route path="/canvas" component={CanvasPage} />
+        <Route path="/canvas/:id" component={CanvasPage} />
         <Route component={NotFound} />
       </Switch>
       
