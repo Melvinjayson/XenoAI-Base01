@@ -1,7 +1,7 @@
 import { Message } from "@/types";
 import { 
   ExternalLink, Mic, MessageSquare, Network, ThumbsUp, ThumbsDown, 
-  Flag, ArrowRight, MoreHorizontal, CheckCircle, Sparkles, BrainCircuit
+  Flag, ArrowRight, MoreHorizontal, CheckCircle, Sparkles, BrainCircuit, Brain
 } from "lucide-react";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { Button } from "@/components/ui/button";
@@ -109,9 +109,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm" />
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
-                  <path d="M13.5 1.5a1.5 1.5 0 0 0-3 0v5.25a1.5 1.5 0 0 0 3 0V1.5zM12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2.25a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5zm7.5-4.25a1.5 1.5 0 0 0 0-3h-5.25a1.5 1.5 0 0 0 0 3h5.25zM1.5 11.5a1.5 1.5 0 0 0 0 3h5.25a1.5 1.5 0 0 0 0-3H1.5z" />
-                </svg>
+                <Brain className="w-5 h-5 text-white" />
               </div>
             </div>
           </div>
