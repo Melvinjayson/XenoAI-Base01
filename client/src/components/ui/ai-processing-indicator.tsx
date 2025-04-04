@@ -136,14 +136,14 @@ export function AIProcessingIndicator({
   if (state === 'idle') return null;
 
   return (
-    <div className={`fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 ${className}`}>
-      <div className="bg-[#F5F0FF] dark:bg-[#2D2065] text-primary shadow-xl
-        flex items-center gap-3 rounded-2xl px-5 py-3.5 animate-in slide-in-from-bottom duration-300
-        border border-primary/10 dark:border-primary/30 hover:shadow-primary/10 hover:shadow-lg
-        transition-all duration-300 ease-in-out">
+    <div className={`fixed bottom-14 left-1/2 transform -translate-x-1/2 z-50 ${className}`} style={{ maxWidth: '85%' }}>
+      <div className="bg-[#F5F0FF] dark:bg-[#2D2065] text-primary shadow-md
+        flex items-center gap-2 rounded-lg px-2.5 py-1.5 animate-in slide-in-from-bottom duration-300
+        border border-primary/10 dark:border-primary/30 hover:shadow-primary/10 hover:shadow-sm
+        transition-all duration-300 ease-in-out scale-90">
         <div className="flex-shrink-0 relative">
           <div className={cn(
-            "w-10 h-10 bg-primary/10 dark:bg-primary/20 rounded-xl flex items-center justify-center",
+            "w-8 h-8 bg-primary/10 dark:bg-primary/20 rounded-lg flex items-center justify-center",
             "transition-all duration-300 transform",
             state === 'speaking' && "bg-primary/20 dark:bg-primary/30",
             state === 'listening' && "bg-destructive/20 dark:bg-destructive/30",
@@ -152,14 +152,14 @@ export function AIProcessingIndicator({
             state === 'searching' && "bg-primary/20 dark:bg-primary/30",
             state === 'processing' && "bg-emerald-500/20 dark:bg-emerald-600/30",
             state === 'connecting' && "bg-purple-500/20 dark:bg-purple-600/30"
-          )} style={{ transform: `scale(${iconScale})` }}>
+          )} style={{ transform: `scale(${iconScale * 0.9})` }}>
             {getIconForState(state)}
             
             {/* Voice activity visualization for active states */}
             {(state === 'speaking' || state === 'listening') && (
               <>
                 <div className={cn(
-                  "absolute inset-0 rounded-xl border",
+                  "absolute inset-0 rounded-lg border",
                   "animate-[ripple_1.8s_ease-out_infinite]",
                   state === 'speaking' ? "border-primary" : "border-destructive"
                 )} style={{
@@ -167,7 +167,7 @@ export function AIProcessingIndicator({
                   opacity: 0.7 - (audioLevel * 0.3)
                 }} />
                 <div className={cn(
-                  "absolute inset-0 rounded-xl border",
+                  "absolute inset-0 rounded-lg border",
                   "animate-[ripple_2.2s_ease-out_infinite_300ms]",
                   state === 'speaking' ? "border-primary" : "border-destructive"
                 )} style={{
@@ -180,7 +180,7 @@ export function AIProcessingIndicator({
             {/* Subtle animation rings for other states */}
             {(['thinking', 'analyzing', 'processing', 'searching', 'connecting'].includes(state)) && (
               <div className={cn(
-                "absolute inset-0 rounded-xl border",
+                "absolute inset-0 rounded-lg border",
                 "animate-[pulse_2.5s_ease-in-out_infinite]",
                 state === 'thinking' ? "border-amber-500" : 
                 state === 'analyzing' ? "border-cyan-500" :
@@ -196,7 +196,7 @@ export function AIProcessingIndicator({
         </div>
         
         <div className="flex flex-col">
-          <span className="text-sm font-medium dark:text-white transition-all duration-300">
+          <span className="text-xs font-medium dark:text-white transition-all duration-300">
             {displayMessage}
           </span>
           
@@ -231,17 +231,17 @@ export function AIProcessingIndicator({
           {onPauseToggle && (
             <button 
               onClick={onPauseToggle} 
-              className="p-2 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-lg 
+              className="p-1.5 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-lg 
                 transition-all duration-150 hover:scale-105 active:scale-95 
-                focus:outline-none focus:ring-2 focus:ring-primary/20"
+                focus:outline-none focus:ring-1 focus:ring-primary/20"
               aria-label={isPaused ? "Resume" : "Pause"}
             >
               {isPaused ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
                   <rect x="6" y="4" width="4" height="16"></rect>
                   <rect x="14" y="4" width="4" height="16"></rect>
                 </svg>
@@ -282,7 +282,7 @@ function getDefaultMessage(state: ProcessingState, index: number = 0): string {
 }
 
 function getIconForState(state: ProcessingState) {
-  const baseAnimationClass = "w-6 h-6 transition-all text-primary";
+  const baseAnimationClass = "w-5 h-5 transition-all text-primary";
   
   switch (state) {
     case 'thinking':
