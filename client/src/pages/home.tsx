@@ -3,7 +3,7 @@ import ChatContainer from "@/components/chat/chat-container";
 import EnhancedInputArea from "@/components/chat/enhanced-input-area";
 import VoiceIndicator from "@/components/chat/voice-indicator";
 import BottomSheet from "@/components/ui/bottom-sheet";
-import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal, Kanban, Brain } from "lucide-react";
+import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal, Kanban, Brain, Layout } from "lucide-react";
 import { useChat } from "@/context/chat-context";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
@@ -20,6 +20,12 @@ import { useGestureArea } from "@/context/gesture-context";
 import { GestureHandlers } from "@/hooks/use-gestures";
 import { GestureIndicator } from "@/components/ui/gesture-indicator";
 import { toast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from "@/components/ui/dropdown-menu";
 
 export default function Home() {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
@@ -288,6 +294,7 @@ export default function Home() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Link href="/workbench">
               <Button variant="ghost" size="sm" className="relative flex items-center gap-2 h-9 px-3 text-primary">
                 <Network className="w-4 h-4" />
                 <span className="font-medium">Workbench</span>
@@ -340,6 +347,7 @@ export default function Home() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Link href="/workbench">
               <Button variant="ghost" size="icon" className="rounded-full relative h-9 w-9" aria-label="Workbench">
                 <Network className="w-5 h-5 text-primary" />
                 <span className="absolute top-1 right-1 flex h-2 w-2">

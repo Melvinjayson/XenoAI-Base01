@@ -196,6 +196,15 @@ export class MemStorage implements IStorage {
   private projectComments: Map<number, ProjectComment>;
   private taskComments: Map<number, TaskComment>;
   
+  // IDs for project management
+  private projectCurrentId: number;
+  private milestoneCurrentId: number;
+  private taskCurrentId: number;
+  private researchInsightCurrentId: number;
+  private insightTaskRelationCurrentId: number;
+  private projectCommentCurrentId: number;
+  private taskCommentCurrentId: number;
+  
   private userCurrentId: number;
   private messageCurrentId: number;
   private sessionCurrentId: number;
@@ -206,13 +215,6 @@ export class MemStorage implements IStorage {
   private canvasCurrentId: number;
   private canvasElementCurrentId: number;
   private colorPaletteCurrentId: number;
-  private projectCurrentId: number;
-  private milestoneCurrentId: number;
-  private taskCurrentId: number;
-  private researchInsightCurrentId: number;
-  private insightTaskRelationCurrentId: number;
-  private projectCommentCurrentId: number;
-  private taskCommentCurrentId: number;
 
   constructor() {
     this.users = new Map();
