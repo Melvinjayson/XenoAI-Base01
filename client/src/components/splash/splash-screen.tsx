@@ -168,19 +168,19 @@ export function SplashScreen() {
         className="absolute inset-0 z-0"
       />
 
-      <div className="z-10 flex flex-col items-center justify-center min-h-screen gap-8 px-4">
+      <div className="z-10 flex flex-col items-center justify-start pt-20 min-h-screen gap-8 px-4">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="relative"
         >
-          <div className="relative w-24 h-24">
+          <div className="relative w-32 h-32">
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm" />
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-14 h-14 text-white" fill="currentColor">
-                <path d="M13.5 1.5a1.5 1.5 0 0 0-3 0v5.25a1.5 1.5 0 0 0 3 0V1.5zM12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2.25a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5zm7.5-4.25a1.5 1.5 0 0 0 0-3h-5.25a1.5 1.5 0 0 0 0 3h5.25zM1.5 11.5a1.5 1.5 0 0 0 0 3h5.25a1.5 1.5 0 0 0 0-3H1.5z" />
+              <svg viewBox="0 0 24 24" className="w-16 h-16 text-white" fill="currentColor">
+                <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3 0-5.44-2.44-5.44-5.44 0-1.81.89-3.41 2.26-4.4-.44-.06-.9-.1-1.36-.1z" />
               </svg>
             </div>
             <div className="absolute -inset-2 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-full blur-xl" />
