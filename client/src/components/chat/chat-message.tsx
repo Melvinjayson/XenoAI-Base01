@@ -1,5 +1,5 @@
 import { Message } from "@/types";
-import { ExternalLink, Mic, MessageSquare } from "lucide-react";
+import { ExternalLink, Mic, MessageSquare, Network } from "lucide-react";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { AvatarImage } from "@radix-ui/react-avatar";
 import { Separator } from "@/components/ui/separator";
 import { useChat } from "@/context/chat-context";
 import { useLanguage } from "@/context/language-context";
+import { Link } from "wouter";
 
 interface ChatMessageProps {
   message: Message;

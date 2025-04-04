@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ChatContainer from "@/components/chat/chat-container";
 import EnhancedInputArea from "@/components/chat/enhanced-input-area";
 import VoiceIndicator from "@/components/chat/voice-indicator";
 import BottomSheet from "@/components/ui/bottom-sheet";
-import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network } from "lucide-react";
+import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal } from "lucide-react";
 import { useChat } from "@/context/chat-context";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
@@ -11,17 +11,22 @@ import { Message } from "@/types";
 import { Button } from "@/components/ui/button";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { useTheme } from "@/context/theme-context";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { SearchFilterOptions } from "@/components/search-filters";
 import { SearchFilters } from "@/types";
+import { useGestureArea } from "@/context/gesture-context";
+import { GestureIndicator } from "@/components/ui/gesture-indicator";
+import { toast } from "@/hooks/use-toast";
 
 export default function Home() {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isMuteEnabled, setIsMuteEnabled] = useState(false);
   const [voiceVolume, setVoiceVolume] = useState(100);
   const [voiceId, setVoiceId] = useState('default');
+  const [showGestureIndicator, setShowGestureIndicator] = useState<string | null>(null);
   const { messages, isLoading, sendMessage, clearConversation } = useChat();
   const { isDarkMode } = useTheme();
+  const [, navigate] = useLocation();
   
   const { 
     isListening, 
@@ -98,9 +103,82 @@ export default function Home() {
       speak(message.content, voiceId || 'default');
     }
   };
+  
+  // Handle gesture swipe actions
+  const handleSwipeLeft = () => {
+    navigate('/knowledge-graph');
+    setShowGestureIndicator('right');
+    setTimeout(() => setShowGestureIndicator(null), 1500);
+  };
+  
+  const handleSwipeRight = () => {
+    // Optional future functionality: previous conversation page
+    toast({
+      title: "Navigation Hint",
+      description: "Swipe left to view the Knowledge Graph",
+      duration: 3000,
+    });
+  };
+  
+  const handleSwipeUp = () => {
+    // Display chat history or saved conversations in the future
+    if (isBottomSheetOpen) {
+      setIsBottomSheetOpen(false);
+    } else {
+      startListening();
+      setShowGestureIndicator('up');
+      setTimeout(() => setShowGestureIndicator(null), 1500);
+    }
+  };
+  
+  const handleSwipeDown = () => {
+    if (isListening) {
+      stopListening();
+      handleSendVoiceMessage();
+    } else if (isSpeaking) {
+      stopSpeaking();
+    } else {
+      setIsBottomSheetOpen(true);
+      setShowGestureIndicator('down');
+      setTimeout(() => setShowGestureIndicator(null), 1500);
+    }
+  };
+  
+  // Register the gesture area
+  const { ref: gestureRef } = useGestureArea('chat-container', {
+    swipeThreshold: 75,
+    enableHorizontalSwipe: true,
+    enableVerticalSwipe: true,
+    navigationMap: {
+      left: '/knowledge-graph',
+    }
+  }, {
+    swipeLeft: handleSwipeLeft,
+    swipeRight: handleSwipeRight,
+    swipeUp: handleSwipeUp,
+    swipeDown: handleSwipeDown,
+  });
+  
+
 
   return (
-    <div className={`flex flex-col h-screen max-w-md mx-auto relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
+    <div 
+      ref={gestureRef}
+      className={`flex flex-col h-screen max-w-md mx-auto relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}
+    >
+      {/* Gesture Indicator */}
+      {showGestureIndicator && 
+        <GestureIndicator 
+          direction={showGestureIndicator as 'left' | 'right' | 'up' | 'down'} 
+          message={
+            showGestureIndicator === 'left' ? "Swipe left for previous" : 
+            showGestureIndicator === 'right' ? "Knowledge Graph" : 
+            showGestureIndicator === 'up' ? "Voice Input" : 
+            "Help Menu"
+          }
+        />
+      }
+      
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center">

@@ -10,6 +10,8 @@ import OnboardingPage from "@/pages/onboarding-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
+import { GestureProvider } from "@/context/gesture-context";
+import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 import { useEffect, useState } from "react";
 
@@ -17,6 +19,7 @@ function Router() {
   const [location, setLocation] = useLocation();
   const [showVoiceWidget, setShowVoiceWidget] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [showGestureTutorial, setShowGestureTutorial] = useState(false);
   
   // Redirect to splash screen on initial load
   useEffect(() => {
@@ -28,11 +31,22 @@ function Router() {
   
   useEffect(() => {
     // Only show the voice widget on main pages, not splash or onboarding
-    setShowVoiceWidget(
-      location === "/" || 
-      location === "/knowledge-graph"
-    );
-  }, [location]);
+    const isMainPage = location === "/" || location === "/knowledge-graph";
+    setShowVoiceWidget(isMainPage);
+    
+    // Show gesture tutorial when first arriving at main pages from onboarding
+    if (isMainPage && location === "/" && !showGestureTutorial) {
+      const hasSeenTutorial = localStorage.getItem('gesture-tutorial-seen');
+      if (!hasSeenTutorial) {
+        setShowGestureTutorial(true);
+        localStorage.setItem('gesture-tutorial-seen', 'true');
+      }
+    }
+  }, [location, showGestureTutorial]);
+  
+  const handleTutorialComplete = () => {
+    setShowGestureTutorial(false);
+  };
   
   return (
     <>
@@ -45,6 +59,7 @@ function Router() {
       </Switch>
       
       {showVoiceWidget && <FloatingVoiceWidget />}
+      {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
     </>
   );
 }
@@ -55,8 +70,10 @@ function App() {
       <ThemeProvider>
         <LanguageProvider>
           <ChatProvider>
-            <Router />
-            <Toaster />
+            <GestureProvider>
+              <Router />
+              <Toaster />
+            </GestureProvider>
           </ChatProvider>
         </LanguageProvider>
       </ThemeProvider>
