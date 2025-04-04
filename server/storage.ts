@@ -292,12 +292,28 @@ export class MemStorage implements IStorage {
     const id = this.bookmarkCurrentId++;
     const now = new Date();
     
+    // Handle tags to ensure it's a string array or null
+    let processedTags: string[] | null = null;
+    if (bookmark.tags) {
+      if (Array.isArray(bookmark.tags)) {
+        processedTags = bookmark.tags.map(tag => String(tag));
+      } else {
+        processedTags = [String(bookmark.tags)];
+      }
+    }
+    
     const newBookmark: Bookmark = {
-      ...bookmark,
       id,
+      sessionId: bookmark.sessionId,
+      title: bookmark.title,
+      userId: bookmark.userId || null,
+      description: bookmark.description || null,
+      snippet: bookmark.snippet || null,
+      tags: processedTags,
+      isFavorite: bookmark.isFavorite || false,
       createdAt: now,
       updatedAt: now,
-      isFavorite: bookmark.isFavorite || false
+      knowledgeGraphSnapshot: bookmark.knowledgeGraphSnapshot || null
     };
     
     this.bookmarks.set(id, newBookmark);
@@ -325,11 +341,31 @@ export class MemStorage implements IStorage {
       return undefined;
     }
     
+    // Process tags if present
+    let processedTags: string[] | null = bookmark.tags;
+    if (data.tags !== undefined) {
+      if (data.tags === null) {
+        processedTags = null;
+      } else if (Array.isArray(data.tags)) {
+        processedTags = data.tags.map(tag => String(tag));
+      } else if (data.tags) {
+        processedTags = [String(data.tags)];
+      }
+    }
+    
+    // Create a properly typed updated bookmark
     const updatedBookmark: Bookmark = {
-      ...bookmark,
-      ...data,
       id: bookmark.id,
+      sessionId: data.sessionId || bookmark.sessionId,
+      title: data.title || bookmark.title,
+      userId: data.userId || bookmark.userId,
+      description: data.description !== undefined ? data.description : bookmark.description,
+      snippet: data.snippet !== undefined ? data.snippet : bookmark.snippet,
+      tags: processedTags,
+      isFavorite: data.isFavorite !== undefined ? data.isFavorite : bookmark.isFavorite,
+      createdAt: bookmark.createdAt,
       updatedAt: new Date(),
+      knowledgeGraphSnapshot: data.knowledgeGraphSnapshot || bookmark.knowledgeGraphSnapshot
     };
     
     this.bookmarks.set(bookmarkId, updatedBookmark);
@@ -345,10 +381,27 @@ export class MemStorage implements IStorage {
     const id = this.fileCurrentId++;
     const now = new Date();
     
+    // Create properly typed analysis object with correct properties
+    let typedAnalysis: { summary?: string; entities?: any[]; keywords?: string[] } | null = null;
+    if (file.analysis) {
+      typedAnalysis = {
+        summary: typeof file.analysis.summary === 'string' ? file.analysis.summary : undefined,
+        entities: Array.isArray(file.analysis.entities) ? file.analysis.entities : undefined,
+        keywords: Array.isArray(file.analysis.keywords) ? file.analysis.keywords.map(k => String(k)) : undefined
+      };
+    }
+    
     const newFile: File = {
-      ...file,
       id,
-      createdAt: now
+      path: file.path,
+      sessionId: file.sessionId || null,
+      userId: file.userId || null,
+      filename: file.filename,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      createdAt: now,
+      analysis: typedAnalysis
     };
     
     this.files.set(id, newFile);
@@ -380,9 +433,19 @@ export class MemStorage implements IStorage {
       return undefined;
     }
     
+    // Create properly typed analysis object with correct properties
+    let typedAnalysis: { summary?: string; entities?: any[]; keywords?: string[] } | null = null;
+    if (analysis) {
+      typedAnalysis = {
+        summary: typeof analysis.summary === 'string' ? analysis.summary : undefined,
+        entities: Array.isArray(analysis.entities) ? analysis.entities : undefined,
+        keywords: Array.isArray(analysis.keywords) ? analysis.keywords.map(k => String(k)) : undefined
+      };
+    }
+    
     const updatedFile: File = {
       ...file,
-      analysis
+      analysis: typedAnalysis
     };
     
     this.files.set(fileId, updatedFile);
@@ -398,9 +461,37 @@ export class MemStorage implements IStorage {
     const id = this.insightCurrentId++;
     const now = new Date();
     
+    // Process nodeIds if present
+    let processedNodeIds: string[] | null = null;
+    if (insight.nodeIds) {
+      if (Array.isArray(insight.nodeIds)) {
+        processedNodeIds = insight.nodeIds.map(id => String(id));
+      } else {
+        processedNodeIds = [String(insight.nodeIds)];
+      }
+    }
+    
+    // Process edgeIds if present
+    let processedEdgeIds: string[] | null = null;
+    if (insight.edgeIds) {
+      if (Array.isArray(insight.edgeIds)) {
+        processedEdgeIds = insight.edgeIds.map(id => String(id));
+      } else {
+        processedEdgeIds = [String(insight.edgeIds)];
+      }
+    }
+    
     const newInsight: Insight = {
-      ...insight,
       id,
+      type: insight.type,
+      sessionId: insight.sessionId,
+      userId: insight.userId || null,
+      description: insight.description,
+      knowledgeGraphSnapshot: insight.knowledgeGraphSnapshot || null,
+      relevance: insight.relevance,
+      confidence: insight.confidence || null,
+      nodeIds: processedNodeIds,
+      edgeIds: processedEdgeIds,
       createdAt: now
     };
     
