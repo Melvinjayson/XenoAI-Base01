@@ -266,7 +266,7 @@ export default function Home() {
                 <span className="font-medium">Knowledge Graph</span>
               </Button>
             </Link>
-            <Link href="/enhanced-knowledge-graph">
+            <Link href="/workbench">
               <Button variant="ghost" size="sm" className="relative flex items-center gap-2 h-9 px-3 text-primary">
                 <Network className="w-4 h-4" />
                 <span className="font-medium">Workbench</span>
@@ -297,7 +297,7 @@ export default function Home() {
                 <Network className="w-5 h-5" />
               </Button>
             </Link>
-            <Link href="/enhanced-knowledge-graph">
+            <Link href="/workbench">
               <Button variant="ghost" size="icon" className="rounded-full relative h-9 w-9" aria-label="Workbench">
                 <Network className="w-5 h-5 text-primary" />
                 <span className="absolute top-1 right-1 flex h-2 w-2">
