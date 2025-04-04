@@ -31,6 +31,13 @@ interface KnowledgeGraph {
 
 // Define WebXR types
 declare global {
+  interface Navigator {
+    xr?: {
+      isSessionSupported: (mode: string) => Promise<boolean>;
+      requestSession: (mode: string, options?: any) => Promise<XRSession>;
+    }
+  }
+  
   interface XRSession {
     end: () => Promise<void>;
     addEventListener: (type: string, listener: EventListener) => void;
@@ -54,6 +61,11 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
     resetState
   } = useAIProcessingState();
 
+  // Use our custom hooks for better device detection
+  const isMobile = useMobileDetection();
+  const { isXRSupported, isVRSupported, isLoading: isXRLoading } = useXRCapabilities();
+  const hasTouchCapability = useTouchCapability();
+
   // VR session reference
   const xrSessionRef = useRef<XRSession | null>(null);
   
@@ -65,19 +77,24 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
       try {
         setAIState('processing', 'Initializing VR environment...');
         
-        // Check if WebXR is supported
-        if (!navigator.xr) {
+        // Using our custom hooks for better device detection
+        if (isXRLoading) {
+          // Wait a moment for detection to complete
+          setAIState('thinking', 'Detecting XR capabilities...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Check if WebXR is supported using our hook
+        if (!isXRSupported) {
           throw new Error('WebXR not supported in this browser');
         }
         
-        // Check if immersive-vr session is supported
-        const isSupported = await navigator.xr.isSessionSupported('immersive-vr');
-        if (!isSupported) {
+        // Check if VR is supported using our hook
+        if (!isVRSupported) {
           throw new Error('Immersive VR not supported on this device');
         }
         
-        // Check for mobile device and adjust settings accordingly
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        // We'll use our custom hook for mobile detection
         
         // Adjust session options based on device capabilities
         const sessionOptions: any = {
@@ -97,9 +114,14 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
           sessionOptions.optionalFeatures.push('mesh-detection', 'depth-sensing');
         }
         
-        // Request an immersive VR session
-        const session = await navigator.xr.requestSession('immersive-vr', sessionOptions);
-        xrSessionRef.current = session;
+        // Request an immersive VR session - we know navigator.xr exists because of our isXRSupported check
+        let xrSession: XRSession;
+        if (navigator.xr) {
+          xrSession = await navigator.xr.requestSession('immersive-vr', sessionOptions);
+          xrSessionRef.current = xrSession;
+        } else {
+          throw new Error('WebXR not supported');
+        }
         
         // Set up the WebGL context
         const gl = canvasRef.current.getContext('webgl', { 
@@ -124,7 +146,7 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
           
           // Add interactive controls for VR
           if (gl) {
-            setupVRControls(session, gl, {
+            setupVRControls(xrSession, gl, {
               onSelectNode: (nodeId: string) => {
                 const node = graph.nodes.find(n => n.id === nodeId);
                 if (node && onNodeSelect) {
@@ -149,7 +171,7 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
         }
         
         // Handle XR session events
-        session.addEventListener('end', () => {
+        xrSession.addEventListener('end', () => {
           setIsInitialized(false);
           xrSessionRef.current = null;
           onClose();
@@ -204,7 +226,7 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
         xrSessionRef.current.end().catch(console.error);
       }
     };
-  }, [graph, onNodeSelect, onClose, processingState, resetState, setAIState]);
+  }, [graph, onNodeSelect, onClose, processingState, resetState, setAIState, isMobile, isXRSupported, isVRSupported, isXRLoading]);
 
   // End VR session when user leaves the page
   useEffect(() => {
@@ -237,6 +259,24 @@ export default function ImmersiveView({ graph, onClose, onNodeSelect }: Immersiv
           <div className="text-center p-8 rounded-lg max-w-md">
             <h2 className="text-xl font-bold mb-4">Initializing VR Experience</h2>
             <p className="mb-4">Please wait while we prepare your immersive knowledge graph visualization...</p>
+            
+            {/* Show device-specific message */}
+            {isMobile ? (
+              <p className="text-sm text-muted-foreground mb-2">
+                Optimizing for mobile VR experience. For best results, place your device in a VR headset.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground mb-2">
+                Preparing desktop VR experience. Please ensure your VR headset is connected.
+              </p>
+            )}
+            
+            {/* Show information about touch capability if detected */}
+            {hasTouchCapability && (
+              <p className="text-xs text-muted-foreground">
+                Touch controls are available for this device.
+              </p>
+            )}
           </div>
         </div>
       )}

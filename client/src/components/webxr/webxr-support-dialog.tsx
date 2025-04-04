@@ -87,8 +87,14 @@ declare global {
   interface Navigator {
     xr?: {
       isSessionSupported: (mode: string) => Promise<boolean>;
-      requestSession: (mode: string, options?: any) => Promise<any>;
+      requestSession: (mode: string, options?: any) => Promise<XRSession>;
     }
+  }
+  
+  interface XRSession {
+    end: () => Promise<void>;
+    addEventListener: (type: string, listener: EventListener) => void;
+    removeEventListener: (type: string, listener: EventListener) => void;
   }
 }
 
