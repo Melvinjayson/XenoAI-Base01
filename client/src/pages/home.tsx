@@ -260,19 +260,34 @@ export default function Home() {
         <nav className="flex items-center gap-2">
           {/* Knowledge Graph Navigation with Tooltips */}
           <div className="hidden sm:flex items-center gap-3 mr-2 border-r border-border pr-4">
-            <Link href="/canvas">
-              <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
-                <GripHorizontal className="w-4 h-4" />
-                <span className="font-medium">Canvas</span>
-              </Button>
-            </Link>
-            <Link href="/knowledge-graph">
-              <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
-                <Network className="w-4 h-4" />
-                <span className="font-medium">Knowledge Graph</span>
-              </Button>
-            </Link>
-            <Link href="/workbench">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
+                  <Kanban className="w-4 h-4" />
+                  <span className="font-medium">Workbench</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/canvas" className="flex items-center gap-2">
+                    <GripHorizontal className="w-4 h-4" />
+                    <span>Canvas</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/knowledge-graph" className="flex items-center gap-2">
+                    <Network className="w-4 h-4" />
+                    <span>Knowledge Graph</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/workbench" className="flex items-center gap-2">
+                    <Layout className="w-4 h-4" />
+                    <span>Overview</span>
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
               <Button variant="ghost" size="sm" className="relative flex items-center gap-2 h-9 px-3 text-primary">
                 <Network className="w-4 h-4" />
                 <span className="font-medium">Workbench</span>
@@ -298,17 +313,33 @@ export default function Home() {
 
           {/* Mobile Navigation */}
           <div className="sm:hidden flex items-center gap-1 mr-1">
-            <Link href="/canvas">
-              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Canvas">
-                <GripHorizontal className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link href="/knowledge-graph">
-              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Knowledge Graph">
-                <Network className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link href="/workbench">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Workbench">
+                  <Kanban className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/canvas" className="flex items-center gap-2">
+                    <GripHorizontal className="w-4 h-4" />
+                    <span>Canvas</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/knowledge-graph" className="flex items-center gap-2">
+                    <Network className="w-4 h-4" />
+                    <span>Knowledge Graph</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/workbench" className="flex items-center gap-2">
+                    <Layout className="w-4 h-4" />
+                    <span>Overview</span>
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
               <Button variant="ghost" size="icon" className="rounded-full relative h-9 w-9" aria-label="Workbench">
                 <Network className="w-5 h-5 text-primary" />
                 <span className="absolute top-1 right-1 flex h-2 w-2">
