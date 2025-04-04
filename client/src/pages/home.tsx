@@ -208,7 +208,7 @@ export default function Home() {
       }
 
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <header className="fixed bottom-[80px] left-0 right-0 z-10 flex items-center justify-between px-4 py-3 border-y border-border bg-background/95 backdrop-blur-sm max-w-screen-xl mx-auto">
         <div className="flex items-center">
           <div className="relative mr-2">
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm w-8 h-8" />
