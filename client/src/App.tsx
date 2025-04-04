@@ -11,7 +11,7 @@ import OnboardingPage from "@/pages/onboarding-page";
 import VRExperience from "@/pages/vr-experience";
 import CanvasPage from "@/pages/canvas-page";
 import AdminPage from "@/pages/admin-page";
-import ProjectManagementPage from "@/pages/project-management";
+import ProjectManagementPage from "@/pages/project-management-new";
 import ColorPaletteGeneratorPage from "@/pages/color-palette-generator";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";

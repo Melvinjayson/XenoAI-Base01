@@ -63,8 +63,8 @@ export function AddProjectDialog({ open, onOpenChange }: AddProjectDialogProps) 
 
   const createProjectMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      const response = await apiRequest('POST', '/api/projects', data);
-      return response.json();
+      const response = await apiRequest('/api/projects', 'POST', data);
+      return response;
     },
     onSuccess: () => {
       toast({

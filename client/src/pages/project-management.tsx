@@ -396,24 +396,24 @@ export default function ProjectManagementPage() {
   const activeProjectData = projects?.find(p => p.id === activeProject);
 
   return (
-    <div className="container mx-auto py-6 px-4 md:px-6">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Project Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Track research projects, tasks, and insights
-          </p>
-        </div>
-        <Button 
-          className="flex items-center gap-2"
-          onClick={() => setShowAddProject(true)}
-        >
-          <PlusCircle className="h-4 w-4" />
-          <span>New Project</span>
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div className="min-h-screen flex flex-col">
+      <StickyHeader 
+        title="Project Management" 
+        subtitle="Track research projects, tasks, and insights"
+        showHomeButton
+        rightContent={
+          <Button 
+            className="flex items-center gap-2"
+            onClick={() => setShowAddProject(true)}
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>New Project</span>
+          </Button>
+        }
+      />
+      
+      <div className="container mx-auto py-6 px-4 md:px-6 flex-grow">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Project List Sidebar */}
         <div className="lg:col-span-1">
           <Card>
