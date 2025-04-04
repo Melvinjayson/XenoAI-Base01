@@ -33,20 +33,49 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
-      const data = await apiRequest({
-        method: "POST", 
-        endpoint: "/api/chat", 
-        data: {
-          message: content,
-          history: messages
-            .filter((msg) => msg.id !== "welcome")
-            .map((msg) => ({
-              role: msg.role,
-              content: msg.content,
-            })),
-          filters: filters || undefined, // Optional search filters
-        }
+      // Prepare request parameters
+      const requestParams = {
+        message: content,
+        history: messages
+          .filter((msg) => msg.id !== "welcome")
+          .map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+        filters: filters || undefined, // Optional search filters
+        forceAdvancedModel: content.length > 100, // Use advanced model for longer messages
+        isVoiceResponse: false // Default to false for text responses
+      };
+      
+      // Log request for debugging
+      console.log("Sending chat request with message:", content.substring(0, 30) + (content.length > 30 ? "..." : ""));
+      
+      // Send the request with a timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestParams),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+      
+      // Check for error responses
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error ${response.status}: ${errorText || response.statusText}`);
+      }
+      
+      // Parse the successful JSON response
+      const data = await response.json();
+      
+      // Validate response data
+      if (!data || !data.message) {
+        throw new Error("Invalid response format from API");
+      }
       
       // Store search results if they exist for knowledge graph usage
       if (data.sources && data.sources.length > 0) {
@@ -70,9 +99,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
+      console.error("Chat API error:", error);
+      
+      // More specific error message
+      let errorMessage = "Failed to get response. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          errorMessage = "Request timed out. Please try again or check your connection.";
+        } else if (error.message.includes("API Error")) {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to get response. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

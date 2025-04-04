@@ -361,7 +361,54 @@ export async function synthesizeSpeech(
 
 // Fallback to basic audio synthesis if ElevenLabs fails
 async function fallbackSynthesis(text: string): Promise<VoiceSynthesisResponse> {
-  // For fallback, we return null and let the client use browser's built-in TTS
-  console.log('Using fallback speech synthesis for:', text.substring(0, 50) + '...');
-  return { audioUrl: '' };
+  try {
+    // For better error handling, we check if the audio directory exists
+    if (!fs.existsSync(AUDIO_DIR)) {
+      fs.mkdirSync(AUDIO_DIR, { recursive: true });
+    }
+    
+    // Log the fallback
+    console.log('Using fallback speech synthesis for:', text.substring(0, 50) + '...');
+    
+    // Generate a hash of the text to use as a cache key
+    const hash = crypto.createHash('md5').update(text).digest('hex').substring(0, 8);
+    const timestamp = Date.now();
+    
+    // Create a simple text file with information about the fallback
+    // This helps with troubleshooting and ensures the directory is writable
+    const infoFilename = `fallback_info_${hash}_${timestamp}.txt`;
+    const infoFilepath = path.join(AUDIO_DIR, infoFilename);
+    
+    // Write a simple info file to confirm file system access
+    try {
+      fs.writeFileSync(infoFilepath, `Fallback requested at ${new Date().toISOString()}\nText length: ${text.length} characters\nText preview: ${text.substring(0, 100)}...`);
+      console.log("Fallback info file created successfully:", infoFilepath);
+    } catch (writeError) {
+      console.error("Failed to write fallback info file:", writeError);
+      // If we can't write files, there might be a permission issue
+      console.warn("Possible file system permission issue detected in audio directory");
+    }
+    
+    // Check if either the ElevenLabs key is missing or there was a specific error
+    const errorReason = !process.env.ELEVENLABS_API_KEY 
+      ? 'ELEVENLABS_API_KEY not configured' 
+      : 'ElevenLabs API request failed';
+    
+    console.log(`Fallback reason: ${errorReason}`);
+    
+    // Generate a fallback response with an empty URL
+    // The client-side will detect this and use browser's built-in TTS
+    return { 
+      audioUrl: '',
+      fallback: true,
+      reason: errorReason
+    };
+  } catch (error) {
+    console.error("Error in fallback synthesis:", error);
+    return { 
+      audioUrl: '',
+      fallback: true,
+      reason: 'Internal error in fallback synthesis'
+    };
+  }
 }

@@ -58,4 +58,6 @@ export interface VoiceSynthesisRequest {
 
 export interface VoiceSynthesisResponse {
   audioUrl: string;
+  fallback?: boolean;
+  reason?: string;
 }
