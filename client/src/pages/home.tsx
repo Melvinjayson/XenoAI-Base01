@@ -314,7 +314,7 @@ export default function Home() {
             <Link href="/workbench">
               <Button variant="ghost" size="sm" className="relative flex items-center gap-2 h-9 px-3 text-primary">
                 <Network className="w-4 h-4" />
-                <span className="font-medium">Workbench</span>
+                <span className="font-medium">My tool kit</span>
                 <span className="absolute -top-1 -right-1 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
