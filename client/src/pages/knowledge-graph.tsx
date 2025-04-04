@@ -7,7 +7,7 @@ import { Link } from 'wouter';
 import { 
   ArrowLeftIcon, MessageSquareTextIcon, LoaderIcon, Download, Pin, FilePlus, ExternalLink, 
   Maximize, Minimize, Glasses, MonitorIcon, BarChart3, Network, Grid3X3, ListFilter,
-  ChevronLeft, ChevronRight, BookmarkIcon, UploadIcon, LayoutList, MessageSquare, Lightbulb
+  ChevronLeft, ChevronRight, ChevronDown, BookmarkIcon, UploadIcon, LayoutList, MessageSquare, Lightbulb
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,6 +17,7 @@ import ImmersiveView from '@/components/knowledge-graph/immersive-view';
 import WebXRSupport from '@/components/knowledge-graph/webxr-support';
 import { useTextToSpeech, VisualizationCommand } from '@/hooks/use-text-to-speech';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Wrapper component to access both contexts
 const KnowledgeGraphContent = () => {
@@ -24,21 +25,21 @@ const KnowledgeGraphContent = () => {
   const { importGraphFromConversation } = useKnowledgeGraph();
   const [loadingConversation, setLoadingConversation] = useState(false);
   const { toast } = useToast();
-  
+
   // Function to create a knowledge graph from the current chat conversation
   const handleCreateFromConversation = async () => {
     setLoadingConversation(true);
     try {
       // Call our new function from the chat context
       const result = await createKnowledgeGraphFromConversation();
-      
+
       if (!result) {
         throw new Error('No conversation data available');
       }
-      
+
       // Import the graph data into our knowledge graph context
       importGraphFromConversation(result);
-      
+
       toast({
         title: 'Knowledge Graph Created',
         description: `Created knowledge graph from conversation with ${result.graph.nodes.length} nodes and ${result.graph.edges.length} connections.`,
@@ -54,7 +55,7 @@ const KnowledgeGraphContent = () => {
       setLoadingConversation(false);
     }
   };
-  
+
   return (
     <>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
@@ -67,7 +68,7 @@ const KnowledgeGraphContent = () => {
             </Button>
           </Link>
         </div>
-        
+
         <Button 
           variant="outline" 
           size="sm"
@@ -83,7 +84,7 @@ const KnowledgeGraphContent = () => {
           Graph from Conversation
         </Button>
       </div>
-      
+
       <div className="bg-card border rounded-lg shadow-sm flex-1 overflow-hidden">
         <GraphDisplay className="p-4 h-full" />
       </div>
@@ -105,18 +106,18 @@ export default function KnowledgeGraphPage() {
   const [activePanel, setActivePanel] = useState<'chat' | 'insights' | 'bookmarks'>('insights');
   const [visualizationPattern, setVisualizationPattern] = useState<VisualizationPattern>('force');
   const [isGroupingEnabled, setIsGroupingEnabled] = useState(false);
-  
+
   const { speak, currentVisualCommands, stopSpeaking } = useTextToSpeech();
   const { toast } = useToast();
   const isMobile = useMediaQuery('(max-width: 768px)');
-  
+
   // Close side panel on mobile by default
   useEffect(() => {
     if (isMobile) {
       setIsSidePanelOpen(false);
     }
   }, [isMobile]);
-  
+
   // Toggle fullscreen mode
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -135,16 +136,16 @@ export default function KnowledgeGraphPage() {
       }
     }
   };
-  
+
   // Enter immersive mode
   const toggleImmersiveMode = () => {
     if (!isImmersiveMode) {
       // Entering immersive mode
       setIsImmersiveMode(true);
-      
+
       // Close side panel in immersive mode
       setIsSidePanelOpen(false);
-      
+
       // Optional voice guidance when entering immersive mode
       speak(
         "Entering immersive knowledge exploration mode. You can navigate and interact with the knowledge graph using the on-screen controls or voice commands.", 
@@ -159,32 +160,32 @@ export default function KnowledgeGraphPage() {
       // Exiting immersive mode
       setIsImmersiveMode(false);
       stopSpeaking();
-      
+
       // Re-open side panel when exiting immersive mode (except on mobile)
       if (!isMobile) {
         setIsSidePanelOpen(true);
       }
     }
   };
-  
+
   // Enter WebXR mode
   const enterWebXRMode = () => {
     setIsWebXRMode(true);
     setIsImmersiveMode(true);
     setIsSidePanelOpen(false);
-    
+
     speak(
       "Entering WebXR virtual reality mode. You can interact with the knowledge graph using your VR controllers or gestures.", 
       "default", 
       "en"
     );
   };
-  
+
   // Toggle side panel
   const toggleSidePanel = () => {
     setIsSidePanelOpen(!isSidePanelOpen);
   };
-  
+
   // Exit fullscreen when component unmounts
   useEffect(() => {
     return () => {
@@ -196,24 +197,24 @@ export default function KnowledgeGraphPage() {
       stopSpeaking();
     };
   }, [stopSpeaking]);
-  
+
   // Effect to listen for fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
-      
+
       // If user exits fullscreen using ESC key, also exit immersive mode
       if (!document.fullscreenElement && isImmersiveMode) {
         setIsImmersiveMode(false);
       }
     };
-    
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, [isImmersiveMode]);
-  
+
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-background p-2' : 'container mx-auto p-2 md:p-4'} flex flex-col h-[calc(100vh-2rem)]`}>
       <KnowledgeGraphProvider>
@@ -224,7 +225,7 @@ export default function KnowledgeGraphPage() {
               onClose={toggleImmersiveMode} 
             />
           )}
-          
+
           {/* Top Navigation Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2">
@@ -249,7 +250,7 @@ export default function KnowledgeGraphPage() {
               </Link>
               <h1 className="text-lg font-bold hidden md:block">Knowledge Graph Explorer</h1>
             </div>
-            
+
             {/* Visualization Pattern Selector (Desktop) */}
             <div className="hidden md:flex items-center gap-2">
               <span className="text-xs text-muted-foreground mr-1">Visualization:</span>
@@ -269,7 +270,7 @@ export default function KnowledgeGraphPage() {
                   <SelectItem value="clustered">Clustered</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Button 
                 variant="outline" 
                 size="sm"
@@ -280,7 +281,7 @@ export default function KnowledgeGraphPage() {
                 Group Entities
               </Button>
             </div>
-            
+
             {/* Export & View Controls */}
             <div className="flex items-center gap-2 ml-auto">
               <Select defaultValue="pdf">
@@ -295,7 +296,7 @@ export default function KnowledgeGraphPage() {
                   <SelectItem value="json">JSON</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Button 
                 variant="outline" 
                 size="sm"
@@ -304,7 +305,7 @@ export default function KnowledgeGraphPage() {
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </Button>
-              
+
               <Button 
                 variant="secondary" 
                 size="sm"
@@ -315,9 +316,9 @@ export default function KnowledgeGraphPage() {
                 <Glasses className="w-4 h-4 mr-2" />
                 Immersive
               </Button>
-              
+
               <WebXRSupport onEnterVR={enterWebXRMode} />
-              
+
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -332,7 +333,7 @@ export default function KnowledgeGraphPage() {
               </Button>
             </div>
           </div>
-          
+
           {/* Main Content with Side Panel */}
           <div className="flex flex-1 gap-4 overflow-hidden">
             {/* Collapsible Side Panel */}
@@ -349,15 +350,33 @@ export default function KnowledgeGraphPage() {
                     <MessageSquare className="w-4 h-4" />
                     <span className="text-xs">Chat</span>
                   </Button>
-                  <Button
-                    variant={activePanel === 'insights' ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className="flex-1 rounded-none h-9 gap-1"
-                    onClick={() => setActivePanel('insights')}
-                  >
-                    <Lightbulb className="w-4 h-4" />
-                    <span className="text-xs">Insights</span>
-                  </Button>
+                  <Collapsible>
+                    <CollapsibleTrigger className="flex-1 rounded-none h-9 gap-1">
+                      <Button
+                        variant={activePanel === 'insights' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setActivePanel('insights')}
+                      >
+                        <Lightbulb className="w-4 h-4" />
+                        <span className="text-xs">Insights</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="space-y-2 p-2">
+                        <h3 className="text-sm font-medium">Saved Insights</h3>
+                        <div className="text-xs text-muted-foreground">
+                          No saved insights. Pin insights to save them for later.
+                        </div>
+
+                        <div className="mt-4">
+                          <h4 className="text-xs font-medium mb-1">Detected Patterns</h4>
+                          <div className="text-xs text-muted-foreground">
+                            No patterns detected yet. Add more nodes to discover patterns.
+                          </div>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                   <Button
                     variant={activePanel === 'bookmarks' ? 'secondary' : 'ghost'}
                     size="sm"
@@ -368,7 +387,7 @@ export default function KnowledgeGraphPage() {
                     <span className="text-xs">Saved</span>
                   </Button>
                 </div>
-                
+
                 {/* Panel Content based on Active Tab */}
                 <div className="flex-1 overflow-y-auto border rounded-md p-2">
                   {activePanel === 'chat' && (
@@ -377,7 +396,7 @@ export default function KnowledgeGraphPage() {
                       <div className="text-xs text-muted-foreground">
                         No recent conversations. Start a chat to see your conversations here.
                       </div>
-                      
+
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -389,30 +408,15 @@ export default function KnowledgeGraphPage() {
                       </Button>
                     </div>
                   )}
-                  
-                  {activePanel === 'insights' && (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">Saved Insights</h3>
-                      <div className="text-xs text-muted-foreground">
-                        No saved insights. Pin insights to save them for later.
-                      </div>
-                      
-                      <div className="mt-4">
-                        <h4 className="text-xs font-medium mb-1">Detected Patterns</h4>
-                        <div className="text-xs text-muted-foreground">
-                          No patterns detected yet. Add more nodes to discover patterns.
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
+
+
                   {activePanel === 'bookmarks' && (
                     <div className="space-y-2">
                       <h3 className="text-sm font-medium">Saved Items</h3>
                       <div className="text-xs text-muted-foreground">
                         No saved items. Bookmark conversations, nodes, or insights to see them here.
                       </div>
-                      
+
                       <div className="mt-4">
                         <h4 className="text-xs font-medium mb-1">Imported Assets</h4>
                         <div className="flex items-center justify-center border border-dashed rounded-md p-4">
@@ -436,7 +440,7 @@ export default function KnowledgeGraphPage() {
                 </div>
               </div>
             )}
-            
+
             {/* Main Graph Display */}
             <div className="flex-1 bg-card border rounded-lg shadow-sm overflow-hidden">
               <div className="h-full flex flex-col">
@@ -460,7 +464,7 @@ export default function KnowledgeGraphPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="flex items-center gap-1">
                     <Button 
                       variant="ghost" 
@@ -470,7 +474,7 @@ export default function KnowledgeGraphPage() {
                     >
                       <Grid3X3 className={`w-4 h-4 ${isGroupingEnabled ? "text-primary" : ""}`} />
                     </Button>
-                    
+
                     <Button 
                       variant="ghost" 
                       size="icon"
@@ -480,7 +484,7 @@ export default function KnowledgeGraphPage() {
                     </Button>
                   </div>
                 </div>
-                
+
                 {/* Graph Display */}
                 <div className="flex-1 overflow-hidden">
                   <GraphDisplay 
@@ -492,7 +496,7 @@ export default function KnowledgeGraphPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Footer Info */}
           <div className="mt-2 text-xs text-muted-foreground px-1">
             <p>
