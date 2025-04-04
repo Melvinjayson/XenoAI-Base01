@@ -313,12 +313,6 @@ export default function Home() {
                     <span>Knowledge Graph</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/workbench" className="flex items-center gap-2">
-                    <Layout className="w-4 h-4" />
-                    <span>Overview</span>
-                  </Link>
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Link href="/project-management">
@@ -354,12 +348,6 @@ export default function Home() {
                   <Link href="/knowledge-graph" className="flex items-center gap-2">
                     <Network className="w-4 h-4" />
                     <span>Knowledge Graph</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/workbench" className="flex items-center gap-2">
-                    <Layout className="w-4 h-4" />
-                    <span>Overview</span>
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
