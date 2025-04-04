@@ -9,20 +9,90 @@ const searchCache: Cache<SearchResult> = new Map();
 // Default expiration time for cached results (30 minutes)
 const CACHE_EXPIRY_MS = 30 * 60 * 1000;
 
-// Function to perform web search using LangChain enhanced search
-export async function webSearch(query: string): Promise<SearchResult> {
-  // Check cache first
-  const cacheKey = `search:${query.toLowerCase().trim()}`;
-  const cachedResult = searchCache.get(cacheKey);
+// Interface for search filter options
+interface SearchFilterOptions {
+  timeRange?: string;
+  dateRange?: {
+    from?: Date;
+    to?: Date;
+  };
+  sources?: string[];
+  contentType?: string[];
+  relevance?: number;
+  location?: string;
+}
+
+// Function to perform web search using LangChain enhanced search with filters
+export async function webSearch(query: string, filters?: SearchFilterOptions): Promise<SearchResult> {
+  // Apply filters to the query if provided
+  let enhancedQuery = query;
+  let cacheKey = '';
   
-  if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY_MS) {
-    return cachedResult.data;
+  if (filters) {
+    // Create cache key that includes filters
+    const filtersString = JSON.stringify(filters);
+    cacheKey = `search:${query.toLowerCase().trim()}:${filtersString}`;
+    const cachedResult = searchCache.get(cacheKey);
+    
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY_MS) {
+      return cachedResult.data;
+    }
+    
+    // Enhance query with filters
+    if (filters.timeRange && filters.timeRange !== 'anytime') {
+      const timeRangeMap: Record<string, string> = {
+        'past_day': 'in the last 24 hours',
+        'past_week': 'in the last week',
+        'past_month': 'in the last month',
+        'past_year': 'in the last year'
+      };
+      
+      if (timeRangeMap[filters.timeRange]) {
+        enhancedQuery += ` ${timeRangeMap[filters.timeRange]}`;
+      }
+    }
+    
+    // Add date range if specified
+    if (filters.dateRange && (filters.dateRange.from || filters.dateRange.to)) {
+      if (filters.dateRange.from && filters.dateRange.to) {
+        enhancedQuery += ` between ${filters.dateRange.from.toLocaleDateString()} and ${filters.dateRange.to.toLocaleDateString()}`;
+      } else if (filters.dateRange.from) {
+        enhancedQuery += ` after ${filters.dateRange.from.toLocaleDateString()}`;
+      } else if (filters.dateRange.to) {
+        enhancedQuery += ` before ${filters.dateRange.to.toLocaleDateString()}`;
+      }
+    }
+    
+    // Add content type filters
+    if (filters.contentType && filters.contentType.length > 0) {
+      enhancedQuery += ` showing only ${filters.contentType.join(', ')}`;
+    }
+    
+    // Add source filters
+    if (filters.sources && filters.sources.length > 0) {
+      enhancedQuery += ` from ${filters.sources.join(', ')} sources`;
+    }
+    
+    // Add location filter
+    if (filters.location && filters.location !== 'anywhere') {
+      enhancedQuery += ` in ${filters.location}`;
+    }
+    
+    console.log('Enhanced query with filters:', enhancedQuery);
+  } else {
+    // Simple cache check without filters
+    cacheKey = `search:${query.toLowerCase().trim()}`;
+    const cachedResult = searchCache.get(cacheKey);
+    
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY_MS) {
+      return cachedResult.data;
+    }
   }
 
   try {
-    console.log('Starting enhanced search with LangChain for:', query);
+    console.log('Starting enhanced search with LangChain for:', enhancedQuery);
     // Use our LangChain enhanced search for real web results
-    const result = await enhancedSearch(query);
+    const result = await enhancedSearch(enhancedQuery);
     
     // Cache the result
     searchCache.set(cacheKey, {

@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, IStorage, MemStorage } from "./storage";
 import { chat } from "./openai";
 import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
@@ -25,13 +25,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint for chat
   app.post("/api/chat", async (req, res) => {
     try {
-      const { message, history } = req.body;
+      const { message, history, filters } = req.body;
       
       if (!message) {
         return res.status(400).json({ error: "Message is required" });
       }
 
-      const response = await chat(message, history || []);
+      // Pass filters to chat function for advanced search
+      const response = await chat(message, history || [], filters);
       return res.json(response);
     } catch (error) {
       console.error("Chat API error:", error);
@@ -395,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store each preference
       const savedPreferences = [];
       for (const [key, value] of Object.entries(preferences)) {
-        const preference = await storage.saveUserPreference(
+        const preference = await (storage as IStorage).saveUserPreference(
           sessionId,
           key,
           typeof value === 'string' ? value : JSON.stringify(value)
@@ -416,7 +417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/user/preferences", async (req, res) => {
     try {
       const sessionId = req.query.sessionId as string || "default";
-      const preferences = await storage.getUserPreferences(sessionId);
+      const preferences = await (storage as IStorage).getUserPreferences(sessionId);
       return res.json({ preferences });
     } catch (error) {
       console.error("Get preferences API error:", error);
@@ -428,9 +429,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Configure multer for memory storage (file uploads)
-  const storage = multer.memoryStorage();
+  const multerStorage = multer.memoryStorage();
   const upload = multer({ 
-    storage,
+    storage: multerStorage,
     limits: {
       fileSize: 10 * 1024 * 1024, // limit to 10MB
     } 

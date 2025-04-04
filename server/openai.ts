@@ -40,14 +40,29 @@ function formatChatHistoryForLangChain(history: ChatMessage[]): string[] {
 }
 
 // Function to handle chat with OpenAI and LangChain
-export async function chat(userMessage: string, history: ChatMessage[]): Promise<ChatResponse> {
+export async function chat(
+  userMessage: string, 
+  history: ChatMessage[], 
+  filters?: any
+): Promise<ChatResponse> {
   try {
     // For informational queries, try to get enhanced search results first
     if (isInformationalQuery(userMessage)) {
       try {
         console.log('Using web search for informational query:', userMessage);
+        
+        // Apply search filters if provided
+        const searchOptions = filters ? {
+          timeRange: filters.timeRange,
+          dateRange: filters.dateRange,
+          sources: filters.sources,
+          contentType: filters.contentType,
+          relevance: filters.relevance,
+          location: filters.location
+        } : undefined;
+        
         // Attempt to get search results with rich content using our enhanced search
-        const searchResult = await webSearch(userMessage);
+        const searchResult = await webSearch(userMessage, searchOptions);
         
         // If we have search results with sources, use them for the response
         if (searchResult.content && searchResult.sources && searchResult.sources.length > 0) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import ChatContainer from "@/components/chat/chat-container";
-import InputArea from "@/components/chat/input-area";
+import EnhancedInputArea from "@/components/chat/enhanced-input-area";
 import VoiceIndicator from "@/components/chat/voice-indicator";
 import BottomSheet from "@/components/ui/bottom-sheet";
 import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network } from "lucide-react";
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { useTheme } from "@/context/theme-context";
 import { Link } from "wouter";
+import { SearchFilterOptions } from "@/components/search-filters";
+import { SearchFilters } from "@/types";
 
 export default function Home() {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
@@ -140,8 +142,20 @@ export default function Home() {
       {isListening && <VoiceIndicator transcript={transcript} />}
 
       {/* Input Area */}
-      <InputArea 
-        onSend={sendMessage} 
+      <EnhancedInputArea 
+        onSend={async (message, filters) => {
+          // Convert SearchFilterOptions to SearchFilters if needed
+          const searchFilters: SearchFilters | undefined = filters ? {
+            timeRange: filters.timeRange,
+            dateRange: filters.dateRange,
+            sources: filters.sources,
+            contentType: filters.contentType,
+            relevance: filters.relevance,
+            location: filters.location
+          } : undefined;
+          
+          await sendMessage(message, searchFilters);
+        }} 
         onMicClick={handleVoiceButtonClick} 
         onHelpClick={handleHelpClick}
         isListening={isListening}

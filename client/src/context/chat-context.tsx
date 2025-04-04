@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { apiRequest } from "@/lib/queryClient";
-import { Message, ChatContextType, KnowledgeGraph, SearchResult } from "@/types";
+import { Message, ChatContextType, KnowledgeGraph, SearchResult, SearchFilters } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -18,7 +18,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [lastSearchResult, setLastSearchResult] = useState<SearchResult | null>(null);
   const { toast } = useToast();
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, filters?: SearchFilters) => {
     if (!content.trim()) return;
 
     // Add user message to chat
@@ -44,6 +44,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               role: msg.role,
               content: msg.content,
             })),
+          filters: filters || undefined, // Optional search filters
         }
       });
       

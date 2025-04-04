@@ -71,10 +71,22 @@ export interface GraphInsight {
   createdAt: number;
 }
 
+export interface SearchFilters {
+  timeRange?: string;
+  dateRange?: {
+    from: Date | undefined;
+    to: Date | undefined;
+  };
+  sources?: string[];
+  contentType?: string[];
+  relevance?: number;
+  location?: string;
+}
+
 export interface ChatContextType {
   messages: Message[];
   isLoading: boolean;
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (message: string, filters?: SearchFilters) => Promise<void>;
   clearConversation: () => void;
   createKnowledgeGraphFromConversation: () => Promise<{
     graph: KnowledgeGraph;
