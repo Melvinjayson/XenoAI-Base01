@@ -17,6 +17,7 @@ import { Link, useLocation } from "wouter";
 import { SearchFilterOptions } from "@/components/search-filters";
 import { SearchFilters } from "@/types";
 import { useGestureArea } from "@/context/gesture-context";
+import { GestureHandlers } from "@/hooks/use-gestures";
 import { GestureIndicator } from "@/components/ui/gesture-indicator";
 import { toast } from "@/hooks/use-toast";
 
@@ -196,19 +197,30 @@ export default function Home() {
   };
 
   // Register the gesture area
-  const { ref: gestureRef } = useGestureArea('chat-container', {
-    swipeThreshold: 75,
-    enableHorizontalSwipe: true,
-    enableVerticalSwipe: true,
-    navigationMap: {
-      left: '/knowledge-graph',
+  const gestureContext = useGestureArea();
+  const gestureRef = useRef<HTMLDivElement>(null);
+  
+  // Set up the gestures when the ref is available
+  useEffect(() => {
+    if (gestureRef.current) {
+      const handlers: GestureHandlers = {
+        onSwipe: (direction: 'left' | 'right' | 'up' | 'down', velocity: number) => {
+          if (direction === 'left') handleSwipeLeft();
+          if (direction === 'right') handleSwipeRight();
+          if (direction === 'up') handleSwipeUp();
+          if (direction === 'down') handleSwipeDown();
+        }
+      };
+      
+      gestureContext.registerGestureArea(gestureRef.current, handlers);
+      
+      return () => {
+        if (gestureRef.current) {
+          gestureContext.unregisterGestureArea(gestureRef.current);
+        }
+      };
     }
-  }, {
-    swipeLeft: handleSwipeLeft,
-    swipeRight: handleSwipeRight,
-    swipeUp: handleSwipeUp,
-    swipeDown: handleSwipeDown,
-  });
+  }, [gestureContext, handleSwipeLeft, handleSwipeRight, handleSwipeUp, handleSwipeDown]);
 
 
 
