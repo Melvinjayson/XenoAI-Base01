@@ -176,28 +176,74 @@ export function SplashScreen() {
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="relative"
         >
-          <div className="relative w-32 h-32">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm" />
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75" />
+          <div className="relative w-40 h-40">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/80 via-primary to-primary/80 animate-pulse backdrop-blur-sm" />
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/30 via-primary/30 to-primary/30 animate-ping opacity-75" />
             <div className="absolute inset-0 flex items-center justify-center">
               <svg viewBox="0 0 24 24" className="w-16 h-16 text-white" fill="currentColor">
-                <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3 0-5.44-2.44-5.44-5.44 0-1.81.89-3.41 2.26-4.4-.44-.06-.9-.1-1.36-.1z" />
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
               </svg>
             </div>
-            <div className="absolute -inset-2 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-full blur-xl" />
+            <div className="absolute -inset-4 bg-gradient-to-br from-primary/10 via-primary/10 to-primary/10 rounded-full blur-xl" />
           </div>
         </motion.div>
+        
+        <motion.h1
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.8 }}
+          className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70"
+        >
+          XENO AI
+        </motion.h1>
         
         <div className="text-center max-w-md">
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="text-muted-foreground text-sm max-w-md"
+            className="text-muted-foreground text-base max-w-md leading-relaxed"
           >
             Your digital companion on a journey of knowledge discovery and connection. Let's explore together.
           </motion.p>
         </div>
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7, duration: 0.8 }}
+          className="grid grid-cols-3 gap-4 mt-6"
+        >
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="flex flex-col items-center p-3 rounded-lg bg-secondary/50 backdrop-blur-sm"
+          >
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-primary/20 mb-2">
+              <BrainIcon className="w-6 h-6 text-primary" />
+            </div>
+            <span className="text-xs text-center">Intelligent Analysis</span>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="flex flex-col items-center p-3 rounded-lg bg-secondary/50 backdrop-blur-sm"
+          >
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-primary/20 mb-2">
+              <SparklesIcon className="w-6 h-6 text-primary" />
+            </div>
+            <span className="text-xs text-center">Knowledge Discovery</span>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="flex flex-col items-center p-3 rounded-lg bg-secondary/50 backdrop-blur-sm"
+          >
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-primary/20 mb-2">
+              <RocketIcon className="w-6 h-6 text-primary" />
+            </div>
+            <span className="text-xs text-center">Immersive Learning</span>
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* Language selector in top-right corner */}
