@@ -72,6 +72,34 @@ export default function Home() {
       startListening();
     }
   };
+  
+  // Automatically send voice message after a period of silence
+  const [silenceTimer, setSilenceTimer] = useState<NodeJS.Timeout | null>(null);
+  
+  // Effect to handle automatic sending after silence
+  useEffect(() => {
+    // Clear any existing timer when transcript changes
+    if (silenceTimer) {
+      clearTimeout(silenceTimer);
+    }
+    
+    // Only set a timer if we're actively listening and have content
+    if (isListening && transcript.trim().length > 0) {
+      // If user stops speaking for 2 seconds, send the message
+      const timer = setTimeout(() => {
+        stopListening();
+        handleSendVoiceMessage();
+      }, 2000);
+      
+      setSilenceTimer(timer);
+    }
+    
+    return () => {
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+      }
+    };
+  }, [transcript, isListening]);
 
   const handleHelpClick = () => {
     setIsBottomSheetOpen(true);
