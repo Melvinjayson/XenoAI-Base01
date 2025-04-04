@@ -67,12 +67,104 @@ interface InsightCacheEntry {
 // Use a module-level Map for caching insights
 const previousInsightsCache = new Map<string, InsightCacheEntry>();
 
-// Function to extract entities from text using OpenAI
-async function extractEntities(text: string): Promise<{ entity: string; type: NodeType; score: number }[]> {
+// Function to extract entities from text, with AI enhancement
+export async function extractEntities(text: string): Promise<{ entity: string; type: NodeType; score: number; description?: string }[]> {
+  try {
+    // First try to use OpenAI for more accurate entity extraction if available
+    if (process.env.OPENAI_API_KEY) {
+      const aiEntities = await extractEntitiesWithAI(text);
+      if (aiEntities && aiEntities.length > 0) {
+        return aiEntities;
+      }
+    }
+
+    // Fallback to rule-based extraction
+    return await extractEntitiesRuleBased(text);
+  } catch (error) {
+    console.error('Error extracting entities:', error);
+    return await extractEntitiesRuleBased(text);
+  }
+}
+
+// Extract entities using OpenAI for more accurate analysis
+async function extractEntitiesWithAI(text: string): Promise<{ entity: string; type: NodeType; score: number; description?: string }[]> {
+  try {
+    // For ESM compatibility
+    const OpenAI = await import("openai").then(mod => mod.default);
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    
+    // Truncate text if it's too long to stay within token limits
+    const truncatedText = text.length > 2000 ? text.substring(0, 2000) + "..." : text;
+    
+    // Create a prompt to extract entities
+    const prompt = `Analyze the following text and extract key entities. For each entity, determine its type from these categories:
+- person (people, historical figures, etc.)
+- organization (companies, institutions, etc.)
+- location (places, countries, cities, etc.)
+- concept (ideas, theories, abstract notions)
+- time (dates, periods, eras)
+- statistic (numerical data, percentages, metrics)
+
+Also provide a relevance score (0.1-1.0) indicating how important each entity is to the overall text, and a brief description of the entity in context.
+
+Text to analyze:
+"""
+${truncatedText}
+"""
+
+Return the result as a JSON array of entities. Do not include any additional text or explanation.`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.3
+    });
+    
+    // Parse the response
+    let responseContent = '{"entities": []}';
+    if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+      responseContent = response.choices[0].message.content || responseContent;
+    }
+    const parsedResponse = JSON.parse(responseContent);
+    
+    // Extract entities from response - array might be at top level or under an "entities" key
+    const entities = Array.isArray(parsedResponse) ? parsedResponse : 
+                    (parsedResponse.entities || []);
+    
+    if (!entities.length) {
+      console.log("AI didn't return any entities, falling back to rule-based extraction");
+      return [];
+    }
+    
+    // Validate and format entities
+    return entities.map((entity: any) => {
+      // Ensure the type is valid
+      const validTypes: NodeType[] = ['person', 'organization', 'location', 'concept', 'time', 'statistic'];
+      const entityType = validTypes.includes(entity.type) ? entity.type as NodeType : 'concept';
+      
+      // Ensure score is within bounds
+      const score = Math.max(0.1, Math.min(1.0, entity.score || 0.5));
+      
+      return {
+        entity: entity.entity || entity.name || "Unknown Entity",
+        type: entityType,
+        score: score,
+        description: entity.description || undefined
+      };
+    }).filter((entity: any) => entity.entity !== "Unknown Entity");
+  } catch (error) {
+    console.error("Error in AI entity extraction:", error);
+    return [];
+  }
+}
+
+// Extract entities using rule-based approach as a fallback
+async function extractEntitiesRuleBased(text: string): Promise<{ entity: string; type: NodeType; score: number; description?: string }[]> {
   try {
     // Use NLP techniques to categorize entities
     const keywords = extractKeywords(text, 8); // Extract more keywords for better analysis
-    const results: { entity: string; type: NodeType; score: number }[] = [];
+    const results: { entity: string; type: NodeType; score: number; description?: string }[] = [];
     
     // Define common prefixes for entity types
     const conceptPrefixes = ['what', 'how', 'why', 'when', 'where', 'who'];
@@ -107,16 +199,29 @@ async function extractEntities(text: string): Promise<{ entity: string; type: No
       const lengthFactor = Math.min(0.15, keyword.length * 0.01);
       const uniquenessFactor = text.toLowerCase().split(keyword.toLowerCase()).length > 2 ? 0.05 : 0.15;
       
+      // Try to extract a description from surrounding text
+      let description;
+      // Find the sentence containing this keyword
+      const sentences = text.split(/[.!?]+/);
+      const sentenceWithKeyword = sentences.find(s => 
+        s.toLowerCase().includes(keyword.toLowerCase())
+      );
+      
+      if (sentenceWithKeyword) {
+        description = sentenceWithKeyword.trim();
+      }
+      
       results.push({
         entity: keyword,
         type: type,
-        score: baseScore + lengthFactor + uniquenessFactor
+        score: baseScore + lengthFactor + uniquenessFactor,
+        description
       });
     }
     
     return results;
   } catch (error) {
-    console.error('Error extracting entities:', error);
+    console.error('Error in rule-based entity extraction:', error);
     return [];
   }
 }
@@ -345,7 +450,8 @@ export async function createKnowledgeGraphFromSearch(query: string): Promise<Gra
               label: entity.entity,
               type: entity.type,
               score: entity.score,
-              createdAt: Date.now()
+              createdAt: Date.now(),
+              description: entity.description
             };
             
             graph.nodes.push(entityNode);
@@ -703,7 +809,8 @@ export async function expandGraphNode(
                 label: entity.entity,
                 type: entity.type,
                 score: entity.score,
-                createdAt: Date.now()
+                createdAt: Date.now(),
+                description: entity.description
               });
               
               // Connect entity to source
@@ -777,7 +884,8 @@ export async function expandGraphNode(
             label: entity.entity,
             type: entity.type,
             score: entity.score,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            description: entity.description
           };
           
           graph.nodes.push(entityNode);
@@ -882,7 +990,8 @@ export async function expandGraphNode(
           label: entity.entity,
           type: entity.type,
           score: entity.score,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          description: entity.description
         });
         
         // Connect entity to document
@@ -905,5 +1014,141 @@ export async function expandGraphNode(
 
 // Analyze a knowledge graph to find patterns and insights
 export async function analyzeKnowledgeGraph(graph: KnowledgeGraph): Promise<GraphInsight[]> {
-  return generateInsights(graph);
+  // Use basic insight generation first
+  const baseInsights = generateInsights(graph);
+  
+  // Then enhance with AI analysis if OpenAI API key is available
+  try {
+    if (process.env.OPENAI_API_KEY && graph.nodes.length > 3) {
+      const aiInsights = await generateAIInsights(graph, baseInsights);
+      return [...baseInsights, ...aiInsights];
+    }
+  } catch (error) {
+    console.error("Error generating AI insights:", error);
+  }
+  
+  return baseInsights;
+}
+
+async function generateAIInsights(graph: KnowledgeGraph, existingInsights: GraphInsight[]): Promise<GraphInsight[]> {
+  // Skip if the graph is too small or already has many insights
+  if (graph.nodes.length < 4 || existingInsights.length > 10) {
+    return [];
+  }
+  
+  try {
+    // For ESM compatibility
+    const OpenAI = await import("openai").then(mod => mod.default);
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    
+    // Prepare the graph data for analysis
+    const graphSummary = {
+      nodeTypes: Object.fromEntries(
+        Array.from(new Set(graph.nodes.map(n => n.type)))
+          .map(type => [
+            type, 
+            graph.nodes.filter(n => n.type === type).map(n => ({ id: n.id, label: n.label }))
+          ])
+      ),
+      topNodes: graph.nodes
+        .filter(n => n.type !== 'query')
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, 10)
+        .map(n => ({ id: n.id, label: n.label, type: n.type, description: n.description })),
+      keyRelationships: graph.edges
+        .slice(0, 15)
+        .map(e => {
+          const source = graph.nodes.find(n => n.id === e.source);
+          const target = graph.nodes.find(n => n.id === e.target);
+          return {
+            sourceId: e.source,
+            sourceLabel: source?.label || "Unknown",
+            sourceType: source?.type || "unknown",
+            targetId: e.target,
+            targetLabel: target?.label || "Unknown",
+            targetType: target?.type || "unknown",
+            edgeType: e.type || "related_to"
+          };
+        })
+    };
+    
+    // Extract the main query
+    const queryNode = graph.nodes.find(n => n.type === 'query');
+    const queryText = queryNode?.label || '';
+
+    // Create prompt for analysis
+    const prompt = `As an expert knowledge graph analyst, examine this knowledge graph about "${queryText}" and identify additional insights beyond what's already been found.
+
+GRAPH SUMMARY:
+- Total nodes: ${graph.nodes.length}
+- Total edges: ${graph.edges.length}
+- Node types: ${Object.keys(graphSummary.nodeTypes).join(', ')}
+- Key entities: ${graphSummary.topNodes.map(n => n.label).join(', ')}
+
+EXISTING INSIGHTS:
+${existingInsights.map(i => `- ${i.type}: ${i.description}`).join('\n')}
+
+Based on this knowledge graph, generate 2-3 additional insights not already covered. Each insight should include:
+1. Type (pattern, cluster, connection, or anomaly)
+2. Description (concise text explaining the insight)
+3. Relevance score (0.1-1.0)
+4. Confidence score (0.1-1.0)
+5. Rationale (explaining why this insight is significant and how it was derived)
+
+Look for non-obvious patterns, thematic clusters, interesting connections between seemingly unrelated nodes, or anomalies that stand out.
+
+Return your response in the following JSON format:
+{
+  "insights": [
+    {
+      "type": "pattern|cluster|connection|anomaly",
+      "description": "concise description",
+      "relevance": 0.0-1.0,
+      "confidence": 0.0-1.0,
+      "rationale": "detailed explanation"
+    }
+  ]
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" }
+    });
+    
+    // Parse the response
+    let responseContent = '{"insights": []}';
+    if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+      responseContent = response.choices[0].message.content || responseContent;
+    }
+    const aiResponse = JSON.parse(responseContent);
+    
+    // Convert AI-generated insights to our format
+    const timestamp = Date.now();
+    return (aiResponse.insights || []).map((insight: any, index: number) => {
+      // Validate insight type
+      const validTypes = ['pattern', 'cluster', 'connection', 'anomaly'];
+      const insightType = validTypes.includes(insight.type) ? insight.type : 'pattern';
+      
+      // Ensure relevance and confidence are within bounds
+      const relevance = Math.max(0.1, Math.min(1.0, insight.relevance || 0.7));
+      const confidence = Math.max(0.1, Math.min(1.0, insight.confidence || 0.6));
+      
+      return {
+        id: `ai-insight-${timestamp}-${index}`,
+        type: insightType as 'pattern' | 'cluster' | 'connection' | 'anomaly',
+        description: insight.description,
+        relevance: relevance,
+        confidence: confidence,
+        rationale: insight.rationale || "Generated by AI analysis of the knowledge graph",
+        nodeIds: [], // We don't have specific nodes for these insights
+        edgeIds: [],
+        createdAt: timestamp
+      };
+    });
+    
+  } catch (error) {
+    console.error("Error in AI insight generation:", error);
+    return [];
+  }
 }
