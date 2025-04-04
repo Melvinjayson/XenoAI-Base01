@@ -27,7 +27,7 @@ export default function Home() {
   const { messages, isLoading, sendMessage, clearConversation } = useChat();
   const { isDarkMode } = useTheme();
   const [, navigate] = useLocation();
-  
+
   const { 
     isListening, 
     transcript, 
@@ -36,7 +36,7 @@ export default function Home() {
     resetTranscript,
     hasRecognitionSupport 
   } = useSpeechRecognition();
-  
+
   const {
     speak,
     isSpeaking,
@@ -72,17 +72,17 @@ export default function Home() {
       startListening();
     }
   };
-  
+
   // Automatically send voice message after a period of silence
   const [silenceTimer, setSilenceTimer] = useState<NodeJS.Timeout | null>(null);
-  
+
   // Effect to handle automatic sending after silence
   useEffect(() => {
     // Clear any existing timer when transcript changes
     if (silenceTimer) {
       clearTimeout(silenceTimer);
     }
-    
+
     // Only set a timer if we're actively listening and have content
     if (isListening && transcript.trim().length > 0) {
       // If user stops speaking for 2 seconds, send the message
@@ -90,10 +90,10 @@ export default function Home() {
         stopListening();
         handleSendVoiceMessage();
       }, 2000);
-      
+
       setSilenceTimer(timer);
     }
-    
+
     return () => {
       if (silenceTimer) {
         clearTimeout(silenceTimer);
@@ -131,14 +131,14 @@ export default function Home() {
       speak(message.content, voiceId || 'default');
     }
   };
-  
+
   // Handle gesture swipe actions
   const handleSwipeLeft = () => {
     navigate('/knowledge-graph');
     setShowGestureIndicator('right');
     setTimeout(() => setShowGestureIndicator(null), 1500);
   };
-  
+
   const handleSwipeRight = () => {
     // Optional future functionality: previous conversation page
     toast({
@@ -147,7 +147,7 @@ export default function Home() {
       duration: 3000,
     });
   };
-  
+
   const handleSwipeUp = () => {
     // Display chat history or saved conversations in the future
     if (isBottomSheetOpen) {
@@ -158,7 +158,7 @@ export default function Home() {
       setTimeout(() => setShowGestureIndicator(null), 1500);
     }
   };
-  
+
   const handleSwipeDown = () => {
     if (isListening) {
       stopListening();
@@ -171,7 +171,7 @@ export default function Home() {
       setTimeout(() => setShowGestureIndicator(null), 1500);
     }
   };
-  
+
   // Register the gesture area
   const { ref: gestureRef } = useGestureArea('chat-container', {
     swipeThreshold: 75,
@@ -186,7 +186,7 @@ export default function Home() {
     swipeUp: handleSwipeUp,
     swipeDown: handleSwipeDown,
   });
-  
+
 
 
   return (
@@ -206,21 +206,18 @@ export default function Home() {
           }
         />
       }
-      
+
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center">
           <div className="relative mr-2">
-            <div className="rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 w-8 h-8 animate-pulse backdrop-blur-sm" />
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 w-8 h-8 animate-ping opacity-75" />
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm w-8 h-8" />
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75 w-8 h-8" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="rounded-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 w-6 h-6 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-3 h-3 text-white" fill="currentColor">
-                  <path d="M12 2L4 7l8 5 8-5-8-5zM4 15l8 5 8-5-8-5-8 5zm8-3L4 17l8 5 8-5-8-5z"/>
-                </svg>
-              </div>
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
+                <path d="M13.5 1.5a1.5 1.5 0 0 0-3 0v5.25a1.5 1.5 0 0 0 3 0V1.5zM12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2.25a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5zm7.5-4.25a1.5 1.5 0 0 0 0-3h-5.25a1.5 1.5 0 0 0 0 3h5.25zM1.5 11.5a1.5 1.5 0 0 0 0 3h5.25a1.5 1.5 0 0 0 0-3H1.5z" />
+              </svg>
             </div>
-            <div className="absolute -inset-1 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-full blur-md" />
           </div>
           <h1 className="text-lg font-semibold">Xeno AI</h1>
         </div>
@@ -269,7 +266,7 @@ export default function Home() {
             relevance: filters.relevance,
             location: filters.location
           } : undefined;
-          
+
           await sendMessage(message, searchFilters);
         }} 
         onMicClick={handleVoiceButtonClick} 
@@ -293,7 +290,7 @@ export default function Home() {
               <X className="w-5 h-5" />
             </button>
           </div>
-          
+
           <h3 className="font-medium text-lg mb-2">Voice Commands</h3>
           <ul className="space-y-2 mb-4">
             <li className="flex items-start">
@@ -318,7 +315,7 @@ export default function Home() {
             <li>Ask follow-up questions for more details</li>
             <li>Open settings to customize theme and voice options</li>
           </ul>
-          
+
           <div className="pt-4 mt-4 border-t border-border">
             <Button 
               variant="destructive" 
