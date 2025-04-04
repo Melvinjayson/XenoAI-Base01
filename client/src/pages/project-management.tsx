@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { Link, useLocation } from 'wouter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Card,
@@ -40,12 +41,18 @@ import {
   BarChart,
   ListChecks,
   Lightbulb,
-  Link2
+  Link2,
+  Plus,
+  ChevronLeft
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { StickyHeader } from '@/components/ui/sticky-header';
+import { TaskUpdateDialog } from '@/components/project-management/task-update-dialog';
+import { AddProjectDialog } from '@/components/project-management/add-project-dialog';
+import { format } from 'date-fns';
 // Define custom interfaces for demo data
 interface Project {
   id: number;
@@ -311,75 +318,12 @@ function formatDate(dateString: string | null | undefined) {
   return new Date(dateString).toLocaleDateString();
 }
 
-// Task Update Dialog Component
-interface TaskUpdateDialogProps {
-  task: Task;
-  onClose: () => void;
-  onUpdate: (taskId: number, data: Partial<Task>) => void;
-  isUpdating: boolean;
-}
-
-function TaskUpdateDialog({ task, onClose, onUpdate, isUpdating }: TaskUpdateDialogProps) {
-  const [status, setStatus] = useState(task.status);
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const updatedTask: Partial<Task> = {
-      status,
-      // If task is marked as done, set completedDate to now
-      ...(status === 'done' && { completedDate: new Date().toISOString() }),
-    };
-    
-    onUpdate(task.id, updatedTask);
-  };
-  
-  return (
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Update Task Status</DialogTitle>
-        <DialogDescription>
-          Change the status of "{task.title}"
-        </DialogDescription>
-      </DialogHeader>
-      
-      <form onSubmit={handleSubmit} className="space-y-4 py-2">
-        <div className="grid gap-2">
-          <label htmlFor="status" className="text-sm font-medium">Status</label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Status</SelectLabel>
-                <SelectItem value="todo">To Do</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="in_review">In Review</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-                <SelectItem value="blocked">Blocked</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isUpdating}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isUpdating}>
-            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Changes
-          </Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
-  );
-}
+// This component has been moved to its own file in /components/project-management/task-update-dialog.tsx
 
 export default function ProjectManagementPage() {
   const [activeProject, setActiveProject] = useState<number | null>(null);
   const [taskToUpdate, setTaskToUpdate] = useState<Task | null>(null);
+  const [showAddProject, setShowAddProject] = useState(false);
   const { toast } = useToast();
   
   const { data: projects, isLoading: projectsLoading } = useQuery({
@@ -460,7 +404,10 @@ export default function ProjectManagementPage() {
             Track research projects, tasks, and insights
           </p>
         </div>
-        <Button className="flex items-center gap-2">
+        <Button 
+          className="flex items-center gap-2"
+          onClick={() => setShowAddProject(true)}
+        >
           <PlusCircle className="h-4 w-4" />
           <span>New Project</span>
         </Button>
@@ -512,7 +459,12 @@ export default function ProjectManagementPage() {
               )}
             </CardContent>
             <CardFooter className="pt-3">
-              <Button variant="outline" className="w-full" size="sm">
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                size="sm"
+                onClick={() => setShowAddProject(true)}
+              >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add Project
               </Button>
@@ -529,7 +481,7 @@ export default function ProjectManagementPage() {
                 <p className="text-muted-foreground mb-4">
                   Select a project from the sidebar or create a new one to get started
                 </p>
-                <Button>
+                <Button onClick={() => setShowAddProject(true)}>
                   <PlusCircle className="h-4 w-4 mr-2" />
                   Create New Project
                 </Button>
@@ -796,6 +748,12 @@ export default function ProjectManagementPage() {
           />
         </Dialog>
       )}
+
+      {/* Add Project Dialog */}
+      <AddProjectDialog 
+        open={showAddProject} 
+        onOpenChange={setShowAddProject} 
+      />
     </div>
   );
 }
