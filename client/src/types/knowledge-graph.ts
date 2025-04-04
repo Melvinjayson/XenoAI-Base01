@@ -1,6 +1,6 @@
 // Knowledge Graph Types
 
-export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 'person' | 'organization' | 'location' | 'time' | 'statistic';
+export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 'person' | 'organization' | 'location' | 'time' | 'statistic' | 'feedback' | 'correction';
 
 export interface GraphNode {
   id: string;
@@ -16,14 +16,17 @@ export interface GraphNode {
   size?: number;
 }
 
+export type EdgeType = 'search_result' | 'contains' | 'relates' | 'expansion' | 'search' | 'conversation' | 'related_to' | 'context_source' | 'affiliated_with' | 'conceptually_related' | 'includes' | 'located_near' | 'time_related' | 'expanded_by' | 'corrects' | 'enhances' | 'user_feedback' | 'ai_generated';
+
 export interface GraphEdge {
   id: string;
   source: string; // source node id
   target: string; // target node id
   label?: string;
-  type?: string;
+  type?: EdgeType;
   weight?: number; // for relationship strength
   color?: string;
+  curvature?: number;
 }
 
 export interface KnowledgeGraph {

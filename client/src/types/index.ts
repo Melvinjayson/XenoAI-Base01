@@ -1,5 +1,14 @@
 export type AssetType = 'image' | 'chart' | 'table' | 'code';
 
+export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 
+                      'person' | 'organization' | 'location' | 'time' | 'statistic' | 
+                      'feedback' | 'correction';
+
+export type EdgeType = 'search_result' | 'contains' | 'relates' | 'expansion' | 'search' | 
+                      'conversation' | 'related_to' | 'context_source' | 'affiliated_with' | 
+                      'conceptually_related' | 'includes' | 'located_near' | 'time_related' | 
+                      'expanded_by' | 'corrects' | 'enhances' | 'user_feedback' | 'ai_generated';
+
 export interface AssetData {
   type: AssetType;
   title?: string;
@@ -40,10 +49,12 @@ export interface SearchResult {
 export interface GraphNode {
   id: string;
   label: string;
-  type: string;
+  type: NodeType;
   description?: string;
   score?: number;
   createdAt: number;
+  color?: string;
+  size?: number;
   data?: any;
 }
 
@@ -52,8 +63,10 @@ export interface GraphEdge {
   source: string;
   target: string;
   label?: string;
-  type?: string;
+  type?: EdgeType;
   weight?: number;
+  color?: string;
+  curvature?: number;
 }
 
 export interface KnowledgeGraph {
@@ -69,6 +82,13 @@ export interface GraphInsight {
   nodeIds: string[];
   edgeIds: string[];
   createdAt: number;
+  rationale?: string; // explanation for why this insight exists
+  confidence?: number; // confidence score (0-1)
+  history?: { // tracking changes over time for self-learning
+    previousRelevance?: number;
+    correctionCount?: number;
+    lastUpdated?: number;
+  };
 }
 
 export interface SearchFilters {

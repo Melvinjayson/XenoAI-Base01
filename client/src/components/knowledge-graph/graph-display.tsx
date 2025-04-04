@@ -31,6 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { InsightsPanel } from '@/components/knowledge-graph/insights-panel';
 
 // Node colors by type
 const nodeColors: Record<string, string> = {
@@ -639,50 +640,7 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
         </TabsContent>
         
         <TabsContent value="insights" className="flex-1 overflow-auto">
-          {insights.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <p className="text-muted-foreground text-center">
-                No insights available yet. Search and explore the graph to generate insights.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {insights.map((insight) => (
-                <Card key={insight.id}>
-                  <CardHeader className="py-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-md">{insight.type.charAt(0).toUpperCase() + insight.type.slice(1)}</CardTitle>
-                      <Badge variant={insight.relevance > 0.7 ? "default" : "outline"}>
-                        {Math.round(insight.relevance * 100)}% relevant
-                      </Badge>
-                    </div>
-                    <CardDescription>{insight.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    <div className="flex flex-wrap gap-2">
-                      {insight.nodeIds.map(nodeId => {
-                        const node = state.graph.nodes.find(n => n.id === nodeId);
-                        return node ? (
-                          <Badge 
-                            key={nodeId}
-                            variant="outline" 
-                            className="cursor-pointer hover:bg-accent"
-                            style={{ borderColor: node.color || nodeColors[node.type as keyof typeof nodeColors] }}
-                            onClick={() => {
-                              dispatch({ type: 'select_node', payload: nodeId });
-                              setSelectedView('graph');
-                            }}
-                          >
-                            {node.label}
-                          </Badge>
-                        ) : null;
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          <InsightsPanel />
         </TabsContent>
       </Tabs>
     </div>

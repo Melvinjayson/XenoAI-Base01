@@ -478,6 +478,159 @@ export function KnowledgeGraphProvider({ children }: KnowledgeGraphProviderProps
     }
   };
 
+  // Function to add user feedback to the knowledge graph
+  const addUserFeedback = async (feedback: {
+    nodeId?: string;
+    type: 'correction' | 'enhancement' | 'contradiction' | 'confirmation';
+    content: string;
+    confidence?: number;
+  }) => {
+    try {
+      setLoading(true);
+      
+      // Call API to add feedback to the graph
+      const response = await apiRequest<{
+        graph: KnowledgeGraph;
+        insights: GraphInsight[];
+        feedback: { status: string; message: string };
+      }>({
+        endpoint: '/api/knowledge-graph/feedback',
+        method: 'POST',
+        data: { 
+          graph: state.graph,
+          feedback: {
+            ...feedback,
+            source: 'user'
+          }
+        }
+      });
+      
+      if (response && response.graph) {
+        // Update the graph with the feedback changes
+        dispatch({ type: 'merge_graph', payload: response.graph });
+        
+        // Update insights
+        if (response.insights && response.insights.length > 0) {
+          setInsights(response.insights);
+        }
+        
+        // Add feedback label as new node
+        const feedbackNode: GraphNode = {
+          id: `feedback-${Date.now()}`,
+          label: feedback.content.substring(0, 30) + (feedback.content.length > 30 ? '...' : ''),
+          type: feedback.type === 'correction' ? 'correction' as NodeType : 'feedback' as NodeType,
+          description: feedback.content,
+          createdAt: Date.now(),
+          score: feedback.confidence || 0.8,
+          color: feedback.type === 'correction' ? '#FF4A4A' : 
+                 feedback.type === 'enhancement' ? '#4AFF4A' : 
+                 feedback.type === 'confirmation' ? '#4A4AFF' : '#FFFF4A'
+        };
+        
+        dispatch({ type: 'add_node', payload: feedbackNode });
+        
+        // If targeting a specific node, create an edge
+        if (feedback.nodeId) {
+          const edge: GraphEdge = {
+            id: `edge-feedback-${Date.now()}`,
+            source: feedbackNode.id,
+            target: feedback.nodeId,
+            type: 'user_feedback',
+            weight: 0.9
+          };
+          
+          dispatch({ type: 'add_edge', payload: edge });
+        }
+      }
+    } catch (error) {
+      console.error('Error adding feedback to graph:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Function to enhance the graph using AI based on conversation history
+  const enhanceGraphWithConversation = async (
+    conversationHistory: { role: string; content: string }[],
+    searchResults?: any
+  ) => {
+    try {
+      setLoading(true);
+      
+      // Skip if graph is empty
+      if (state.graph.nodes.length === 0) {
+        console.log('Graph is empty, skipping AI enhancement');
+        return;
+      }
+      
+      // Call API to enhance the graph with AI analysis
+      const response = await apiRequest<{
+        graph: KnowledgeGraph;
+        insights: GraphInsight[];
+        enhancement: {
+          status: string;
+          nodeCountBefore: number;
+          nodeCountAfter: number;
+          edgeCountBefore: number;
+          edgeCountAfter: number;
+        };
+      }>({
+        endpoint: '/api/knowledge-graph/enhance-with-ai',
+        method: 'POST',
+        data: { 
+          graph: state.graph,
+          conversationHistory,
+          searchResults
+        }
+      });
+      
+      if (response && response.graph) {
+        console.log('Graph enhanced with AI insights:', response.enhancement);
+        
+        // Update the graph with AI-generated enhancements
+        dispatch({ type: 'merge_graph', payload: response.graph });
+        
+        // Update insights
+        if (response.insights && response.insights.length > 0) {
+          setInsights(response.insights);
+        }
+        
+        // Create an AI enhancement marker node
+        if (response.enhancement.nodeCountAfter > response.enhancement.nodeCountBefore) {
+          const aiNode: GraphNode = {
+            id: `ai-enhancement-${Date.now()}`,
+            label: 'AI Enhanced Analysis',
+            type: 'insight',
+            description: `AI analyzed conversation and added ${response.enhancement.nodeCountAfter - response.enhancement.nodeCountBefore} new nodes and ${response.enhancement.edgeCountAfter - response.enhancement.edgeCountBefore} new connections.`,
+            createdAt: Date.now(),
+            score: 0.9,
+            color: '#00C2FF' // bright blue
+          };
+          
+          dispatch({ type: 'add_node', payload: aiNode });
+          
+          // Connect to query node
+          const queryNode = state.graph.nodes.find(node => node.type === 'query');
+          if (queryNode) {
+            const edge: GraphEdge = {
+              id: `edge-ai-${Date.now()}`,
+              source: aiNode.id,
+              target: queryNode.id,
+              type: 'ai_generated',
+              weight: 0.9
+            };
+            
+            dispatch({ type: 'add_edge', payload: edge });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error enhancing graph with AI:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Run analysis when the graph changes
   useEffect(() => {
     if (state.graph.nodes.length > 0 && !loading) {
@@ -496,7 +649,9 @@ export function KnowledgeGraphProvider({ children }: KnowledgeGraphProviderProps
         analyzeGraph,
         expandNode,
         clearGraph,
-        importGraphFromConversation
+        importGraphFromConversation,
+        addUserFeedback,
+        enhanceGraphWithConversation
       }}
     >
       {children}
