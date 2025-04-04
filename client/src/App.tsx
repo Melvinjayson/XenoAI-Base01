@@ -24,8 +24,12 @@ import { UserProfileProvider } from "@/context/user-profile-context";
 import { ColorPaletteProvider } from "@/context/color-palette-context";
 import { MindMapProvider } from "@/context/mind-map-context";
 import { KnowledgeGraphProvider } from "@/context/knowledge-graph-context";
+import { CompanionProvider, useCompanion } from "@/context/companion-context";
 import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
+import { FloatingCompanion } from "@/components/floating-companion";
+import { CompanionHelpDialog } from "@/components/companion-help-dialog";
+import { CompanionSettingsDialog } from "@/components/companion-settings-dialog";
 import OfflineModeBanner from "@/components/offline-mode-banner";
 import OfflineSettingsPanel from "@/components/offline-settings-panel";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -116,6 +120,57 @@ function Router() {
   );
 }
 
+function CompanionWrapper() {
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const { isVisible, position, mode, showHelpOnStartup } = useCompanion();
+  const [location, navigate] = useLocation();
+  
+  // Check if we should show help on startup
+  useEffect(() => {
+    // Only show help on main pages, not splash or onboarding
+    const isMainPage = location === "/" || location === "/knowledge-graph" || location.startsWith("/canvas");
+    if (isMainPage && showHelpOnStartup) {
+      // Small delay to ensure everything is loaded
+      const timer = setTimeout(() => {
+        setShowHelpDialog(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [location, showHelpOnStartup]);
+  
+  // Only show the companion on main pages
+  const showCompanion = isVisible && mode !== 'hidden';
+  
+  const handleAssistantClick = () => {
+    // Navigate to home page to access the chat
+    navigate("/");
+  };
+  
+  return (
+    <>
+      {showCompanion && (
+        <FloatingCompanion 
+          position={position}
+          onHelp={() => setShowHelpDialog(true)}
+          onSettings={() => setShowSettingsDialog(true)}
+          onAssistant={handleAssistantClick}
+        />
+      )}
+      
+      <CompanionHelpDialog 
+        open={showHelpDialog} 
+        onOpenChange={setShowHelpDialog} 
+      />
+      
+      <CompanionSettingsDialog 
+        open={showSettingsDialog} 
+        onOpenChange={setShowSettingsDialog} 
+      />
+    </>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -130,8 +185,11 @@ function App() {
                       <NotificationProvider>
                         <GestureProvider>
                           <OfflineProvider>
-                            <Router />
-                            <Toaster />
+                            <CompanionProvider>
+                              <Router />
+                              <CompanionWrapper />
+                              <Toaster />
+                            </CompanionProvider>
                           </OfflineProvider>
                         </GestureProvider>
                       </NotificationProvider>
