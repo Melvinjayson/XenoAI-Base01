@@ -4,13 +4,19 @@ import { useChat } from '@/context/chat-context';
 import GraphDisplay from '@/components/knowledge-graph/graph-display';
 import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
-import { ArrowLeftIcon, MessageSquareTextIcon, LoaderIcon, Download, Pin, FilePlus, ExternalLink, Maximize, Minimize, Glasses, MonitorIcon } from 'lucide-react';
+import { 
+  ArrowLeftIcon, MessageSquareTextIcon, LoaderIcon, Download, Pin, FilePlus, ExternalLink, 
+  Maximize, Minimize, Glasses, MonitorIcon, BarChart3, Network, Grid3X3, ListFilter,
+  ChevronLeft, ChevronRight, BookmarkIcon, UploadIcon, LayoutList, MessageSquare, Lightbulb
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ImmersiveView from '@/components/knowledge-graph/immersive-view';
+import WebXRSupport from '@/components/knowledge-graph/webxr-support';
 import { useTextToSpeech, VisualizationCommand } from '@/hooks/use-text-to-speech';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 // Wrapper component to access both contexts
 const KnowledgeGraphContent = () => {
@@ -88,11 +94,28 @@ const KnowledgeGraphContent = () => {
 // Add some types for our export formats
 type ExportFormat = 'pdf' | 'csv' | 'json' | 'png' | 'excel';
 
+// Define visualization pattern types
+type VisualizationPattern = 'force' | 'radial' | 'hierarchical' | 'ontology' | 'timeline' | 'clustered';
+
 export default function KnowledgeGraphPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
+  const [isWebXRMode, setIsWebXRMode] = useState(false);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
+  const [activePanel, setActivePanel] = useState<'chat' | 'insights' | 'bookmarks'>('insights');
+  const [visualizationPattern, setVisualizationPattern] = useState<VisualizationPattern>('force');
+  const [isGroupingEnabled, setIsGroupingEnabled] = useState(false);
+  
   const { speak, currentVisualCommands, stopSpeaking } = useTextToSpeech();
   const { toast } = useToast();
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  
+  // Close side panel on mobile by default
+  useEffect(() => {
+    if (isMobile) {
+      setIsSidePanelOpen(false);
+    }
+  }, [isMobile]);
   
   // Toggle fullscreen mode
   const toggleFullscreen = () => {
@@ -118,6 +141,10 @@ export default function KnowledgeGraphPage() {
     if (!isImmersiveMode) {
       // Entering immersive mode
       setIsImmersiveMode(true);
+      
+      // Close side panel in immersive mode
+      setIsSidePanelOpen(false);
+      
       // Optional voice guidance when entering immersive mode
       speak(
         "Entering immersive knowledge exploration mode. You can navigate and interact with the knowledge graph using the on-screen controls or voice commands.", 
@@ -132,7 +159,30 @@ export default function KnowledgeGraphPage() {
       // Exiting immersive mode
       setIsImmersiveMode(false);
       stopSpeaking();
+      
+      // Re-open side panel when exiting immersive mode (except on mobile)
+      if (!isMobile) {
+        setIsSidePanelOpen(true);
+      }
     }
+  };
+  
+  // Enter WebXR mode
+  const enterWebXRMode = () => {
+    setIsWebXRMode(true);
+    setIsImmersiveMode(true);
+    setIsSidePanelOpen(false);
+    
+    speak(
+      "Entering WebXR virtual reality mode. You can interact with the knowledge graph using your VR controllers or gestures.", 
+      "default", 
+      "en"
+    );
+  };
+  
+  // Toggle side panel
+  const toggleSidePanel = () => {
+    setIsSidePanelOpen(!isSidePanelOpen);
   };
   
   // Exit fullscreen when component unmounts
