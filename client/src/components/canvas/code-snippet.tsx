@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, Code } from 'lucide-react';
+import { nord } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Copy, Check, Code as CodeIcon, ExternalLink } from 'lucide-react';
+import { EnhancedTooltip } from '@/components/ui/enhanced-tooltip';
 
 export interface CodeSnippetProps {
   code: string;
@@ -15,91 +16,114 @@ export interface CodeSnippetProps {
 const CodeSnippet: React.FC<CodeSnippetProps> = ({
   code,
   language,
-  title,
+  title = 'Code Snippet',
   onApplyToCanvas
 }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy: ', err);
+  const [copied, setCopied] = React.useState(false);
+  
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  
+  const handleApplyToCanvas = () => {
+    if (onApplyToCanvas) {
+      onApplyToCanvas(code, language);
     }
   };
-
-  const displayLanguage = language === 'javascript' ? 'JS' : 
-                          language === 'typescript' ? 'TS' :
-                          language === 'html' ? 'HTML' :
-                          language === 'css' ? 'CSS' :
-                          language.toUpperCase();
+  
+  // Determine language display name
+  const getLanguageDisplayName = (lang: string): string => {
+    const languageMap: Record<string, string> = {
+      'js': 'JavaScript',
+      'jsx': 'React JSX',
+      'ts': 'TypeScript',
+      'tsx': 'React TSX',
+      'py': 'Python',
+      'java': 'Java',
+      'c': 'C',
+      'cpp': 'C++',
+      'cs': 'C#',
+      'go': 'Go',
+      'ruby': 'Ruby',
+      'php': 'PHP',
+      'swift': 'Swift',
+      'kotlin': 'Kotlin',
+      'rust': 'Rust',
+      'html': 'HTML',
+      'css': 'CSS',
+      'scss': 'SCSS',
+      'json': 'JSON',
+      'yaml': 'YAML',
+      'markdown': 'Markdown',
+      'sql': 'SQL',
+      'shell': 'Shell',
+      'bash': 'Bash',
+      'powershell': 'PowerShell',
+      'text': 'Plain Text'
+    };
+    
+    return languageMap[lang.toLowerCase()] || lang;
+  };
 
   return (
-    <div className="code-snippet-container my-2 rounded-md overflow-hidden border border-gray-300">
-      <div className="code-header bg-gray-800 px-3 py-1 flex justify-between items-center">
+    <Card className="w-full shadow-md border overflow-hidden">
+      <CardHeader className="p-3 bg-primary/10 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
-          <Code className="h-3.5 w-3.5 text-gray-300" />
-          <span className="text-xs text-gray-300 font-mono">
-            {title || displayLanguage}
-          </span>
+          <CodeIcon className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">
+            {title}
+            <span className="text-xs ml-2 text-muted-foreground">
+              {getLanguageDisplayName(language)}
+            </span>
+          </CardTitle>
         </div>
-        <div className="flex gap-1">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-gray-300 hover:text-white hover:bg-gray-700"
-                  onClick={handleCopy}
-                >
-                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{copied ? 'Copied!' : 'Copy code'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        <div className="flex items-center gap-1">
+          <EnhancedTooltip content="Copy code">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={copyToClipboard}
+              className="h-7 w-7"
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            </Button>
+          </EnhancedTooltip>
           
           {onApplyToCanvas && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-gray-300 hover:text-white hover:bg-gray-700"
-                    onClick={() => onApplyToCanvas(code, language)}
-                  >
-                    <Code className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Apply to canvas</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <EnhancedTooltip content="Add to canvas">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleApplyToCanvas}
+                className="h-7 w-7"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+            </EnhancedTooltip>
           )}
         </div>
-      </div>
-      <div className="max-h-60 overflow-auto text-xs">
-        <SyntaxHighlighter 
+      </CardHeader>
+      <CardContent className="p-0 max-h-96 overflow-auto">
+        <SyntaxHighlighter
           language={language}
-          style={tomorrow}
+          style={nord}
+          showLineNumbers
           customStyle={{
             margin: 0,
-            padding: '0.75rem',
-            fontSize: '0.75rem',
-            lineHeight: 1.5,
+            borderRadius: 0,
+            fontSize: '0.9rem',
           }}
         >
           {code}
         </SyntaxHighlighter>
-      </div>
-    </div>
+      </CardContent>
+      <CardFooter className="p-2 flex justify-between bg-gray-50 text-xs text-gray-500">
+        <span>{code.split('\n').length} lines</span>
+        <span>{code.length} characters</span>
+      </CardFooter>
+    </Card>
   );
 };
 
