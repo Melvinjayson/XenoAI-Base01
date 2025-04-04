@@ -180,8 +180,15 @@ export function SplashScreen() {
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/80 via-primary to-primary/80 animate-pulse backdrop-blur-sm" />
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/30 via-primary/30 to-primary/30 animate-ping opacity-75" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-16 h-16 text-white" fill="currentColor">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+              <svg viewBox="0 0 24 24" className="w-16 h-16 text-white" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                <circle cx="6" cy="12" r="1" fill="currentColor" />
+                <circle cx="12" cy="12" r="1" fill="currentColor" />
+                <circle cx="18" cy="12" r="1" fill="currentColor" />
+                <circle cx="9" cy="6" r="1" fill="currentColor" />
+                <circle cx="15" cy="6" r="1" fill="currentColor" />
+                <circle cx="9" cy="18" r="1" fill="currentColor" />
+                <circle cx="15" cy="18" r="1" fill="currentColor" />
               </svg>
             </div>
             <div className="absolute -inset-4 bg-gradient-to-br from-primary/10 via-primary/10 to-primary/10 rounded-full blur-xl" />
