@@ -13,15 +13,33 @@ import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
 import { GestureProvider } from "@/context/gesture-context";
+import { OfflineProvider, useOfflineContext } from "@/context/offline-context";
 import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
+import OfflineModeBanner from "@/components/offline-mode-banner";
+import OfflineSettingsPanel from "@/components/offline-settings-panel";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
+import { WifiOff } from "lucide-react";
+
+function OfflineDialog() {
+  const { showOfflineSettings, closeOfflineSettings } = useOfflineContext();
+  
+  return (
+    <Dialog open={showOfflineSettings} onOpenChange={closeOfflineSettings}>
+      <DialogContent className="sm:max-w-md p-0">
+        <OfflineSettingsPanel onClose={closeOfflineSettings} />
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function Router() {
   const [location, setLocation] = useLocation();
   const [showVoiceWidget, setShowVoiceWidget] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [showGestureTutorial, setShowGestureTutorial] = useState(false);
+  const { isOnline } = useOfflineContext();
   
   // Redirect to splash screen on initial load
   useEffect(() => {
@@ -50,21 +68,35 @@ function Router() {
     setShowGestureTutorial(false);
   };
   
+  // Determine if we should show the offline banner
+  const showOfflineBanner = location !== "/splash" && location !== "/onboarding";
+  
   return (
     <>
-      <Switch>
-        <Route path="/splash" component={SplashPage} />
-        <Route path="/onboarding" component={OnboardingPage} />
-        <Route path="/" component={Home} />
-        <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
-        <Route path="/vr-experience" component={VRExperience} />
-        <Route path="/canvas" component={CanvasPage} />
-        <Route path="/canvas/:id" component={CanvasPage} />
-        <Route component={NotFound} />
-      </Switch>
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-red-500 text-white p-2 text-center text-xs flex items-center justify-center gap-2">
+          <WifiOff className="h-3 w-3" /> You're currently offline. Some features may be limited.
+        </div>
+      )}
       
-      {showVoiceWidget && <FloatingVoiceWidget />}
-      {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
+      <div className={`${!isOnline ? 'pt-8' : ''}`}>
+        {showOfflineBanner && <OfflineModeBanner />}
+        
+        <Switch>
+          <Route path="/splash" component={SplashPage} />
+          <Route path="/onboarding" component={OnboardingPage} />
+          <Route path="/" component={Home} />
+          <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
+          <Route path="/vr-experience" component={VRExperience} />
+          <Route path="/canvas" component={CanvasPage} />
+          <Route path="/canvas/:id" component={CanvasPage} />
+          <Route component={NotFound} />
+        </Switch>
+        
+        {showVoiceWidget && <FloatingVoiceWidget />}
+        {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
+        <OfflineDialog />
+      </div>
     </>
   );
 }
@@ -76,8 +108,10 @@ function App() {
         <LanguageProvider>
           <ChatProvider>
             <GestureProvider>
-              <Router />
-              <Toaster />
+              <OfflineProvider>
+                <Router />
+                <Toaster />
+              </OfflineProvider>
             </GestureProvider>
           </ChatProvider>
         </LanguageProvider>

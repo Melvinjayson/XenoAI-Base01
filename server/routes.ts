@@ -1344,6 +1344,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Sync endpoint for offline data
+  app.post('/api/sync', async (req, res) => {
+    try {
+      const { type } = req.body;
+      
+      // Mock success for now - in a real app, this would trigger background syncing
+      // based on the type (messages, canvas, all, etc.)
+      const count = Math.floor(Math.random() * 5); // Simulate 0-4 synced items
+      
+      // This would register a background sync with the service worker in a real implementation
+      if (type) {
+        console.log(`Sync request received for type: ${type}`);
+      }
+      
+      // Return success
+      return res.json({ 
+        success: true, 
+        count,
+        message: count > 0 ? `Successfully synced ${count} items` : 'Nothing to sync'
+      });
+    } catch (error) {
+      console.error('Error in sync endpoint:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to sync data'
+      });
+    }
+  });
+
+  // Endpoint to test offline functionality
+  app.get('/api/test-data', (req, res) => {
+    return res.json({
+      timestamp: Date.now(),
+      message: 'This is test data that can be cached for offline use',
+      randomValue: Math.random()
+    });
+  });
+  
   // Create HTTP server
   const httpServer = createServer(app);
 

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xeno AI - Offline</title>
+  <style>
+    :root {
+      --primary: #6B4BFF;
+      --primary-light: #9983FF;
+      --background: #FFFFFF;
+      --text: #1A1A1A;
+      --muted: #667085;
+      --border: #E4E7EC;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: var(--background);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    
+    .container {
+      max-width: 500px;
+      padding: 2rem;
+    }
+    
+    .logo {
+      width: 80px;
+      height: 80px;
+      background-color: rgba(107, 75, 255, 0.1);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 2rem;
+      transform: rotate(45deg);
+    }
+    
+    .logo-inner {
+      transform: rotate(-45deg);
+      color: var(--primary);
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    
+    h1 {
+      color: var(--primary);
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    
+    p {
+      color: var(--muted);
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    
+    .button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: background-color 0.2s;
+    }
+    
+    .button:hover {
+      background-color: var(--primary-light);
+    }
+    
+    .features {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-top: 3rem;
+    }
+    
+    .feature {
+      background-color: rgba(107, 75, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: left;
+    }
+    
+    .feature h3 {
+      margin-top: 0;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .feature p {
+      margin-bottom: 0;
+      font-size: 0.9rem;
+    }
+    
+    .icon {
+      color: var(--primary);
+    }
+    
+    @media (min-width: 640px) {
+      .features {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-inner">X</div>
+    </div>
+    
+    <h1>You're Offline</h1>
+    <p>Looks like you're not connected to the internet. Xeno AI has offline capabilities, so you can still access your saved content and recent work.</p>
+    
+    <button class="button" onclick="tryReconnect()">Try Again</button>
+    
+    <div class="features">
+      <div class="feature">
+        <h3>
+          <span class="icon">📝</span>
+          Available Offline
+        </h3>
+        <p>You can access your recent knowledge graphs, canvas drawings and saved content while offline.</p>
+      </div>
+      
+      <div class="feature">
+        <h3>
+          <span class="icon">🔄</span>
+          Auto Sync
+        </h3>
+        <p>Any changes made while offline will automatically sync when you're back online.</p>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    function tryReconnect() {
+      window.location.reload();
+    }
+    
+    // Listen for online event to automatically refresh
+    window.addEventListener('online', () => {
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>

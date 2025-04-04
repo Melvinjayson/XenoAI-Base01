@@ -5,7 +5,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useLanguage } from "@/context/language-context";
 import { LanguageSelector } from "@/components/language-selector";
 import { Button } from "@/components/ui/button";
-import { Brain, Search, Connection, LucideIcon } from "lucide-react";
+import { Brain, Search, Network, LucideIcon } from "lucide-react";
 
 interface FeatureCard {
   icon: LucideIcon;
@@ -25,7 +25,7 @@ const features: FeatureCard[] = [
     description: "Find and connect knowledge effortlessly"
   },
   {
-    icon: Connection,
+    icon: Network,
     title: "Knowledge Mapping",
     description: "Visualize and understand complex topics"
   }

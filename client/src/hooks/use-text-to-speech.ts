@@ -50,17 +50,11 @@ export function useTextToSpeech() {
       console.log('Synthesizing speech with voice:', voiceId, 'language:', language);
       
       // Request speech synthesis from server
-      const result = await apiRequest('POST', '/api/synthesize', {
+      const data = await apiRequest('/api/synthesize', 'POST', {
         text,
         voiceId,
         language,
       });
-      
-      if (!result.ok) {
-        throw new Error(`Server returned ${result.status}`);
-      }
-      
-      const data = await result.json();
       
       // Create and set up audio element
       audioElement = new Audio();
@@ -76,9 +70,12 @@ export function useTextToSpeech() {
         audioElement = null;
       });
       
-      audioElement.addEventListener('error', (e) => {
+      audioElement.addEventListener('error', (e: ErrorEvent) => {
         console.error('Audio playback error:', e);
-        console.error('Failed to play audio:', e.currentTarget.error);
+        // Use the audioElement's error property directly
+        if (audioElement && audioElement.error) {
+          console.error('Failed to play audio:', audioElement.error);
+        }
         console.log('Audio src that failed:', audioElement?.src);
         setIsSpeaking(false);
         setError('Failed to play audio. Please try again.');
