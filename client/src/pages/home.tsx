@@ -296,6 +296,13 @@ export default function Home() {
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem asChild>
+                  <Link href="/workbench" className="flex items-center gap-2">
+                    <Layout className="w-4 h-4" />
+                    <span>Workbench</span>
+                  </Link>
+                </DropdownMenuItem>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
                   <Link href="/canvas" className="flex items-center gap-2">
                     <GripHorizontal className="w-4 h-4" />
                     <span>Canvas</span>
