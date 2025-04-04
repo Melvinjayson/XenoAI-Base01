@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, IStorage, MemStorage } from "./storage";
-import { chat } from "./openai";
+import { chat, prepareGreeting } from "./openai";
 import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
@@ -14,6 +14,7 @@ import {
   enhanceGraphWithAI,
   type NodeType 
 } from "./knowledge-graph";
+import { selectModel, models } from "./model-selector";
 import { WebSocketServer } from "ws";
 import path from "path";
 import multer from "multer";
@@ -32,14 +33,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint for chat
   app.post("/api/chat", async (req, res) => {
     try {
-      const { message, history, filters } = req.body;
+      const { message, history, filters, forceAdvancedModel, isVoiceResponse } = req.body;
       
       if (!message) {
         return res.status(400).json({ error: "Message is required" });
       }
 
-      // Pass filters to chat function for advanced search
-      const response = await chat(message, history || [], filters);
+      // Log the model preference for debugging
+      if (forceAdvancedModel) {
+        console.log("Chat request with forced advanced model");
+      }
+      
+      if (isVoiceResponse) {
+        console.log("Preparing chat for voice response");
+      }
+
+      // Pass filters and model preferences to chat function
+      const response = await chat(
+        message, 
+        history || [], 
+        filters, 
+        forceAdvancedModel || false,
+        isVoiceResponse || false
+      );
+      
       return res.json(response);
     } catch (error) {
       console.error("Chat API error:", error);
@@ -331,6 +348,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Knowledge graph from conversation API error:", error);
       return res.status(500).json({ 
         error: "Failed to build knowledge graph from conversation", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for getting a dynamic greeting
+  app.get("/api/greeting", (_req, res) => {
+    try {
+      const greeting = prepareGreeting();
+      return res.json({ greeting });
+    } catch (error) {
+      console.error("Greeting API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to generate greeting", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for available models
+  app.get("/api/models", (_req, res) => {
+    try {
+      // Define models directly in the endpoint for simplicity
+      const availableModels = {
+        'gpt-4o': {
+          id: 'gpt-4o',
+          name: 'GPT-4o',
+          provider: 'openai',
+          description: 'Advanced model with strong reasoning and knowledge graph capabilities',
+          maxTokens: 4096,
+          isLightweight: false,
+          contextWindow: 8192,
+          cost: 'high',
+          capabilities: ['chat', 'search', 'knowledge', 'voice']
+        },
+        'gpt-3.5-turbo': {
+          id: 'gpt-3.5-turbo',
+          name: 'GPT-3.5 Turbo',
+          provider: 'openai',
+          description: 'Fast, efficient model for basic conversations and simple tasks',
+          maxTokens: 4096,
+          isLightweight: true,
+          contextWindow: 4096,
+          cost: 'low',
+          capabilities: ['chat', 'search']
+        }
+      };
+      
+      return res.json({ 
+        models: availableModels,
+        defaultModel: 'gpt-3.5-turbo'
+      });
+    } catch (error) {
+      console.error("Models API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get models information", 
         details: error instanceof Error ? error.message : "Unknown error" 
       });
     }

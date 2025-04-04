@@ -112,8 +112,12 @@ const voices: Record<string, Voice> = {
 };
 
 // Truncate and optimize text for voice synthesis to save tokens
+// Enhanced function to optimize text for voice with more natural speech patterns
 function optimizeTextForVoice(text: string, maxLength: number = 500): string {
-  if (text.length <= maxLength) return text;
+  // If the text is already short enough, make it more conversational and return
+  if (text.length <= maxLength) {
+    return enhanceShortVoiceResponse(text);
+  }
   
   // If text is too long, try to find a good stopping point (end of sentence)
   const truncatedText = text.substring(0, maxLength);
@@ -126,12 +130,74 @@ function optimizeTextForVoice(text: string, maxLength: number = 500): string {
   if (endIndex < 0) endIndex = truncatedText.lastIndexOf(' ');
   if (endIndex < 0) endIndex = maxLength;
   
+  // Create a truncated version with a good ending point
+  let optimizedText = text.substring(0, endIndex + 1);
+  
   // Add a note about truncation if we're cutting significant content
   if (text.length > maxLength * 1.5) {
-    return `${text.substring(0, endIndex + 1)} I've summarized this response for voice. You can read the full answer in the chat.`;
+    optimizedText = `${optimizedText} I've summarized this for voice. You can read the full answer in the chat.`;
   }
   
-  return text.substring(0, endIndex + 1);
+  // Make the voice response more conversational and natural
+  return enhanceShortVoiceResponse(optimizedText);
+}
+
+// Function to make short voice responses more natural and conversational
+function enhanceShortVoiceResponse(text: string): string {
+  // Don't modify very short responses
+  if (text.length < 20) return text;
+  
+  // List of conversational starters to occasionally add variety
+  const conversationalStarters = [
+    "So, ", 
+    "Well, ", 
+    "Actually, ", 
+    "You know, ", 
+    "Let me see... ", 
+    "Hmm, ", 
+    "I'd say ", 
+    "I think "
+  ];
+  
+  // List of verbal punctuation to make speech sound more natural
+  const verbalBreathers = [
+    ", right?",
+    ", you see?",
+    ", you know?",
+    " — as you might expect",
+    " — interestingly enough"
+  ];
+  
+  // Probability controls (we don't want to add these to every response)
+  const shouldAddStarter = Math.random() < 0.4; // 40% chance
+  const shouldAddBreather = text.length > 100 && Math.random() < 0.3; // 30% chance for longer texts
+  
+  // Add conversational starter to beginning of text
+  if (shouldAddStarter) {
+    const starter = conversationalStarters[Math.floor(Math.random() * conversationalStarters.length)];
+    // Only add the starter if the text doesn't already begin with something similar
+    const firstWord = text.split(' ')[0].toLowerCase();
+    if (!conversationalStarters.some(s => firstWord === s.trim().toLowerCase())) {
+      // Convert first letter to lowercase after the starter
+      text = starter + text.charAt(0).toLowerCase() + text.substring(1);
+    }
+  }
+  
+  // Add verbal breather in the middle of a longer text
+  if (shouldAddBreather) {
+    const sentences = text.split('. ');
+    if (sentences.length > 2) {
+      // Choose a sentence in the middle to add the breather
+      const middleIndex = Math.floor(sentences.length / 2);
+      const breather = verbalBreathers[Math.floor(Math.random() * verbalBreathers.length)];
+      
+      // Add the breather at the end of the selected sentence
+      sentences[middleIndex] = sentences[middleIndex] + breather;
+      text = sentences.join('. ');
+    }
+  }
+  
+  return text;
 }
 
 export async function synthesizeSpeech(
