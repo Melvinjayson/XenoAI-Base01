@@ -7,6 +7,7 @@ import Home from "@/pages/home";
 import KnowledgeGraphPage from "@/pages/knowledge-graph";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
+import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 
 function Router() {
   return (
@@ -24,6 +25,7 @@ function App() {
       <ThemeProvider>
         <ChatProvider>
           <Router />
+          <FloatingVoiceWidget />
           <Toaster />
         </ChatProvider>
       </ThemeProvider>

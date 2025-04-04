@@ -5,9 +5,11 @@ import { chat } from "./openai";
 import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
 import { synthesizeSpeech } from "./voice";
+import { speechToText } from "./speech-to-text";
 import { createKnowledgeGraphFromSearch, expandGraphNode, analyzeKnowledgeGraph, type NodeType } from "./knowledge-graph";
 import { WebSocketServer } from "ws";
 import path from "path";
+import multer from "multer";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static audio files
@@ -420,6 +422,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Get preferences API error:", error);
       return res.status(500).json({ 
         error: "Failed to get preferences", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Configure multer for memory storage (file uploads)
+  const storage = multer.memoryStorage();
+  const upload = multer({ 
+    storage,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // limit to 10MB
+    } 
+  });
+
+  // Speech to text API endpoint
+  app.post("/api/speech-to-text", upload.single('audio'), async (req, res) => {
+    try {
+      return await speechToText(req, res);
+    } catch (error) {
+      console.error("Speech-to-text API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to process speech to text", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for exporting knowledge graph insights
+  app.post("/api/knowledge-graph/export", async (req, res) => {
+    try {
+      const { insights, format = 'json' } = req.body;
+      
+      if (!insights || !Array.isArray(insights)) {
+        return res.status(400).json({ error: "Valid insights array is required" });
+      }
+      
+      let contentType = 'application/json';
+      let content = '';
+      
+      if (format === 'json') {
+        content = JSON.stringify(insights, null, 2);
+      } else if (format === 'csv') {
+        contentType = 'text/csv';
+        // Create CSV header
+        const headers = ['type', 'description', 'relevance', 'confidence', 'rationale'];
+        content = headers.join(',') + '\n';
+        
+        // Add each insight as a row
+        insights.forEach((insight: any) => {
+          const row = [
+            insight.type || '',
+            `"${(insight.description || '').replace(/"/g, '""')}"`, // Escape quotes
+            insight.relevance || '',
+            insight.confidence || '',
+            `"${(insight.rationale || '').replace(/"/g, '""')}"` // Escape quotes
+          ];
+          content += row.join(',') + '\n';
+        });
+      } else if (format === 'txt') {
+        contentType = 'text/plain';
+        insights.forEach((insight: any, index: number) => {
+          content += `Insight ${index + 1}:\n`;
+          content += `Type: ${insight.type || 'N/A'}\n`;
+          content += `Description: ${insight.description || 'N/A'}\n`;
+          content += `Relevance: ${insight.relevance || 'N/A'}\n`;
+          content += `Confidence: ${insight.confidence || 'N/A'}\n`;
+          content += `Rationale: ${insight.rationale || 'N/A'}\n`;
+          content += '\n';
+        });
+      } else {
+        return res.status(400).json({ error: "Unsupported format. Use json, csv, or txt." });
+      }
+      
+      // Set appropriate headers
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="xeno-insights.${format}"`);
+      
+      res.send(content);
+    } catch (error) {
+      console.error("Knowledge graph export API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to export knowledge graph insights", 
         details: error instanceof Error ? error.message : "Unknown error" 
       });
     }
