@@ -99,6 +99,7 @@ interface UserProfileContextType {
   updateAvatarPersonality: (personality: AvatarPersonality) => void;
   updateAvatarAppearance: (appearance: Partial<AvatarAppearance>) => void;
   updateLearningStyle: (style: LearningStyle) => void;
+  updatePreference: (key: string, value: any) => void;
   trackInteraction: (interactionData: {
     query?: string;
     topics?: string[];
@@ -247,6 +248,30 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     setProfile(defaultUserProfile);
   };
 
+  // Update a single preference by key
+  const updatePreference = (key: string, value: any) => {
+    setProfile(prev => {
+      // Create a shallow copy to avoid mutation
+      const newProfile = { ...prev };
+      
+      // Handle nested preferences with dot notation (e.g., "adaptiveSettings.enableLearningPatternTracking")
+      if (key.includes('.')) {
+        const [parentKey, childKey] = key.split('.');
+        if (parentKey && childKey && parentKey in newProfile) {
+          (newProfile as any)[parentKey] = {
+            ...(newProfile as any)[parentKey],
+            [childKey]: value
+          };
+        }
+      } else {
+        // Set top-level preference
+        (newProfile as any)[key] = value;
+      }
+      
+      return newProfile;
+    });
+  };
+
   return (
     <UserProfileContext.Provider value={{
       profile,
@@ -254,6 +279,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
       updateAvatarPersonality,
       updateAvatarAppearance,
       updateLearningStyle,
+      updatePreference,
       trackInteraction,
       resetProfile
     }}>

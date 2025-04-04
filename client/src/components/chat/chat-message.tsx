@@ -1,5 +1,8 @@
 import { Message } from "@/types";
-import { ExternalLink, Mic, MessageSquare, Network } from "lucide-react";
+import { 
+  ExternalLink, Mic, MessageSquare, Network, ThumbsUp, ThumbsDown, 
+  Flag, ArrowRight, MoreHorizontal, CheckCircle, Sparkles, BrainCircuit
+} from "lucide-react";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,7 +14,17 @@ import { Separator } from "@/components/ui/separator";
 import { useChat } from "@/context/chat-context";
 import { useLanguage } from "@/context/language-context";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { 
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
+  DropdownMenuSeparator, DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessageProps {
   message: Message;
@@ -21,6 +34,17 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const { speak, isSpeaking, stopSpeaking } = useTextToSpeech();
   const { sendMessage } = useChat();
   const { language } = useLanguage();
+  const { toast } = useToast();
+  
+  // State for feedback
+  const [hasFeedback, setHasFeedback] = useState(false);
+  const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Reference for the feedback dialog
+  const feedbackInputRef = useRef<HTMLInputElement>(null);
 
   const handleSpeak = () => {
     if (isSpeaking) {
@@ -33,11 +57,45 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const handleRelatedQueryClick = (query: string) => {
     sendMessage(query);
   };
+  
+  const handleFeedback = (type: 'positive' | 'negative') => {
+    if (type === 'negative') {
+      setShowFeedbackForm(true);
+    } else {
+      setFeedback(type);
+      setHasFeedback(true);
+      toast({
+        title: "Feedback submitted",
+        description: "Thank you for your feedback! This helps Xeno AI improve.",
+        variant: "default",
+      });
+    }
+  };
+  
+  const handleSubmitFeedback = () => {
+    setIsSubmitting(true);
+    
+    // Simulate API call to submit feedback
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setShowFeedbackForm(false);
+      setFeedback('negative');
+      setHasFeedback(true);
+      setFeedbackText('');
+      
+      toast({
+        title: "Feedback submitted",
+        description: "Thank you for your feedback! This helps Xeno AI improve.",
+        variant: "default",
+      });
+    }, 800);
+  };
 
   const isUser = message.role === "user";
   const date = new Date(message.timestamp);
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
+  
+  // Design based on the provided screenshot
   return (
     <div className={cn("flex flex-col mb-4 sm:mb-6 w-full", isUser && "items-end")}>
       {isUser ? (
@@ -57,7 +115,8 @@ export default function ChatMessage({ message }: ChatMessageProps) {
               </div>
             </div>
           </div>
-          <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full dark:text-white">
+          
+          <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full dark:text-slate-100 relative">
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
@@ -97,8 +156,9 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 </div>
               </div>
             )}
-
-            <div className="mt-3 flex items-center justify-between gap-2">
+            
+            {/* Message Footer with Utilities and Feedback */}
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-200 dark:border-gray-700 pt-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500">
                   Updated: {time}
@@ -111,23 +171,147 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 >
                   {isSpeaking ? "Stop" : "Listen"}
                 </Button>
+                
+                {/* Show Badge for Feedback State */}
+                {hasFeedback && (
+                  <Badge variant={feedback === 'positive' ? 'default' : 'destructive'} className="h-5 text-[10px]">
+                    {feedback === 'positive' ? (
+                      <span className="flex items-center">
+                        <CheckCircle className="w-3 h-3 mr-1" /> Helpful
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <Flag className="w-3 h-3 mr-1" /> Flagged
+                      </span>
+                    )}
+                  </Badge>
+                )}
               </div>
+              
               <div className="flex items-center gap-2">
-                <Link href="/knowledge-graph">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                  >
-                    <Network className="w-3 h-3 mr-1" />
-                    View Graph
-                  </Button>
-                </Link>
+                {/* Feedback system */}
+                {!hasFeedback && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500 mr-1">Have feedback?</span>
+                    
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 rounded-full"
+                            onClick={() => handleFeedback('positive')}
+                          >
+                            <ThumbsUp className="h-4 w-4 text-gray-500 hover:text-primary" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p className="text-xs">This was helpful</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 rounded-full"
+                            onClick={() => handleFeedback('negative')}
+                          >
+                            <ThumbsDown className="h-4 w-4 text-gray-500 hover:text-destructive" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p className="text-xs">This needs improvement</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
+                          <ArrowRight className="h-4 w-4 text-gray-500" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <Link href="/workbench">
+                          <DropdownMenuItem>
+                            <BrainCircuit className="mr-2 h-4 w-4" />
+                            <span>Open in Workbench</span>
+                          </DropdownMenuItem>
+                        </Link>
+                        <Link href="/knowledge-graph">
+                          <DropdownMenuItem>
+                            <Network className="mr-2 h-4 w-4" />
+                            <span>View Knowledge Graph</span>
+                          </DropdownMenuItem>
+                        </Link>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => {
+                          navigator.clipboard.writeText(message.content);
+                          toast({ 
+                            title: "Copied to clipboard",
+                            description: "Message content copied to clipboard",
+                          });
+                        }}>
+                          <span>Copy text</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
+      
+      {/* Feedback Form Dialog */}
+      <Dialog open={showFeedbackForm} onOpenChange={setShowFeedbackForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit Feedback</DialogTitle>
+            <DialogDescription>
+              Please provide details about what was incorrect or could be improved.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <Input
+              ref={feedbackInputRef}
+              placeholder="What was wrong or could be improved?"
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowFeedbackForm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitFeedback}
+              disabled={!feedbackText.trim() || isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="mr-2">Submitting</span>
+                  <span className="animate-spin">⏳</span>
+                </>
+              ) : (
+                "Submit Feedback"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

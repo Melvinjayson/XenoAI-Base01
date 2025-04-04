@@ -727,7 +727,7 @@ const EnhancedKnowledgeGraphContent = () => {
   );
 };
 
-export default function EnhancedKnowledgeGraphPage() {
+export default function WorkbenchPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-2rem)] overflow-hidden bg-background">
       <KnowledgeGraphProvider>
