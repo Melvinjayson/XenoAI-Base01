@@ -9,6 +9,7 @@ import SplashPage from "@/pages/splash-page";
 import OnboardingPage from "@/pages/onboarding-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
+import { LanguageProvider } from "@/context/language-context";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 import { useEffect, useState } from "react";
 
@@ -52,10 +53,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <ChatProvider>
-          <Router />
-          <Toaster />
-        </ChatProvider>
+        <LanguageProvider>
+          <ChatProvider>
+            <Router />
+            <Toaster />
+          </ChatProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

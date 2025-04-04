@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useLanguage } from "@/context/language-context";
+import { LanguageSelector } from "@/components/language-selector";
 
 // Particle animation class
 class Particle {
@@ -58,6 +60,7 @@ export function SplashScreen() {
   const [, setLocation] = useLocation();
   const particlesRef = useRef<Particle[]>([]);
   const requestRef = useRef<number | null>(null);
+  const { translate } = useLanguage();
   const logoTextRef = useRef<string>("XENO AI");
   
   // Effect for particle animation
@@ -176,6 +179,11 @@ export function SplashScreen() {
         </motion.div>
       </div>
       
+      {/* Language selector in top-right corner */}
+      <div className="z-10 absolute top-4 right-4">
+        <LanguageSelector />
+      </div>
+      
       {/* Progress bar at the bottom of the page */}
       <div className="z-10 absolute bottom-10 left-0 right-0 flex flex-col items-center gap-4">
         <motion.div 
@@ -206,7 +214,7 @@ export function SplashScreen() {
                 }
               }}
             >
-              Continue
+              {translate("button.continue")}
             </motion.button>
           )}
         </motion.div>
@@ -217,7 +225,7 @@ export function SplashScreen() {
           transition={{ delay: 0.5 }}
           className="text-muted-foreground text-sm"
         >
-          {progress === 100 ? "Ready!" : "Loading intelligent search..."}
+          {progress === 100 ? translate("splash.ready") : translate("splash.loading")}
         </motion.p>
       </div>
     </div>

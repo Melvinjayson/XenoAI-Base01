@@ -2,6 +2,7 @@
 export interface VoiceSynthesisRequest {
   text: string;
   voiceId?: string;
+  language?: string; // Language code (e.g., 'en', 'es', 'fr')
 }
 
 export interface VoiceSynthesisResponse {

@@ -110,13 +110,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint for voice synthesis
   app.post("/api/synthesize", async (req, res) => {
     try {
-      const { text, voiceId } = req.body;
+      const { text, voiceId, language } = req.body;
       
       if (!text) {
         return res.status(400).json({ error: "Text is required" });
       }
-
-      const result = await synthesizeSpeech({ text, voiceId });
+      
+      // Pass language parameter to synthesizeSpeech for language-specific voices
+      const result = await synthesizeSpeech({ 
+        text, 
+        voiceId,
+        language: language || 'en' // Default to English if no language specified
+      });
+      
       return res.json(result);
     } catch (error) {
       console.error("Voice synthesis API error:", error);

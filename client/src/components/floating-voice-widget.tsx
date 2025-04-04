@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useChat } from '@/context/chat-context';
+import { useLanguage } from '@/context/language-context';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +22,7 @@ export function FloatingVoiceWidget() {
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const { sendMessage, messages, isLoading } = useChat();
   const { speak } = useTextToSpeech();
+  const { language } = useLanguage();
 
   const toggleWidget = () => {
     setIsOpen(!isOpen);
@@ -136,7 +138,7 @@ export function FloatingVoiceWidget() {
         .pop();
         
       if (latestAssistantMessage) {
-        speak(latestAssistantMessage.content);
+        speak(latestAssistantMessage.content, "default", language);
       }
     } catch (error) {
       console.error('Error sending message:', error);

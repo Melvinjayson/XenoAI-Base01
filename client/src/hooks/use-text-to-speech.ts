@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface TextToSpeechResult {
-  speak: (text: string, voiceId?: string) => void;
+  speak: (text: string, voiceId?: string, language?: string) => void;
   isSpeaking: boolean;
   stopSpeaking: () => void;
   hasSpeechSupport: boolean;
@@ -11,6 +11,7 @@ interface TextToSpeechResult {
 interface PendingAudio {
   text: string;
   voiceId: string;
+  language: string;
 }
 
 export function useTextToSpeech(): TextToSpeechResult {
@@ -62,17 +63,18 @@ export function useTextToSpeech(): TextToSpeechResult {
     }
 
     isProcessingRef.current = true;
-    const { text, voiceId } = audioQueueRef.current.shift()!;
+    const { text, voiceId, language } = audioQueueRef.current.shift()!;
 
     try {
-      console.log("Synthesizing speech with voice:", voiceId);
+      console.log("Synthesizing speech with voice:", voiceId, "language:", language);
       // Try to use ElevenLabs API
       const data = await apiRequest<{audioUrl: string}>({
         method: "POST", 
         endpoint: "/api/synthesize", 
         data: {
           text,
-          voiceId
+          voiceId,
+          language
         }
       });
       
@@ -96,7 +98,7 @@ export function useTextToSpeech(): TextToSpeechResult {
           console.error("Audio playback error:", e);
           console.log("Audio src that failed:", audio.src);
           setIsSpeaking(false);
-          fallbackToBuiltInTTS(text);
+          fallbackToBuiltInTTS(text, language);
           
           // Even on error, try to process the next item
           setTimeout(() => processNextInQueue(), 300);
@@ -114,22 +116,22 @@ export function useTextToSpeech(): TextToSpeechResult {
           await audio.play();
         } catch (playError) {
           console.error("Failed to play audio:", playError);
-          fallbackToBuiltInTTS(text);
+          fallbackToBuiltInTTS(text, language);
           setTimeout(() => processNextInQueue(), 300);
         }
       } else {
         // If no audio URL was returned, fall back to browser TTS
-        fallbackToBuiltInTTS(text);
+        fallbackToBuiltInTTS(text, language);
         setTimeout(() => processNextInQueue(), 300);
       }
     } catch (error) {
       console.error("Voice synthesis error:", error);
-      fallbackToBuiltInTTS(text);
+      fallbackToBuiltInTTS(text, language);
       setTimeout(() => processNextInQueue(), 300);
     }
   }, []);
 
-  const speak = useCallback(async (text: string, voiceId: string = "default") => {
+  const speak = useCallback(async (text: string, voiceId: string = "default", language: string = "en") => {
     if (!text) return;
 
     // Sanitize voiceId to ensure it's valid
@@ -137,8 +139,8 @@ export function useTextToSpeech(): TextToSpeechResult {
       ? voiceId 
       : 'default';
 
-    // Add to queue with validated voice ID
-    audioQueueRef.current.push({ text, voiceId: validVoiceId });
+    // Add to queue with validated voice ID and language
+    audioQueueRef.current.push({ text, voiceId: validVoiceId, language });
     
     // If we're not currently processing the queue, start processing
     if (!isProcessingRef.current) {
@@ -147,7 +149,7 @@ export function useTextToSpeech(): TextToSpeechResult {
   }, [processNextInQueue]);
 
   // Fallback to browser's built-in TTS when ElevenLabs is unavailable
-  const fallbackToBuiltInTTS = useCallback((text: string) => {
+  const fallbackToBuiltInTTS = useCallback((text: string, language: string = 'en') => {
     if (!hasBrowserSpeechSupport) {
       setIsSpeaking(false);
       return;
@@ -156,13 +158,16 @@ export function useTextToSpeech(): TextToSpeechResult {
     // Create a new speech synthesis utterance
     const utterance = new SpeechSynthesisUtterance(text);
     
+    // Set the language for the utterance
+    utterance.lang = language;
+    
     // Store reference to current utterance
     speechSynthRef.current = utterance;
 
     // Set voice (optional - can use a specific voice if preferred)
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(voice => 
-      voice.lang.includes('en') && voice.name.includes('Google') && !voice.name.includes('Male')
+      voice.lang.includes(language) && voice.name.includes('Google') && !voice.name.includes('Male')
     );
     
     if (preferredVoice) {

@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { AvatarImage } from "@radix-ui/react-avatar";
 import { Separator } from "@/components/ui/separator";
 import { useChat } from "@/context/chat-context";
+import { useLanguage } from "@/context/language-context";
 
 interface ChatMessageProps {
   message: Message;
@@ -17,12 +18,13 @@ interface ChatMessageProps {
 export default function ChatMessage({ message }: ChatMessageProps) {
   const { speak, isSpeaking, stopSpeaking } = useTextToSpeech();
   const { sendMessage } = useChat();
+  const { language } = useLanguage();
 
   const handleSpeak = () => {
     if (isSpeaking) {
       stopSpeaking();
     } else {
-      speak(message.content);
+      speak(message.content, "default", language);
     }
   };
   

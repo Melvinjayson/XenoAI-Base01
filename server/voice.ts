@@ -203,7 +203,7 @@ function enhanceShortVoiceResponse(text: string): string {
 export async function synthesizeSpeech(
   request: VoiceSynthesisRequest
 ): Promise<VoiceSynthesisResponse> {
-  const { text, voiceId: requestedVoiceId = 'default' } = request;
+  const { text, voiceId: requestedVoiceId = 'default', language = 'en' } = request;
   
   // Skip empty text
   if (!text || text.trim() === '') {
@@ -214,7 +214,7 @@ export async function synthesizeSpeech(
   const optimizedText = optimizeTextForVoice(text);
   
   // Create a more stable cache key with MD5 hash to handle very similar texts
-  const hash = crypto.createHash('md5').update(`${requestedVoiceId}:${optimizedText}`).digest('hex');
+  const hash = crypto.createHash('md5').update(`${requestedVoiceId}:${language}:${optimizedText}`).digest('hex');
   const cacheKey = `voice:${hash}`;
   
   // Check if we have a cached version
@@ -236,13 +236,14 @@ export async function synthesizeSpeech(
       console.log("Voice synthesis request:", { 
         text: optimizedText.substring(0, 50) + "...", 
         voiceId: requestedVoiceId,
+        language,
         hash: hash.substring(0, 8)
       });
       
       // Check if we have ElevenLabs API key
       if (!process.env.ELEVENLABS_API_KEY) {
         console.log("No ElevenLabs API key found, using fallback synthesis");
-        return await fallbackSynthesis(optimizedText);
+        return await fallbackSynthesis(optimizedText, language);
       }
       
       // Get the voice to use
@@ -292,7 +293,8 @@ export async function synthesizeSpeech(
           body: JSON.stringify({
             text: optimizedText,
             voice_settings: selectedVoice.settings,
-            model_id: modelId
+            model_id: modelId,
+            voice_language: language
           }),
           signal: controller.signal
         });
@@ -346,7 +348,7 @@ export async function synthesizeSpeech(
       }
     } catch (error) {
       console.error('ElevenLabs speech synthesis error:', error);
-      return await fallbackSynthesis(optimizedText);
+      return await fallbackSynthesis(optimizedText, language);
     } finally {
       // Remove from active requests when done
       activeSynthesisRequests.delete(cacheKey);
@@ -360,7 +362,7 @@ export async function synthesizeSpeech(
 }
 
 // Fallback to basic audio synthesis if ElevenLabs fails
-async function fallbackSynthesis(text: string): Promise<VoiceSynthesisResponse> {
+async function fallbackSynthesis(text: string, language: string = 'en'): Promise<VoiceSynthesisResponse> {
   try {
     // For better error handling, we check if the audio directory exists
     if (!fs.existsSync(AUDIO_DIR)) {
@@ -381,7 +383,7 @@ async function fallbackSynthesis(text: string): Promise<VoiceSynthesisResponse> 
     
     // Write a simple info file to confirm file system access
     try {
-      fs.writeFileSync(infoFilepath, `Fallback requested at ${new Date().toISOString()}\nText length: ${text.length} characters\nText preview: ${text.substring(0, 100)}...`);
+      fs.writeFileSync(infoFilepath, `Fallback requested at ${new Date().toISOString()}\nLanguage: ${language}\nText length: ${text.length} characters\nText preview: ${text.substring(0, 100)}...`);
       console.log("Fallback info file created successfully:", infoFilepath);
     } catch (writeError) {
       console.error("Failed to write fallback info file:", writeError);
