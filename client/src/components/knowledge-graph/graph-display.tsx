@@ -3,7 +3,7 @@ import { useKnowledgeGraph } from '@/context/knowledge-graph-context';
 import { useChat } from '@/context/chat-context';
 import ForceGraph2D from 'react-force-graph-2d';
 import ForceGraph3D from 'react-force-graph-3d';
-import { GraphNode, GraphEdge, NodeType } from '@/types/knowledge-graph';
+import { KnowledgeGraphNode as GraphNode, KnowledgeGraphEdge as GraphEdge, NodeType } from '@/types/knowledge-graph';
 import { useTheme } from '@/context/theme-context';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -25,7 +25,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
-  DropdownMenuLabel
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -63,9 +65,15 @@ const edgeColors: Record<string, string> = {
 
 interface GraphDisplayProps {
   className?: string;
+  visualizationPattern?: 'force' | 'radial' | 'hierarchical' | 'ontology' | 'timeline' | 'clustered';
+  isGroupingEnabled?: boolean;
 }
 
-export default function GraphDisplay({ className }: GraphDisplayProps) {
+export default function GraphDisplay({ 
+  className, 
+  visualizationPattern = 'force',
+  isGroupingEnabled = false
+}: GraphDisplayProps) {
   const { state, dispatch, insights, loading, searchGraph, expandNode, clearGraph } = useKnowledgeGraph();
   const { messages } = useChat();
   const { isDarkMode } = useTheme();
@@ -86,9 +94,26 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
     ['query', 'entity', 'document', 'concept', 'insight', 'person', 'organization', 'location', 'time', 'statistic']
   );
   const [graphAnimation, setGraphAnimation] = useState(true);
-  const [clusterNodes, setClusterNodes] = useState(false);
+  // Use passed props for clustering and visualization pattern
+  const [clusterNodes, setClusterNodes] = useState(isGroupingEnabled);
+  const [currentVisualizationPattern, setCurrentVisualizationPattern] = useState(visualizationPattern);
   const [highlightConnections, setHighlightConnections] = useState(true);
   const [enhancedTooltips, setEnhancedTooltips] = useState(true);
+  
+  // Update local state when props change
+  useEffect(() => {
+    setClusterNodes(isGroupingEnabled);
+  }, [isGroupingEnabled]);
+  
+  useEffect(() => {
+    setCurrentVisualizationPattern(visualizationPattern);
+    // Apply visualization pattern when it changes
+    if (graphRef.current) {
+      applyVisualizationPattern();
+    }
+  }, [visualizationPattern]);
+  
+  // Move the useEffect hook after the filteredNodes and applyVisualizationPattern are defined
   
   // Calculate graph background color based on theme
   const graphBgColor = isDarkMode ? '#121212' : '#ffffff';
@@ -135,8 +160,257 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
   const handleResetView = () => {
     if (graphRef.current) {
       graphRef.current.zoomToFit(400, 40);
+      
+      // Apply visualization pattern to reset the layout
+      applyVisualizationPattern();
     }
   };
+  
+  // Apply node filters (moved before applyVisualizationPattern to fix errors)
+  const filteredNodes = useMemo(() => {
+    return state.graph.nodes.filter(node => visibleNodeTypes.includes(node.type as NodeType));
+  }, [state.graph.nodes, visibleNodeTypes]);
+  
+  // Apply edge filters (moved before applyVisualizationPattern to fix errors)
+  const filteredEdges = useMemo(() => {
+    // Only include edges where both source and target nodes are visible
+    return state.graph.edges.filter(edge => {
+      const sourceNode = state.graph.nodes.find(n => n.id === edge.source);
+      const targetNode = state.graph.nodes.find(n => n.id === edge.target);
+      return sourceNode && targetNode && 
+             visibleNodeTypes.includes(sourceNode.type as NodeType) && 
+             visibleNodeTypes.includes(targetNode.type as NodeType);
+    });
+  }, [state.graph.edges, state.graph.nodes, visibleNodeTypes]);
+  
+  // Function to apply different visualization patterns
+  const applyVisualizationPattern = useCallback(() => {
+    if (!graphRef.current || !filteredNodes || filteredNodes.length === 0) return;
+    
+    const fg = graphRef.current;
+    const width = fg.width();
+    const height = fg.height();
+    
+    // Get current nodes
+    const nodes = [...filteredNodes];
+    
+    // Get connection data for grouping
+    const nodesByType: Record<string, any[]> = {};
+    nodes.forEach(node => {
+      if (!nodesByType[node.type]) {
+        nodesByType[node.type] = [];
+      }
+      nodesByType[node.type].push(node);
+    });
+    
+    // Handle different visualization patterns
+    switch (currentVisualizationPattern) {
+      case 'radial': {
+        // Place nodes in a circle
+        const radius = Math.min(width, height) * 0.35;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        nodes.forEach((node, i) => {
+          const angle = (i / nodes.length) * 2 * Math.PI;
+          node.fx = centerX + radius * Math.cos(angle);
+          node.fy = centerY + radius * Math.sin(angle);
+        });
+        break;
+      }
+      
+      case 'hierarchical': {
+        // Simple hierarchical layout - find root nodes (no incoming edges)
+        const incomingEdges = new Map();
+        filteredEdges.forEach(edge => {
+          if (!incomingEdges.has(edge.target)) {
+            incomingEdges.set(edge.target, []);
+          }
+          incomingEdges.get(edge.target).push(edge);
+        });
+        
+        const rootNodeIds = new Set(
+          nodes
+            .filter(n => !incomingEdges.has(n.id) || incomingEdges.get(n.id).length === 0)
+            .map(n => n.id)
+        );
+        
+        if (rootNodeIds.size > 0) {
+          // Build hierarchy using BFS
+          const levels = [
+            nodes.filter(n => rootNodeIds.has(n.id))
+          ];
+          
+          const visited = new Set(rootNodeIds);
+          let currentLevel = [...rootNodeIds];
+          
+          // Keep finding children until we've processed all nodes
+          while (currentLevel.length > 0 && visited.size < nodes.length) {
+            const nextLevel = [];
+            const levelNodes = [];
+            
+            currentLevel.forEach(parentId => {
+              filteredEdges
+                .filter(edge => edge.source === parentId)
+                .forEach(edge => {
+                  if (!visited.has(edge.target)) {
+                    nextLevel.push(edge.target);
+                    levelNodes.push(nodes.find(n => n.id === edge.target));
+                    visited.add(edge.target);
+                  }
+                });
+            });
+            
+            if (levelNodes.length > 0) {
+              levels.push(levelNodes);
+            }
+            currentLevel = nextLevel;
+          }
+          
+          // Position nodes in levels
+          const levelHeight = height / (levels.length || 1);
+          
+          levels.forEach((levelNodes, level) => {
+            const levelWidth = width / (levelNodes.length || 1);
+            
+            levelNodes.forEach((node, i) => {
+              node.fx = (i + 0.5) * levelWidth;
+              node.fy = (level + 0.5) * levelHeight;
+            });
+          });
+        }
+        break;
+      }
+      
+      case 'ontology': {
+        // Group by domain (based on node type categories)
+        const domains = {
+          Information: ['query', 'document'],
+          Entities: ['entity', 'person', 'organization', 'location'],
+          Concepts: ['concept', 'insight'],
+          Analytics: ['statistic', 'feedback', 'correction']
+        };
+        
+        const domainMap = new Map();
+        Object.entries(domains).forEach(([domain, types]) => {
+          types.forEach(type => domainMap.set(type, domain));
+        });
+        
+        // Group nodes by domain
+        const nodesByDomain: Record<string, any[]> = {};
+        nodes.forEach(node => {
+          const domain = domainMap.get(node.type) || 'Other';
+          if (!nodesByDomain[domain]) {
+            nodesByDomain[domain] = [];
+          }
+          nodesByDomain[domain].push(node);
+        });
+        
+        const domainCount = Object.keys(nodesByDomain).length;
+        const radius = Math.min(width, height) * 0.35;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        // Position domains in a circle
+        Object.entries(nodesByDomain).forEach(([domain, domainNodes], i) => {
+          const angle = (i / domainCount) * 2 * Math.PI;
+          const domainX = centerX + radius * Math.cos(angle);
+          const domainY = centerY + radius * Math.sin(angle);
+          
+          // Position nodes within domain in a smaller circle
+          const nodeRadius = radius * 0.25;
+          domainNodes.forEach((node, j) => {
+            const nodeAngle = (j / domainNodes.length) * 2 * Math.PI;
+            node.fx = domainX + nodeRadius * Math.cos(nodeAngle);
+            node.fy = domainY + nodeRadius * Math.sin(nodeAngle);
+          });
+        });
+        break;
+      }
+      
+      case 'timeline': {
+        // Sort nodes by creation time if available
+        const timeNodes = nodes.filter(n => n.createdAt);
+        if (timeNodes.length > 1) {
+          // Sort by time
+          timeNodes.sort((a, b) => a.createdAt - b.createdAt);
+          
+          const startTime = timeNodes[0].createdAt;
+          const endTime = timeNodes[timeNodes.length - 1].createdAt;
+          const timeSpan = endTime - startTime || 1;
+          
+          // Position nodes along a timeline
+          const margin = width * 0.1;
+          const timelineWidth = width - 2 * margin;
+          
+          timeNodes.forEach(node => {
+            const progress = (node.createdAt - startTime) / timeSpan;
+            node.fx = margin + progress * timelineWidth;
+            // Stagger vertically to avoid overlap
+            node.fy = height / 2 + (Math.random() - 0.5) * (height * 0.3);
+          });
+          
+          // For nodes without timestamps, position them at the end
+          nodes
+            .filter(n => !n.createdAt)
+            .forEach((node, i) => {
+              node.fx = width - margin;
+              node.fy = height / 2 + ((i % 5) - 2) * 30;
+            });
+        }
+        break;
+      }
+      
+      case 'clustered': {
+        // Cluster nodes by type
+        const clusterCount = Object.keys(nodesByType).length;
+        const radius = Math.min(width, height) * 0.35;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        Object.entries(nodesByType).forEach(([type, typeNodes], i) => {
+          const angle = (i / clusterCount) * 2 * Math.PI;
+          const clusterX = centerX + radius * Math.cos(angle);
+          const clusterY = centerY + radius * Math.sin(angle);
+          
+          // Cluster nodes in a random pattern
+          typeNodes.forEach(node => {
+            // Random position within cluster
+            const r = 20 + Math.random() * 40;
+            const a = Math.random() * 2 * Math.PI;
+            node.fx = clusterX + r * Math.cos(a);
+            node.fy = clusterY + r * Math.sin(a);
+          });
+        });
+        break;
+      }
+      
+      case 'force':
+      default:
+        // Force-directed layout - remove fixed positions
+        nodes.forEach(node => {
+          node.fx = undefined;
+          node.fy = undefined;
+        });
+        break;
+    }
+    
+    // Trigger graph update if needed
+    if (fg.graphData) {
+      const currentData = fg.graphData();
+      fg.graphData({
+        nodes: currentData.nodes,
+        links: currentData.links
+      });
+    }
+  }, [currentVisualizationPattern, filteredNodes, filteredEdges]);
+
+  // Apply visualization pattern when filteredNodes or graph is ready
+  useEffect(() => {
+    if (filteredNodes && filteredNodes.length > 0 && graphRef.current) {
+      applyVisualizationPattern();
+    }
+  }, [filteredNodes, applyVisualizationPattern]);
   
   // Customize node and link appearance
   const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -191,22 +465,7 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
     }
   }, [state.selectedNodes, hoveredNode, isDarkMode, textColor]);
   
-  // Apply node filters
-  const filteredNodes = useMemo(() => {
-    return state.graph.nodes.filter(node => visibleNodeTypes.includes(node.type as NodeType));
-  }, [state.graph.nodes, visibleNodeTypes]);
-  
-  // Apply edge filters
-  const filteredEdges = useMemo(() => {
-    // Only include edges where both source and target nodes are visible
-    return state.graph.edges.filter(edge => {
-      const sourceNode = state.graph.nodes.find(n => n.id === edge.source);
-      const targetNode = state.graph.nodes.find(n => n.id === edge.target);
-      return sourceNode && targetNode && 
-             visibleNodeTypes.includes(sourceNode.type as NodeType) && 
-             visibleNodeTypes.includes(targetNode.type as NodeType);
-    });
-  }, [state.graph.edges, state.graph.nodes, visibleNodeTypes]);
+
   
   // Determine node sizes based on their connections
   const nodeDegrees = useMemo(() => {
@@ -399,12 +658,38 @@ export default function GraphDisplay({ className }: GraphDisplayProps) {
                     ))}
                     
                     <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Visualization Pattern</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    
+                    <DropdownMenuRadioGroup 
+                      value={currentVisualizationPattern}
+                      onValueChange={(value) => {
+                        setCurrentVisualizationPattern(value as 'force' | 'radial' | 'hierarchical' | 'ontology' | 'timeline' | 'clustered');
+                        // Apply the new pattern
+                        setTimeout(() => applyVisualizationPattern(), 100);
+                      }}
+                    >
+                      <DropdownMenuRadioItem value="force">Force-directed</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="radial">Radial</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="hierarchical">Hierarchical</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="ontology">Ontology</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="timeline">Timeline</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="clustered">Clustered</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                    
+                    <DropdownMenuSeparator />
                     <DropdownMenuLabel>Display Options</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     
                     <DropdownMenuCheckboxItem
                       checked={clusterNodes}
-                      onCheckedChange={setClusterNodes}
+                      onCheckedChange={(checked) => {
+                        setClusterNodes(checked);
+                        if (checked !== isGroupingEnabled) {
+                          // Notify parent component if needed
+                          // onGroupingChange?.(checked);
+                        }
+                      }}
                     >
                       Group similar nodes
                     </DropdownMenuCheckboxItem>
