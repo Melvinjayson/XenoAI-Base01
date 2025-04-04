@@ -13,8 +13,17 @@ import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 import { useEffect, useState } from "react";
 
 function Router() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [showVoiceWidget, setShowVoiceWidget] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  
+  // Redirect to splash screen on initial load
+  useEffect(() => {
+    if (initialLoad && location === "/") {
+      setLocation("/splash");
+      setInitialLoad(false);
+    }
+  }, [initialLoad, location, setLocation]);
   
   useEffect(() => {
     // Only show the voice widget on main pages, not splash or onboarding
