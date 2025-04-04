@@ -177,14 +177,14 @@ export function SplashScreen() {
             className="mb-2 relative"
           >
             <div className="relative w-20 h-20">
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm" />
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75" />
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse backdrop-blur-sm" />
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-400/40 to-pink-400/40 animate-ping opacity-75" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-10 h-10 text-white" fill="currentColor">
-                  <path d="M12 2L4 7l8 5 8-5-8-5zM4 15l8 5 8-5-8-5-8 5zm8-3L4 17l8 5 8-5-8-5z"/>
+                <svg viewBox="0 0 24 24" className="w-12 h-12 text-white" fill="currentColor">
+                  <path d="M4.5 10.5c-.825 0-1.5.675-1.5 1.5s.675 1.5 1.5 1.5S6 12.825 6 12s-.675-1.5-1.5-1.5zm15 0c-.825 0-1.5.675-1.5 1.5s.675 1.5 1.5 1.5S21 12.825 21 12s-.675-1.5-1.5-1.5zm-7.5 0c-.825 0-1.5.675-1.5 1.5s.675 1.5 1.5 1.5 1.5-.675 1.5-1.5-.675-1.5-1.5-1.5zm-3-3C8.175 7.5 7.5 8.175 7.5 9S8.175 10.5 9 10.5s1.5-.675 1.5-1.5-.675-1.5-1.5-1.5zm6 0c-.825 0-1.5.675-1.5 1.5s.675 1.5 1.5 1.5 1.5-.675 1.5-1.5-.675-1.5-1.5-1.5zM12 3c-.825 0-1.5.675-1.5 1.5S11.175 6 12 6s1.5-.675 1.5-1.5S12.825 3 12 3zm-3 12c-.825 0-1.5.675-1.5 1.5s.675 1.5 1.5 1.5 1.5-.675 1.5-1.5-.675-1.5-1.5-1.5zm6 0c-.825 0-1.5.675-1.5 1.5s.675 1.5 1.5 1.5 1.5-.675 1.5-1.5-.675-1.5-1.5-1.5z"/>
                 </svg>
               </div>
-              <div className="absolute -inset-1 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-xl blur-xl" />
+              <div className="absolute -inset-1 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-full blur-xl" />
             </div>
           </motion.div>
           
