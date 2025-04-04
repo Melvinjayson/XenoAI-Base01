@@ -1,48 +1,40 @@
-import React from 'react';
+import * as React from "react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from "@/components/ui/tooltip";
 
 interface EnhancedTooltipProps {
-  title: string;
-  description?: string;
   children: React.ReactNode;
-  side?: 'top' | 'right' | 'bottom' | 'left';
-  align?: 'start' | 'center' | 'end';
+  content: React.ReactNode;
+  side?: "top" | "right" | "bottom" | "left";
+  align?: "start" | "center" | "end";
+  delayDuration?: number;
   className?: string;
 }
 
-const EnhancedTooltip: React.FC<EnhancedTooltipProps> = ({
-  title,
-  description,
+export function EnhancedTooltip({
   children,
-  side = 'top',
-  align = 'center',
-  className = '',
-}) => {
+  content,
+  side = "top",
+  align = "center",
+  delayDuration = 300,
+  className = "",
+}: EnhancedTooltipProps) {
   return (
     <TooltipProvider>
-      <Tooltip delayDuration={300}>
+      <Tooltip delayDuration={delayDuration}>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent 
           side={side} 
-          align={align} 
-          className={`max-w-xs ${className}`}
-          sideOffset={5}
+          align={align}
+          className={`text-xs px-3 py-1.5 bg-background border border-border shadow-md ${className}`}
         >
-          <div className="space-y-1">
-            <p className="font-medium">{title}</p>
-            {description && (
-              <p className="text-xs text-muted-foreground">{description}</p>
-            )}
-          </div>
+          {content}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
-};
-
-export default EnhancedTooltip;
+}

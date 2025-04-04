@@ -278,6 +278,12 @@ export default function Home() {
                 </span>
               </Button>
             </Link>
+            <Link href="/admin">
+              <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
+                <Settings className="w-4 h-4" />
+                <span className="font-medium">Admin</span>
+              </Button>
+            </Link>
           </div>
 
           {/* Mobile Navigation */}
@@ -294,6 +300,11 @@ export default function Home() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
+              </Button>
+            </Link>
+            <Link href="/admin">
+              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Admin">
+                <Settings className="w-5 h-5" />
               </Button>
             </Link>
           </div>

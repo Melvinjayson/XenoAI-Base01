@@ -10,6 +10,7 @@ import SplashPage from "@/pages/splash-page";
 import OnboardingPage from "@/pages/onboarding-page";
 import VRExperience from "@/pages/vr-experience";
 import CanvasPage from "@/pages/canvas-page";
+import AdminPage from "@/pages/admin-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -94,6 +95,7 @@ function Router() {
           <Route path="/vr-experience" component={VRExperience} />
           <Route path="/canvas" component={CanvasPage} />
           <Route path="/canvas/:id" component={CanvasPage} />
+          <Route path="/admin" component={AdminPage} />
           <Route component={NotFound} />
         </Switch>
         

@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { VoiceSynthesisRequest, VoiceSynthesisResponse, Cache } from './types';
 import OpenAI from 'openai';
+import { apiQuotaManager } from './api-quota-manager';
 
 // Initialize OpenAI client for the Text-to-Speech service
 const openai = new OpenAI({
@@ -252,6 +253,15 @@ export async function synthesizeSpeech(
         return await fallbackSynthesis(optimizedText, language);
       }
       
+      // Check API quota limits
+      const estimatedTokens = optimizedText.length;
+      const rateLimitInfo = apiQuotaManager.checkRateLimit('elevenlabs', estimatedTokens);
+      if (rateLimitInfo.isLimited) {
+        console.log(`ElevenLabs API quota limit reached: ${rateLimitInfo.reason}`);
+        console.log(`Next reset at: ${new Date(rateLimitInfo.resetTime).toLocaleString()}`);
+        return await fallbackSynthesis(optimizedText, language);
+      }
+      
       // Get the voice to use
       const selectedVoice = voices[requestedVoiceId] || voices.default;
       console.log("Selected voice:", selectedVoice.name);
@@ -313,6 +323,9 @@ export async function synthesizeSpeech(
         }
         
         console.log("ElevenLabs API response received successfully");
+        
+        // Record successful API usage
+        apiQuotaManager.recordApiUsage('elevenlabs', estimatedTokens);
         
         // Save the audio file
         const arrayBuffer = await response.arrayBuffer();
@@ -404,6 +417,15 @@ async function fallbackSynthesis(text: string, language: string = 'en'): Promise
       try {
         console.log('Attempting OpenAI TTS synthesis...');
         
+        // Check OpenAI API quota limits
+        const estimatedTokens = text.length;
+        const rateLimitInfo = apiQuotaManager.checkRateLimit('openai', estimatedTokens);
+        if (rateLimitInfo.isLimited) {
+          console.log(`OpenAI API quota limit reached: ${rateLimitInfo.reason}`);
+          console.log(`Next reset at: ${new Date(rateLimitInfo.resetTime).toLocaleString()}`);
+          throw new Error("OpenAI quota limit reached");
+        }
+        
         // Select appropriate voice based on language
         const languageKey = language.split('-')[0]; // Extract base language code
         const voiceId = languageToOpenAIVoice[language] || 
@@ -423,6 +445,9 @@ async function fallbackSynthesis(text: string, language: string = 'en'): Promise
         // Save the file
         fs.writeFileSync(audioFilepath, buffer);
         console.log('OpenAI TTS synthesis successful, saved to:', audioFilepath);
+        
+        // Record successful API usage
+        apiQuotaManager.recordApiUsage('openai', estimatedTokens);
         
         // Return audio URL
         const audioUrl = `/audio/${audioFilename}`;

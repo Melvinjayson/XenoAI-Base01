@@ -37,7 +37,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import HelpButton from '@/components/ui/help-button';
-import EnhancedTooltip from '@/components/ui/enhanced-tooltip';
+import { EnhancedTooltip } from '@/components/ui/enhanced-tooltip';
 import WorkbenchOnboarding from '@/components/onboarding/workbench-onboarding';
 import '@/components/onboarding/onboarding.css';
 

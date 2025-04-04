@@ -8,6 +8,7 @@ import { synthesizeSpeech } from "./voice";
 import { speechToText } from "./speech-to-text";
 import { queryPerplexity, perplexitySearchConversation } from "./perplexity";
 import { uploadAndAnalyzeImage, extractColorsFromUrl } from "./color-analyzer";
+import { apiQuotaManager } from "./api-quota-manager";
 import { 
   InsertFile, 
   InsertCanvas, 
@@ -384,6 +385,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // API endpoint for API quota status
+  app.get("/api/quota-status", (_req, res) => {
+    try {
+      const quotaStatus = apiQuotaManager.getUsageSummary();
+      return res.json({ 
+        status: quotaStatus,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error("API quota status error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get API quota status", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for adjusting API quotas
+  app.post("/api/quota-adjust", (req, res) => {
+    try {
+      const { service, dailyQuota, hourlyQuota } = req.body;
+      
+      if (!service || dailyQuota === undefined || hourlyQuota === undefined) {
+        return res.status(400).json({ error: "service, dailyQuota, and hourlyQuota are required" });
+      }
+      
+      apiQuotaManager.adjustQuota(service, dailyQuota, hourlyQuota);
+      
+      return res.json({ 
+        success: true,
+        message: `Quota for ${service} adjusted to ${dailyQuota} daily, ${hourlyQuota} hourly`,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error("API quota adjustment error:", error);
+      return res.status(500).json({ 
+        error: "Failed to adjust API quota", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
   // API endpoint for available models
   app.get("/api/models", (_req, res) => {
     try {
@@ -493,6 +536,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         enhancedSearch: "✓" // Our open-source search alternative is always available
       }
     });
+  });
+  
+  // API endpoint for API quota status
+  app.get("/api/quota-status", (_req, res) => {
+    try {
+      const quotaStatus = apiQuotaManager.getUsageSummary();
+      return res.json({ 
+        status: quotaStatus,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error("API quota status error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get API quota status", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for adjusting API quotas
+  app.post("/api/quota-adjust", (req, res) => {
+    try {
+      const { service, dailyQuota, hourlyQuota } = req.body;
+      
+      if (!service || dailyQuota === undefined || hourlyQuota === undefined) {
+        return res.status(400).json({ error: "service, dailyQuota, and hourlyQuota are required" });
+      }
+      
+      apiQuotaManager.adjustQuota(service, dailyQuota, hourlyQuota);
+      
+      return res.json({ 
+        success: true,
+        message: `Quota for ${service} adjusted to ${dailyQuota} daily, ${hourlyQuota} hourly`,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error("API quota adjustment error:", error);
+      return res.status(500).json({ 
+        error: "Failed to adjust API quota", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
   });
 
   // API endpoint for open source search
