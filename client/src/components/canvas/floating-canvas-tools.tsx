@@ -44,6 +44,7 @@ interface FloatingCanvasToolsProps {
   onCreateText: () => void;
   onCreateShape: (shape: string) => void;
   onCreateNode: () => void;
+  onSelectDrawingTool?: (tool: string, color: string, strokeWidth: number) => void;
   position?: 'left' | 'right';
   isVisible?: boolean;
 }
@@ -52,6 +53,7 @@ const FloatingCanvasTools = ({
   onCreateText,
   onCreateShape,
   onCreateNode,
+  onSelectDrawingTool,
   position = 'left',
   isVisible = true
 }: FloatingCanvasToolsProps) => {
