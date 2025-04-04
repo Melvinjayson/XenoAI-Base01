@@ -43,8 +43,10 @@ function formatChatHistoryForLangChain(history: ChatMessage[]): string[] {
 }
 
 // Function to prepare a dynamic greeting based on time of day
-export function prepareGreeting(): string {
-  const hour = new Date().getHours();
+export function prepareGreeting(userName?: string, lastInteraction?: Date): string {
+  // Time-based personalization
+  const now = new Date();
+  const hour = now.getHours();
   let timeBasedGreeting: string;
   
   if (hour < 12) {
@@ -55,15 +57,95 @@ export function prepareGreeting(): string {
     timeBasedGreeting = "Good evening";
   }
   
-  const greetings = [
+  // Day-based personalization
+  const day = now.getDay();
+  const isWeekend = day === 0 || day === 6; // Sunday or Saturday
+  const isFriday = day === 5;
+  const isMonday = day === 1;
+  
+  // Determine if it's a special time of day
+  const isEarlyMorning = hour < 7;
+  const isLateNight = hour >= 22;
+  
+  // Determine if user is returning after a while
+  let returningUserContext = '';
+  if (lastInteraction) {
+    const daysSinceLastInteraction = Math.floor((now.getTime() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSinceLastInteraction > 7) {
+      returningUserContext = "It's been a while! ";
+    } else if (daysSinceLastInteraction > 2) {
+      returningUserContext = "Nice to see you again! ";
+    }
+  }
+  
+  // Personal greeting if we have a username
+  const personalGreeting = userName ? `Hey ${userName}! ` : '';
+  
+  // Base greetings pool
+  const standardGreetings = [
     `${timeBasedGreeting}! I'm Xeno AI, your personal assistant. How can I help you today?`,
     `Hey there! ${timeBasedGreeting}. I'm Xeno AI, ready to assist with whatever you need.`,
-    `Welcome back! ${timeBasedGreeting}. Xeno AI at your service. What can I do for you?`,
+    `${returningUserContext}${timeBasedGreeting}. Xeno AI at your service. What can I do for you?`,
     `${timeBasedGreeting}! Xeno AI here. What questions do you have for me today?`,
     `Hi there! I'm Xeno AI, your AI assistant. ${timeBasedGreeting}, how can I assist you?`
   ];
   
-  return greetings[Math.floor(Math.random() * greetings.length)];
+  // Special time/day greetings
+  const specialGreetings = [];
+  
+  if (isEarlyMorning) {
+    specialGreetings.push(
+      "You're up early! I'm Xeno AI, ready to help start your day right.",
+      "Early bird! Xeno AI here, ready to help with your morning tasks."
+    );
+  }
+  
+  if (isLateNight) {
+    specialGreetings.push(
+      "Burning the midnight oil? I'm Xeno AI, here to help no matter the hour.",
+      "Late night? I'm Xeno AI, your 24/7 assistant. What can I help with?"
+    );
+  }
+  
+  if (isWeekend) {
+    specialGreetings.push(
+      `${timeBasedGreeting}! It's the weekend and Xeno AI is here to make it even better.`,
+      `Weekend vibes! I'm Xeno AI, ready to help with whatever you have planned.`
+    );
+  }
+  
+  if (isFriday) {
+    specialGreetings.push(
+      `${timeBasedGreeting}! It's Friday! I'm Xeno AI, ready to wrap up your week on a high note.`,
+      `TGIF! Xeno AI here to help you finish the week strong.`
+    );
+  }
+  
+  if (isMonday) {
+    specialGreetings.push(
+      `${timeBasedGreeting}! Let's start the week strong. I'm Xeno AI, your personal assistant.`,
+      `Monday motivation! I'm Xeno AI, ready to help you tackle this week's challenges.`
+    );
+  }
+  
+  // Combine standard and special greetings, giving special ones higher probability
+  const combinedGreetings = [...standardGreetings];
+  if (specialGreetings.length > 0) {
+    // Add special greetings with higher weight (3x)
+    for (let i = 0; i < 3; i++) {
+      combinedGreetings.push(...specialGreetings);
+    }
+  }
+  
+  // Select a random greeting from our pool
+  let greeting = combinedGreetings[Math.floor(Math.random() * combinedGreetings.length)];
+  
+  // Add personal greeting if available
+  if (personalGreeting && !greeting.includes(userName!)) {
+    greeting = personalGreeting + greeting;
+  }
+  
+  return greeting;
 }
 
 // Function to handle chat with OpenAI and LangChain

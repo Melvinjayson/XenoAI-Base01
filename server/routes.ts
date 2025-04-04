@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage, IStorage, MemStorage } from "./storage";
+import { storage, IStorage } from "./storage";
 import { chat, prepareGreeting } from "./openai";
 import { webSearch, getSuggestions } from "./search";
 import { openSearch, openConversationalResponse } from "./open-search";
@@ -18,6 +18,8 @@ import { selectModel, models } from "./model-selector";
 import { WebSocketServer } from "ws";
 import path from "path";
 import multer from "multer";
+import fs from "fs";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static audio files

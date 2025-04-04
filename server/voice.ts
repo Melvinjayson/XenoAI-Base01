@@ -2,6 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { VoiceSynthesisRequest, VoiceSynthesisResponse, Cache } from './types';
+import OpenAI from 'openai';
+
+// Initialize OpenAI client for the Text-to-Speech service
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Cache for audio files
 const audioCache: Cache<string> = new Map();
@@ -361,7 +367,22 @@ export async function synthesizeSpeech(
   return synthesisPromise;
 }
 
-// Fallback to basic audio synthesis if ElevenLabs fails
+// Map of language codes to OpenAI voice identifiers
+const languageToOpenAIVoice: Record<string, string> = {
+  'en': 'alloy', // Default English voice
+  'en-US': 'nova', // American English
+  'en-GB': 'echo', // British English
+  'es': 'shimmer', // Spanish
+  'fr': 'nova', // French
+  'de': 'alloy', // German
+  'ja': 'shimmer', // Japanese
+  'zh': 'alloy', // Chinese
+  'ko': 'echo', // Korean
+  'ar': 'nova', // Arabic
+  'ru': 'alloy', // Russian
+};
+
+// Fallback to OpenAI TTS first, then browser synthesis if that fails
 async function fallbackSynthesis(text: string, language: string = 'en'): Promise<VoiceSynthesisResponse> {
   try {
     // For better error handling, we check if the audio directory exists
@@ -373,8 +394,54 @@ async function fallbackSynthesis(text: string, language: string = 'en'): Promise
     console.log('Using fallback speech synthesis for:', text.substring(0, 50) + '...');
     
     // Generate a hash of the text to use as a cache key
-    const hash = crypto.createHash('md5').update(text).digest('hex').substring(0, 8);
+    const hash = crypto.createHash('md5').update(`${language}:${text}`).digest('hex').substring(0, 8);
     const timestamp = Date.now();
+    const audioFilename = `speech_openai_${hash}_${timestamp}.mp3`;
+    const audioFilepath = path.join(AUDIO_DIR, audioFilename);
+    
+    // Try OpenAI TTS first if API key is available
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        console.log('Attempting OpenAI TTS synthesis...');
+        
+        // Select appropriate voice based on language
+        const languageKey = language.split('-')[0]; // Extract base language code
+        const voiceId = languageToOpenAIVoice[language] || 
+                        languageToOpenAIVoice[languageKey] || 
+                        'alloy'; // Default to alloy if no match
+        
+        // Call OpenAI TTS API
+        const mp3Response = await openai.audio.speech.create({
+          model: 'tts-1', // tts-1 is the standard model, tts-1-hd is higher quality but more expensive
+          voice: voiceId,
+          input: text,
+        });
+        
+        // Convert response to buffer
+        const buffer = Buffer.from(await mp3Response.arrayBuffer());
+        
+        // Save the file
+        fs.writeFileSync(audioFilepath, buffer);
+        console.log('OpenAI TTS synthesis successful, saved to:', audioFilepath);
+        
+        // Return audio URL
+        const audioUrl = `/audio/${audioFilename}`;
+        
+        // Cache the result
+        audioCache.set(`voice:${hash}`, {
+          data: audioUrl,
+          timestamp: Date.now(),
+        });
+        
+        return { 
+          audioUrl,
+          fallback: true, // Still marked as fallback for tracking
+          reason: 'Using OpenAI TTS as alternative'
+        };
+      } catch (openaiError) {
+        console.error('OpenAI TTS synthesis failed:', openaiError);
+      }
+    }
     
     // Create a simple text file with information about the fallback
     // This helps with troubleshooting and ensures the directory is writable
@@ -391,19 +458,24 @@ async function fallbackSynthesis(text: string, language: string = 'en'): Promise
       console.warn("Possible file system permission issue detected in audio directory");
     }
     
-    // Check if either the ElevenLabs key is missing or there was a specific error
-    const errorReason = !process.env.ELEVENLABS_API_KEY 
-      ? 'ELEVENLABS_API_KEY not configured' 
-      : 'ElevenLabs API request failed';
+    // Determine reason for fallback
+    let fallbackReason = 'Using browser TTS as fallback';
+    if (!process.env.ELEVENLABS_API_KEY) {
+      fallbackReason = 'ELEVENLABS_API_KEY not configured';
+    } else if (!process.env.OPENAI_API_KEY) {
+      fallbackReason = 'ElevenLabs quota exceeded and OpenAI TTS not configured';
+    } else {
+      fallbackReason = 'All TTS services failed';
+    }
     
-    console.log(`Fallback reason: ${errorReason}`);
+    console.log(`Final fallback reason: ${fallbackReason}`);
     
     // Generate a fallback response with an empty URL
     // The client-side will detect this and use browser's built-in TTS
     return { 
       audioUrl: '',
       fallback: true,
-      reason: errorReason
+      reason: fallbackReason
     };
   } catch (error) {
     console.error("Error in fallback synthesis:", error);
