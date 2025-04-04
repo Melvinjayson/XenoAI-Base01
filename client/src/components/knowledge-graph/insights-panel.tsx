@@ -452,8 +452,8 @@ export function InsightsPanel({ className }: InsightsPanelProps) {
       switch (insight.type) {
         case 'pattern':
           actionItems.push({
-            title: 'Explore Pattern',
-            description: `Investigate the pattern: ${insight.description}`,
+            title: 'Learn Pattern',
+            description: `Explore this recurring theme to deepen your understanding: ${insight.description}`,
             action: () => {
               // Select the nodes involved in this pattern
               if (insight.nodeIds && insight.nodeIds.length > 0) {
@@ -466,8 +466,8 @@ export function InsightsPanel({ className }: InsightsPanelProps) {
           
         case 'cluster':
           actionItems.push({
-            title: 'Analyze Cluster',
-            description: `Review this related group of topics: ${insight.description}`,
+            title: 'Study Concept Group',
+            description: `Examine how these ideas relate to simplify this topic: ${insight.description}`,
             action: () => {
               // Select the nodes involved in this cluster
               if (insight.nodeIds && insight.nodeIds.length > 0) {
@@ -480,8 +480,8 @@ export function InsightsPanel({ className }: InsightsPanelProps) {
           
         case 'connection':
           actionItems.push({
-            title: 'Review Connection',
-            description: `Examine this relationship: ${insight.description}`,
+            title: 'Understand Connection',
+            description: `Discover how these concepts connect to enhance learning: ${insight.description}`,
             action: () => {
               // Select the nodes involved in this connection
               if (insight.nodeIds && insight.nodeIds.length > 0) {
@@ -494,8 +494,8 @@ export function InsightsPanel({ className }: InsightsPanelProps) {
           
         case 'anomaly':
           actionItems.push({
-            title: 'Investigate Anomaly',
-            description: `Look into this unexpected finding: ${insight.description}`,
+            title: 'Explore Unusual Finding',
+            description: `Investigate this unique perspective that challenges conventional understanding: ${insight.description}`,
             action: () => {
               // Select the nodes involved in this anomaly
               if (insight.nodeIds && insight.nodeIds.length > 0) {
@@ -511,8 +511,8 @@ export function InsightsPanel({ className }: InsightsPanelProps) {
     // If we have conversation history, add an action to enhance the graph with AI
     if (chatHistory.length > 0 && actionItems.length < 5) {
       actionItems.push({
-        title: 'Enhance with AI',
-        description: 'Use AI to analyze conversation context and enhance the knowledge graph',
+        title: 'Enhance Learning',
+        description: 'Use AI to analyze your conversation and reveal hidden connections that simplify complex topics',
         action: handleEnhanceWithAI,
         icon: <Lightbulb className="h-4 w-4" />
       });
@@ -534,7 +534,7 @@ export function InsightsPanel({ className }: InsightsPanelProps) {
         
         <TabsContent value="insights" className="flex-1 overflow-y-auto">
           <div className="flex justify-between items-center mb-2">
-            <h3 className="text-lg font-semibold">Graph Insights</h3>
+            <h3 className="text-lg font-semibold">Learning Insights</h3>
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
@@ -610,9 +610,9 @@ export function InsightsPanel({ className }: InsightsPanelProps) {
           ) : insights.length === 0 ? (
             <Alert className="mb-4">
               <Info className="h-4 w-4" />
-              <AlertTitle>No insights available</AlertTitle>
+              <AlertTitle>Begin your learning journey</AlertTitle>
               <AlertDescription>
-                The knowledge graph needs more data to generate insights. Try expanding nodes or adding more search queries.
+                Add more topics to the knowledge graph to discover connections that simplify complex concepts. Try searching for related topics or expanding existing nodes.
               </AlertDescription>
             </Alert>
           ) : (
@@ -694,7 +694,7 @@ export function InsightsPanel({ className }: InsightsPanelProps) {
               ) : (
                 <>
                   <Lightbulb className="h-4 w-4 mr-1" />
-                  Enhance with AI
+                  Enhance Learning
                 </>
               )}
             </Button>

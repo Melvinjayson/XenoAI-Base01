@@ -216,9 +216,9 @@ export default function KnowledgeGraphPage() {
               
               <Card>
                 <CardHeader className="p-3">
-                  <CardTitle className="text-sm font-medium">Insights</CardTitle>
+                  <CardTitle className="text-sm font-medium">Learning Insights</CardTitle>
                   <CardDescription className="text-xs">
-                    Explore relationships and patterns
+                    Discover connections that simplify complex topics
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
@@ -260,8 +260,8 @@ export default function KnowledgeGraphPage() {
           
           <div className="mt-2 text-xs text-muted-foreground px-1">
             <p>
-              Search for topics to build an interactive knowledge graph or create one from your current conversation.
-              Click on nodes to expand them and discover connections between concepts.
+              Search for topics to build an interactive knowledge map that simplifies learning. Visualize how ideas connect to 
+              gain deeper understanding of complex subjects. Create a knowledge graph from your conversation or explore topics that interest you.
             </p>
           </div>
         </div>

@@ -127,7 +127,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       {
         id: "welcome",
         role: "assistant",
-        content: "Hi there! I'm Xeno AI, your personal AI assistant. You can ask me questions, and I'll search for answers. Try asking something or tap the mic to use voice input.",
+        content: "Welcome to Xeno AI! I'm here to help you explore and connect ideas through interactive learning. Ask me anything, and I'll visualize knowledge in ways that make complex topics easier to understand. Try asking a question or tap the mic icon to use voice interaction.",
         timestamp: Date.now(),
       },
     ]);

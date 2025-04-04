@@ -8,33 +8,33 @@ import { Button } from "@/components/ui/button";
 const slides = [
   {
     title: "Welcome to Xeno AI",
-    description: "Your intelligent AI assistant with advanced knowledge graph capabilities and voice interaction.",
+    description: "Discover a new way to learn and navigate complex information through interactive visual exploration. I'll help you connect ideas and simplify understanding.",
     icon: <BrainCircuit className="w-12 h-12 text-primary" />,
     color: "#6B4BFF",
     features: [
-      "Natural language search",
-      "Voice interaction",
-      "Knowledge graph visualization",
-      "Contextual memory"
+      "Visual knowledge mapping",
+      "Intuitive exploration",
+      "Conversational learning",
+      "Personalized insights"
     ]
   },
   {
-    title: "Intelligent Search",
-    description: "Ask questions in natural language and get smart, contextual responses with reliable sources.",
+    title: "Discover Through Conversation",
+    description: "Ask questions naturally and receive visual, connected responses that reveal relationships between concepts, making complex topics easier to grasp.",
     icon: <Search className="w-12 h-12 text-primary" />,
     color: "#6B4BFF",
     demo: "searchDemo"
   },
   {
-    title: "Voice Interaction",
-    description: "Speak to Xeno AI and hear responses. Perfect for hands-free use or accessibility needs.",
+    title: "Learn With Voice",
+    description: "Engage in hands-free learning through natural voice conversations. Ask questions and receive explanations in a way that feels like talking with a knowledgeable friend.",
     icon: <Mic className="w-12 h-12 text-primary" />,
     color: "#6B4BFF", 
     demo: "voiceDemo"
   },
   {
-    title: "Knowledge Graph",
-    description: "Visualize connections between topics and explore relationships in an interactive graph.",
+    title: "See How Ideas Connect",
+    description: "Visualize the relationships between concepts in an interactive knowledge graph. Uncover connections you might have missed and explore topics from multiple perspectives.",
     icon: <Zap className="w-12 h-12 text-primary" />,
     color: "#6B4BFF",
     demo: "graphDemo"
@@ -94,12 +94,12 @@ export function OnboardingCarousel() {
             <div className="flex items-center gap-2 bg-background p-3 rounded-md shadow-sm">
               <Search className="w-4 h-4 text-muted-foreground" />
               <p className="text-muted-foreground animate-pulse">
-                What is the future of artificial intelligence?
+                How do quantum computers work?
               </p>
             </div>
             <div className="mt-3 bg-background p-3 rounded-md">
               <p className="text-sm">
-                AI is evolving toward more general intelligence, enhanced multimodal understanding, better ethics & governance, and increased accessibility...
+                Quantum computers use qubits that can exist in multiple states simultaneously, unlike traditional bits. This enables them to solve complex problems by exploring many possibilities at once...
               </p>
             </div>
           </div>
