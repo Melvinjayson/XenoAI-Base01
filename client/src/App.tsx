@@ -18,9 +18,12 @@ import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
 import { GestureProvider } from "@/context/gesture-context";
 import { OfflineProvider, useOfflineContext } from "@/context/offline-context";
+import { NotificationProvider } from "@/context/notification-context";
+import { WebSocketProvider } from "@/context/websocket-context";
 import { UserProfileProvider } from "@/context/user-profile-context";
 import { ColorPaletteProvider } from "@/context/color-palette-context";
 import { MindMapProvider } from "@/context/mind-map-context";
+import { KnowledgeGraphProvider } from "@/context/knowledge-graph-context";
 import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 import OfflineModeBanner from "@/components/offline-mode-banner";
@@ -121,14 +124,20 @@ function App() {
           <UserProfileProvider>
             <ColorPaletteProvider>
               <ChatProvider>
-                <MindMapProvider>
-                  <GestureProvider>
-                    <OfflineProvider>
-                      <Router />
-                      <Toaster />
-                    </OfflineProvider>
-                  </GestureProvider>
-                </MindMapProvider>
+                <WebSocketProvider>
+                  <MindMapProvider>
+                    <KnowledgeGraphProvider>
+                      <NotificationProvider>
+                        <GestureProvider>
+                          <OfflineProvider>
+                            <Router />
+                            <Toaster />
+                          </OfflineProvider>
+                        </GestureProvider>
+                      </NotificationProvider>
+                    </KnowledgeGraphProvider>
+                  </MindMapProvider>
+                </WebSocketProvider>
               </ChatProvider>
             </ColorPaletteProvider>
           </UserProfileProvider>

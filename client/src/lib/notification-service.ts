@@ -4,9 +4,9 @@
  */
 
 type NotificationPermissionStatus = 'default' | 'granted' | 'denied';
-type NotificationCategory = 'insight' | 'research' | 'task' | 'system' | 'productivity';
+export type NotificationCategory = 'insight' | 'research' | 'task' | 'system' | 'productivity';
 
-interface NotificationOptions {
+export interface NotificationOptions {
   title: string;
   body: string;
   icon?: string;
@@ -16,7 +16,6 @@ interface NotificationOptions {
   category?: NotificationCategory;
   actions?: NotificationAction[];
   requireInteraction?: boolean;
-  renotify?: boolean;
   silent?: boolean;
 }
 
@@ -26,7 +25,7 @@ interface NotificationAction {
   icon?: string;
 }
 
-interface StoredNotification extends NotificationOptions {
+export interface StoredNotification extends NotificationOptions {
   id: string;
   timestamp: number;
   read: boolean;
@@ -51,37 +50,26 @@ export class NotificationService {
   }
 
   private async init() {
-    try {
-      // Check if the browser supports notifications
-      if (!('Notification' in window)) {
-        console.warn('This browser does not support desktop notifications');
-        return;
-      }
+    // Check if browser supports notifications
+    if (!('Notification' in window)) {
+      console.warn('This browser does not support notifications');
+      return;
+    }
 
-      // Check permission status
-      this.permissionStatus = Notification.permission as NotificationPermissionStatus;
-      
-      // Load notification history from localStorage
-      this.loadNotificationHistory();
-      
-      // Register service worker for push notifications if available
-      if ('serviceWorker' in navigator) {
-        try {
-          const registration = await navigator.serviceWorker.ready;
-          console.log('Service Worker ready for push notifications');
-          
-          // Listen for push notifications
-          navigator.serviceWorker.addEventListener('message', (event) => {
-            if (event.data && event.data.type === 'PUSH_NOTIFICATION') {
-              this.handlePushNotification(event.data.notification);
-            }
-          });
-        } catch (error) {
-          console.error('Service Worker registration failed:', error);
-        }
+    // Load permission status
+    this.permissionStatus = Notification.permission as NotificationPermissionStatus;
+    
+    // Load notification history from localStorage
+    this.loadNotificationHistory();
+
+    // Register service worker for push notifications if available
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        console.log('Service Worker registered with scope:', registration.scope);
+      } catch (error) {
+        console.error('Service Worker registration failed:', error);
       }
-    } catch (error) {
-      console.error('Error initializing notification service:', error);
     }
   }
 
@@ -95,12 +83,8 @@ export class NotificationService {
     }
 
     if (this.permissionStatus !== 'granted') {
-      try {
-        const permission = await Notification.requestPermission();
-        this.permissionStatus = permission as NotificationPermissionStatus;
-      } catch (error) {
-        console.error('Error requesting notification permission:', error);
-      }
+      const permission = await Notification.requestPermission();
+      this.permissionStatus = permission as NotificationPermissionStatus;
     }
 
     return this.permissionStatus;
@@ -112,55 +96,50 @@ export class NotificationService {
    * @returns Promise<boolean> Whether the notification was shown
    */
   public async showNotification(options: NotificationOptions): Promise<boolean> {
+    // Store notification in history first
+    const notification = this.storeNotification(options);
+    
+    // Notify listeners
+    this.notifyListeners(notification);
+
+    // Check if we should attempt to display a browser notification
     if (!('Notification' in window)) {
-      console.warn('This browser does not support desktop notifications');
-      this.storeNotification(options);
       return false;
     }
 
     if (this.permissionStatus !== 'granted') {
-      this.permissionStatus = await this.requestPermission();
-      if (this.permissionStatus !== 'granted') {
-        // Still store the notification for in-app display
-        this.storeNotification(options);
+      const permission = await this.requestPermission();
+      if (permission !== 'granted') {
         return false;
       }
     }
 
     try {
-      const notification = new Notification(options.title, {
+      // Show browser notification
+      const browserNotification = new Notification(options.title, {
         body: options.body,
-        icon: options.icon || '/favicon.ico',
+        icon: options.icon,
         badge: options.badge,
         tag: options.tag,
-        data: {
-          ...options.data,
-          category: options.category || 'system',
-          timestamp: Date.now()
-        },
-        requireInteraction: options.requireInteraction,
-        renotify: options.renotify,
-        silent: options.silent,
-        actions: options.actions
+        data: { ...options.data, id: notification.id },
+        requireInteraction: options.requireInteraction || false,
+        silent: options.silent || false
       });
 
-      // Handle notification clicks
-      notification.onclick = (event) => {
-        event.preventDefault();
-        window.focus();
-        notification.close();
+      browserNotification.onclick = () => {
+        // Mark as read when clicked
+        this.markAsRead(notification.id);
         
-        // Execute any action based on the notification data
-        if (notification.data && typeof notification.data.onClick === 'function') {
-          notification.data.onClick();
-        }
+        // Focus window
+        window.focus();
+        
+        // Close notification
+        browserNotification.close();
       };
 
-      this.storeNotification(options);
       return true;
     } catch (error) {
-      console.error('Error showing notification:', error);
-      this.storeNotification(options);
+      console.error('Failed to show notification:', error);
       return false;
     }
   }
@@ -171,12 +150,13 @@ export class NotificationService {
    */
   private storeNotification(options: NotificationOptions): StoredNotification {
     const notification: StoredNotification = {
-      id: `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: crypto.randomUUID(),
       timestamp: Date.now(),
       read: false,
-      ...options,
+      ...options
     };
 
+    // Add to history (at the beginning)
     this.notificationHistory.unshift(notification);
     
     // Limit history size
@@ -187,9 +167,6 @@ export class NotificationService {
     // Save to localStorage
     this.saveNotificationHistory();
 
-    // Notify listeners
-    this.notifyListeners(notification);
-    
     return notification;
   }
 
@@ -199,20 +176,15 @@ export class NotificationService {
    */
   private handlePushNotification(data: any) {
     const options: NotificationOptions = {
-      title: data.title || 'Xeno AI',
+      title: data.title || 'New Notification',
       body: data.body || '',
       icon: data.icon,
       badge: data.badge,
-      tag: data.tag,
-      data: data.data,
-      category: data.category || 'system',
-      requireInteraction: data.requireInteraction,
-      renotify: data.renotify,
-      silent: data.silent,
-      actions: data.actions
+      data: data.data || {},
+      category: data.category
     };
 
-    this.storeNotification(options);
+    this.showNotification(options);
   }
 
   /**
@@ -222,7 +194,7 @@ export class NotificationService {
     try {
       localStorage.setItem('notification_history', JSON.stringify(this.notificationHistory));
     } catch (error) {
-      console.error('Error saving notification history:', error);
+      console.error('Failed to save notification history:', error);
     }
   }
 
@@ -236,7 +208,7 @@ export class NotificationService {
         this.notificationHistory = JSON.parse(history);
       }
     } catch (error) {
-      console.error('Error loading notification history:', error);
+      console.error('Failed to load notification history:', error);
       this.notificationHistory = [];
     }
   }
@@ -250,7 +222,7 @@ export class NotificationService {
       try {
         listener(notification);
       } catch (error) {
-        console.error('Error in notification listener:', error);
+        console.error('Notification listener error:', error);
       }
     });
   }
@@ -276,7 +248,7 @@ export class NotificationService {
     if (category) {
       return this.notificationHistory.filter(n => n.category === category);
     }
-    return [...this.notificationHistory];
+    return this.notificationHistory;
   }
 
   /**
@@ -284,9 +256,9 @@ export class NotificationService {
    * @param id Notification ID
    */
   public markAsRead(id: string): void {
-    const notification = this.notificationHistory.find(n => n.id === id);
-    if (notification) {
-      notification.read = true;
+    const index = this.notificationHistory.findIndex(n => n.id === id);
+    if (index >= 0) {
+      this.notificationHistory[index].read = true;
       this.saveNotificationHistory();
     }
   }
@@ -316,7 +288,7 @@ export class NotificationService {
    */
   public getUnreadCount(category?: NotificationCategory): number {
     if (category) {
-      return this.notificationHistory.filter(n => !n.read && n.category === category).length;
+      return this.notificationHistory.filter(n => n.category === category && !n.read).length;
     }
     return this.notificationHistory.filter(n => !n.read).length;
   }

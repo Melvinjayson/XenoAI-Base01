@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, X, Download, PieChart, BarChart3, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
+import { Mic, MicOff, X, Download, PieChart, BarChart3, ChevronUp, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useChat } from '@/context/chat-context';
 import { useLanguage } from '@/context/language-context';
+import { useWebSocket } from '@/context/websocket-context';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,12 +18,14 @@ export function FloatingVoiceWidget() {
   const [query, setQuery] = useState('');
   const [insights, setInsights] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('chat');
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const microphoneRef = useRef<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const { sendMessage, messages, isLoading } = useChat();
   const { speak } = useTextToSpeech();
   const { language } = useLanguage();
+  const { sendChatMessage, isConnected, addMessageHandler } = useWebSocket();
 
   const toggleWidget = () => {
     setIsOpen(!isOpen);
@@ -124,22 +127,90 @@ export function FloatingVoiceWidget() {
     }
   };
 
+  // Set up WebSocket message handlers
+  useEffect(() => {
+    // Handle chat responses
+    const removeHandler = addMessageHandler('chat_response', (data) => {
+      // Update UI with the response
+      sendMessage(data.message.content || 'Response received');
+      
+      // If processing was happening, stop it
+      if (isProcessing) {
+        setIsProcessing(false);
+      }
+      
+      // If insights are available, update them
+      if (data.insights && Array.isArray(data.insights)) {
+        setInsights(data.insights);
+      }
+    });
+    
+    // Handle voice responses
+    const voiceHandler = addMessageHandler('voice_response', (data) => {
+      if (data.audioUrl) {
+        // Play the audio directly without using the speak function
+        const audio = new Audio(data.audioUrl);
+        audio.play().catch(err => {
+          console.error('Error playing audio:', err);
+        });
+      }
+      
+      if (isProcessing) {
+        setIsProcessing(false);
+      }
+    });
+    
+    // Handle errors
+    const errorHandler = addMessageHandler('chat_error', (data) => {
+      toast({
+        title: 'Error',
+        description: data.error || 'An error occurred',
+        variant: 'destructive',
+      });
+      
+      if (isProcessing) {
+        setIsProcessing(false);
+      }
+    });
+    
+    return () => {
+      removeHandler();
+      voiceHandler();
+      errorHandler();
+    };
+  }, [addMessageHandler, isProcessing, sendMessage, toast]);
+
   const handleSendMessage = async (text?: string) => {
     const messageText = text || query;
-    if (!messageText.trim()) return;
+    if (!messageText.trim() || !isConnected) return;
     
     try {
+      // Use the standard sendMessage to update the chat context
       await sendMessage(messageText);
-      setQuery('');
       
-      // Get the latest assistant message for text-to-speech
-      const latestAssistantMessage = messages
-        .filter(msg => msg.role === 'assistant')
-        .pop();
-        
-      if (latestAssistantMessage) {
-        speak(latestAssistantMessage.content, "default", language);
-      }
+      // Use WebSocket for enhanced communication with voice
+      sendChatMessage(
+        messageText, 
+        messages, 
+        true, // Request voice response
+        { 
+          language,
+          preferredVoice: "default",
+          topK: 3, // For better search results
+          includeInsights: true // Request insights data
+        }
+      );
+      
+      // Update UI state
+      setQuery('');
+      setIsProcessing(true);
+      
+      // Show processing toast
+      toast({
+        title: 'Processing',
+        description: 'Thinking...',
+      });
+      
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -147,6 +218,7 @@ export function FloatingVoiceWidget() {
         description: 'Could not send message. Please try again.',
         variant: 'destructive',
       });
+      setIsProcessing(false);
     }
   };
 
@@ -359,6 +431,16 @@ export function FloatingVoiceWidget() {
                 <h3 className="font-semibold flex items-center gap-2">
                   <Sparkles size={16} className="text-primary" />
                   Xeno AI Assistant
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p className="text-xs">{isConnected ? 'Connected to AI server' : 'Disconnected - trying to reconnect...'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </h3>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsOpen(false)}>
@@ -415,9 +497,13 @@ export function FloatingVoiceWidget() {
                         size="icon"
                         className="h-10 w-10 rounded-full shrink-0"
                         onClick={() => handleSendMessage()}
-                        disabled={!query.trim() || isLoading}
+                        disabled={!query.trim() || isLoading || isProcessing || !isConnected}
                       >
-                        <ChevronUp size={16} />
+                        {isProcessing ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <ChevronUp size={16} />
+                        )}
                       </Button>
                     </div>
                   </div>

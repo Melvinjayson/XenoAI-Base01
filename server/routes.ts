@@ -2797,9 +2797,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Set up WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Store active connections
+  const clients = new Set();
 
   wss.on('connection', (ws) => {
     console.log('WebSocket client connected');
+    
+    // Add client to the set
+    clients.add(ws);
     
     // Send welcome message
     ws.send(JSON.stringify({
@@ -2821,6 +2827,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
             data: data.data
           }));
         }
+        else if (data.type === 'chat_message') {
+          // Handle realtime chat
+          console.log('Received chat message via WebSocket:', data.message);
+          
+          // Basic validation
+          if (!data.message) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'Message is required'
+            }));
+            return;
+          }
+          
+          // Send acknowledgment
+          ws.send(JSON.stringify({
+            type: 'chat_received',
+            timestamp: Date.now()
+          }));
+          
+          // Process chat message in background
+          const history = data.history || [];
+          const forceAdvancedModel = data.forceAdvancedModel || false;
+          const isVoiceResponse = data.isVoiceResponse || false;
+          
+          // Start streaming response
+          ws.send(JSON.stringify({
+            type: 'chat_start',
+            timestamp: Date.now()
+          }));
+          
+          try {
+            // Process chat
+            const response = await chat(
+              data.message, 
+              history, 
+              data.filters, 
+              forceAdvancedModel,
+              isVoiceResponse
+            );
+            
+            // Send full response
+            ws.send(JSON.stringify({
+              type: 'chat_response',
+              response,
+              timestamp: Date.now()
+            }));
+            
+            // If voice response requested, send audio
+            if (isVoiceResponse && response) {
+              // The text might be in different places depending on response format
+              const textToSynthesize = (typeof response === 'string') ? response :
+                (response && typeof response === 'object' && response.message && 
+                  typeof response.message === 'object' && 'content' in response.message ? 
+                  String(response.message.content) : '') || 
+                JSON.stringify(response);
+                
+              if (textToSynthesize) {
+                try {
+                  // Synthesize speech
+                  const language = data.language || 'en';
+                  const voiceId = data.voiceId || 'default';
+                  
+                  const speechResult = await synthesizeSpeech({ 
+                    text: textToSynthesize, 
+                    voiceId,
+                    language
+                  });
+                
+                  // Make sure URL is absolute
+                  if (speechResult.audioUrl) {
+                    if (!speechResult.audioUrl.startsWith('http') && !speechResult.audioUrl.startsWith('/')) {
+                      speechResult.audioUrl = '/' + speechResult.audioUrl;
+                    }
+                  }
+                  
+                  // Send voice response
+                  ws.send(JSON.stringify({
+                    type: 'voice_response',
+                    audioUrl: speechResult.audioUrl,
+                    timestamp: Date.now(),
+                    fallback: speechResult.fallback || false,
+                    reason: speechResult.reason || null
+                  }));
+                } catch (voiceError) {
+                  console.error('Voice synthesis error in WebSocket:', voiceError);
+                  ws.send(JSON.stringify({
+                    type: 'voice_error',
+                    error: 'Failed to synthesize speech',
+                    timestamp: Date.now()
+                  }));
+                }
+              }
+            }
+          } catch (chatError) {
+            console.error('Chat processing error in WebSocket:', chatError);
+            ws.send(JSON.stringify({
+              type: 'chat_error',
+              error: 'Failed to process chat message',
+              details: chatError instanceof Error ? chatError.message : 'Unknown error',
+              timestamp: Date.now()
+            }));
+          }
+        }
       } catch (error) {
         console.error('WebSocket message error:', error);
         ws.send(JSON.stringify({
@@ -2832,7 +2941,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     ws.on('close', () => {
       console.log('WebSocket client disconnected');
+      // Remove client from the set
+      clients.delete(ws);
     });
+    
+    // Notify all clients every 30 seconds with a heartbeat
+    const heartbeatInterval = setInterval(() => {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'heartbeat',
+          timestamp: Date.now()
+        }));
+      } else {
+        clearInterval(heartbeatInterval);
+      }
+    }, 30000);
   });
 
   return httpServer;
