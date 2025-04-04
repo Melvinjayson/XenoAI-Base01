@@ -103,6 +103,38 @@ export interface SearchFilters {
   location?: string;
 }
 
+export type SystemCommandType = 'file_management' | 'project_creation' | 'knowledge_graph' | 'mind_map' | 'workbench' | 'other';
+
+export interface SystemCommandResult {
+  success: boolean;
+  output: string;
+  command: string;
+  commandType: SystemCommandType;
+}
+
+export interface WorkbenchAnalysisResult {
+  activeProjects: number;
+  fileCount: number;
+  knowledgeGraphs: number;
+  mindMaps: number;
+  recentActivities: string[];
+  suggestedActions: string[];
+  focusAreas: string[];
+}
+
+export interface TaskItem {
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  estimatedHours?: number;
+}
+
+export interface TaskList {
+  title: string;
+  description: string;
+  tasks: TaskItem[];
+}
+
 export interface ChatContextType {
   messages: Message[];
   isLoading: boolean;
@@ -114,5 +146,16 @@ export interface ChatContextType {
     insights: GraphInsight[];
     query: string;
   } | null>;
+  analyzeConversationForCommands: () => Promise<{
+    hasSystemCommand: boolean;
+    command?: string;
+    action?: string;
+    target?: string;
+    parameters?: Record<string, any>;
+    confidence: number;
+  }>;
+  executeSystemCommand: (command: string) => Promise<SystemCommandResult>;
+  generateTaskList: () => Promise<TaskList>;
+  analyzeWorkbench: () => Promise<WorkbenchAnalysisResult>;
   lastSearchResult: SearchResult | null;
 }

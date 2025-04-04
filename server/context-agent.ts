@@ -4,6 +4,9 @@ import { NodeType, KnowledgeGraph, KnowledgeGraphNode, KnowledgeGraphEdge, Graph
 import { apiQuotaManager } from "./api-quota-manager";
 import { webSearch } from "./search";
 import { extractEntities } from "./knowledge-graph";
+import { MindMap, MindMapTopic } from "./mind-map-manager";
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -36,7 +39,11 @@ export type ActionType =
   | 'search_related_topics'     // Search for related topics
   | 'summarize_conversation'    // Summarize the current conversation
   | 'suggest_next_steps'        // Suggest next research steps
-  | 'export_findings';          // Export findings in a structured format
+  | 'export_findings'           // Export findings in a structured format
+  | 'analyze_workbench'         // Analyze the current workbench state
+  | 'manage_project_files'      // Manage and organize project files
+  | 'generate_task_list'        // Generate a task list based on conversation
+  | 'execute_system_command';   // Execute a system command from natural language
 
 /**
  * Interface representing a detected context
@@ -239,7 +246,8 @@ function validateContextResponse(response: any): DetectedContext {
     'create_knowledge_graph', 'update_knowledge_graph', 'expand_node', 
     'create_project', 'add_research_insight', 'create_mind_map', 
     'search_related_topics', 'summarize_conversation', 
-    'suggest_next_steps', 'export_findings'
+    'suggest_next_steps', 'export_findings', 'analyze_workbench',
+    'manage_project_files', 'generate_task_list', 'execute_system_command'
   ];
 
   // Default to research_topic if invalid type
@@ -658,6 +666,538 @@ Format your response as a JSON object with this structure:
     console.error("Error parsing natural language command:", error);
     return parseSimpleCommand(command);
   }
+}
+
+/**
+ * Advanced contextual understanding and system control functions
+ */
+
+/**
+ * Interface for system command execution results
+ */
+export interface SystemCommandResult {
+  success: boolean;
+  output: string;
+  command: string;
+  commandType: 'file_management' | 'project_creation' | 'knowledge_graph' | 'mind_map' | 'workbench' | 'other';
+}
+
+/**
+ * Interface for workbench analysis result
+ */
+export interface WorkbenchAnalysisResult {
+  activeProjects: number;
+  fileCount: number;
+  knowledgeGraphs: number;
+  mindMaps: number;
+  recentActivities: string[];
+  suggestedActions: string[];
+  focusAreas: string[];
+}
+
+/**
+ * Analyze conversation for natural language commands to control the system
+ * This provides a higher level of abstraction than parseNaturalLanguageCommand
+ * by interpreting user intent to control system components
+ */
+export async function analyzeConversationForSystemCommands(
+  messages: ChatMessage[],
+  context?: DetectedContext
+): Promise<{
+  hasSystemCommand: boolean;
+  command?: string;
+  action?: string;
+  target?: string;
+  parameters?: Record<string, any>;
+  confidence: number;
+}> {
+  try {
+    // Check API quota before proceeding
+    const quotaCheck = apiQuotaManager.checkRateLimit('openai', 500);
+    if (quotaCheck.isLimited) {
+      console.log("OpenAI API rate limited, using simplified command detection");
+      return { hasSystemCommand: false, confidence: 0 };
+    }
+
+    // Extract the last 3 user messages for context
+    const recentMessages = messages
+      .filter(m => m.role === 'user')
+      .slice(-3)
+      .map(m => m.content)
+      .join('\n');
+    
+    if (!recentMessages) {
+      return { hasSystemCommand: false, confidence: 0 };
+    }
+
+    // Build a prompt to detect system commands
+    const prompt = `Analyze this conversation excerpt to determine if the user is requesting a system action or command:
+
+USER MESSAGES:
+${recentMessages}
+
+Determine if the user is asking the system to perform any of these actions:
+1. Create or modify a knowledge graph
+2. Create or modify a mind map
+3. Create or manage a project
+4. Organize or manage files
+5. Analyze the current workspace/workbench
+6. Execute a specific task or operation
+7. Generate content based on the conversation
+
+If a system command is detected, extract:
+- The primary action requested
+- The target of the action
+- Any parameters or specifications
+- Your confidence level in this interpretation (0.0-1.0)
+
+Respond with a JSON object with this structure:
+{
+  "hasSystemCommand": true/false,
+  "command": "The natural language command (if detected)",
+  "action": "create/update/analyze/organize/etc",
+  "target": "knowledge_graph/mind_map/project/files/workbench/etc",
+  "parameters": {
+    // Any detected parameters for the command
+  },
+  "confidence": 0.8 // Between 0 and 1
+}
+
+If no system command is detected, just return { "hasSystemCommand": false, "confidence": 0 }`;
+
+    // Call the OpenAI API
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.2, // Lower temperature for more precise detection
+    });
+
+    // Parse the response
+    const content = response.choices[0].message.content || '';
+    const result = JSON.parse(content);
+    
+    // Record API usage
+    apiQuotaManager.recordApiUsage('openai', response.usage?.total_tokens || 0);
+
+    // Validate the result
+    return {
+      hasSystemCommand: !!result.hasSystemCommand,
+      command: result.command,
+      action: result.action,
+      target: result.target,
+      parameters: result.parameters || {},
+      confidence: typeof result.confidence === 'number' ? 
+        Math.max(0, Math.min(1, result.confidence)) : 0
+    };
+  } catch (error) {
+    console.error("Error analyzing for system commands:", error);
+    return { hasSystemCommand: false, confidence: 0 };
+  }
+}
+
+/**
+ * Analyze the current workbench state to provide context-aware suggestions
+ */
+export async function analyzeWorkbenchState(
+  projects: any[] = [],
+  knowledgeGraphs: KnowledgeGraph[] = [], 
+  mindMaps: MindMap[] = [],
+  files: any[] = [],
+  context?: DetectedContext
+): Promise<WorkbenchAnalysisResult> {
+  try {
+    // Check API quota
+    const quotaCheck = apiQuotaManager.checkRateLimit('openai', 600);
+    if (quotaCheck.isLimited) {
+      console.log("OpenAI API rate limited, using simplified workbench analysis");
+      return generateSimpleWorkbenchAnalysis(projects, knowledgeGraphs, mindMaps, files);
+    }
+
+    // Prepare workbench data summary
+    const projectsSummary = projects.map(p => `- ${p.title || p.name}: ${p.status || 'Status unknown'}`).join('\n');
+    const graphsSummary = knowledgeGraphs.map(g => 
+      `- Graph with ${g.nodes.length} nodes and ${g.edges.length} edges. Main topics: ${g.nodes.slice(0, 3).map(n => n.label).join(', ')}`
+    ).join('\n');
+    const mapsSummary = mindMaps.map(m => `- ${m.title || 'Untitled'}: centered on "${m.centralTopic.text}"`).join('\n');
+    const filesSummary = `${files.length} files in the workspace`;
+
+    // Current research context
+    const contextSummary = context ? 
+      `User is focused on ${context.type} about "${context.topic}" with confidence ${context.confidence}` : 
+      'No specific research context detected';
+
+    // Build a comprehensive prompt
+    const prompt = `Analyze this workbench state and provide insights and suggestions:
+
+CURRENT RESEARCH CONTEXT:
+${contextSummary}
+
+PROJECTS (${projects.length}):
+${projectsSummary || 'No projects found'}
+
+KNOWLEDGE GRAPHS (${knowledgeGraphs.length}):
+${graphsSummary || 'No knowledge graphs found'}
+
+MIND MAPS (${mindMaps.length}):
+${mapsSummary || 'No mind maps found'}
+
+FILES:
+${filesSummary}
+
+Based on this workbench state, provide:
+1. A count of active projects, files, knowledge graphs, and mind maps
+2. A list of recent activities (inferred from the state)
+3. A list of suggested actions the user might want to take next
+4. Key focus areas that should receive attention
+
+Format your response as a JSON object:
+{
+  "activeProjects": 3,
+  "fileCount": 12,
+  "knowledgeGraphs": 2,
+  "mindMaps": 1,
+  "recentActivities": ["List of inferred recent activities"],
+  "suggestedActions": ["List of suggested next actions"],
+  "focusAreas": ["List of areas that need attention"]
+}`;
+
+    // Call the OpenAI API
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.5,
+    });
+
+    // Parse the response
+    const content = response.choices[0].message.content || '';
+    const result = JSON.parse(content);
+    
+    // Record API usage
+    apiQuotaManager.recordApiUsage('openai', response.usage?.total_tokens || 0);
+
+    // Return the analysis with validation
+    return {
+      activeProjects: result.activeProjects || projects.length,
+      fileCount: result.fileCount || files.length,
+      knowledgeGraphs: result.knowledgeGraphs || knowledgeGraphs.length,
+      mindMaps: result.mindMaps || mindMaps.length,
+      recentActivities: Array.isArray(result.recentActivities) ? result.recentActivities : [],
+      suggestedActions: Array.isArray(result.suggestedActions) ? result.suggestedActions : [],
+      focusAreas: Array.isArray(result.focusAreas) ? result.focusAreas : []
+    };
+  } catch (error) {
+    console.error("Error analyzing workbench state:", error);
+    return generateSimpleWorkbenchAnalysis(projects, knowledgeGraphs, mindMaps, files);
+  }
+}
+
+/**
+ * Generate a simple workbench analysis without using AI
+ */
+function generateSimpleWorkbenchAnalysis(
+  projects: any[] = [],
+  knowledgeGraphs: KnowledgeGraph[] = [], 
+  mindMaps: MindMap[] = [],
+  files: any[] = []
+): WorkbenchAnalysisResult {
+  const recentActivities = [];
+  
+  if (projects.length > 0) {
+    recentActivities.push('Working on research projects');
+  }
+  
+  if (knowledgeGraphs.length > 0) {
+    recentActivities.push('Exploring knowledge graphs');
+  }
+  
+  if (mindMaps.length > 0) {
+    recentActivities.push('Creating mind maps');
+  }
+  
+  if (files.length > 0) {
+    recentActivities.push('Managing research files');
+  }
+  
+  // Generate basic suggested actions
+  const suggestedActions = [
+    'Create a new research project',
+    'Build a knowledge graph from conversation',
+    'Explore concepts with a mind map',
+    'Organize your research materials'
+  ];
+  
+  // Generate basic focus areas
+  const focusAreas = [
+    'Research organization',
+    'Knowledge synthesis',
+    'Concept exploration'
+  ];
+  
+  return {
+    activeProjects: projects.length,
+    fileCount: files.length,
+    knowledgeGraphs: knowledgeGraphs.length,
+    mindMaps: mindMaps.length,
+    recentActivities,
+    suggestedActions,
+    focusAreas
+  };
+}
+
+/**
+ * Execute a system command based on natural language instruction
+ */
+export async function executeSystemCommand(
+  command: string,
+  context: DetectedContext
+): Promise<SystemCommandResult> {
+  try {
+    // First parse the command to understand what the user wants
+    const parsedCommand = await parseNaturalLanguageCommand(command, context);
+    
+    // Default result with failure status
+    const defaultResult: SystemCommandResult = {
+      success: false,
+      output: "Could not execute command",
+      command,
+      commandType: 'other'
+    };
+    
+    // Determine the command type
+    let commandType: 'file_management' | 'project_creation' | 'knowledge_graph' | 'mind_map' | 'workbench' | 'other' = 'other';
+    
+    // Check for file management commands
+    if (parsedCommand.action.includes('file') || 
+        parsedCommand.action.includes('save') || 
+        parsedCommand.action.includes('load') ||
+        parsedCommand.action.includes('export')) {
+      commandType = 'file_management';
+      
+      // Placeholder for file management logic
+      // In a real implementation, this would interact with a file system API
+      return {
+        success: true,
+        output: `File operation processed: ${parsedCommand.action} on ${parsedCommand.target}`,
+        command,
+        commandType
+      };
+    }
+    
+    // Check for knowledge graph commands
+    if (parsedCommand.target.includes('knowledge') || 
+        parsedCommand.target.includes('graph') || 
+        parsedCommand.action.includes('expand')) {
+      commandType = 'knowledge_graph';
+      
+      // Placeholder for knowledge graph operations
+      return {
+        success: true,
+        output: `Knowledge graph operation: ${parsedCommand.action}`,
+        command,
+        commandType
+      };
+    }
+    
+    // Check for mind map commands
+    if (parsedCommand.target.includes('mind') || parsedCommand.target.includes('map')) {
+      commandType = 'mind_map';
+      
+      // Placeholder for mind map operations
+      return {
+        success: true,
+        output: `Mind map operation: ${parsedCommand.action}`,
+        command,
+        commandType
+      };
+    }
+    
+    // Check for project creation commands
+    if (parsedCommand.action.includes('create') && parsedCommand.target.includes('project')) {
+      commandType = 'project_creation';
+      
+      // Placeholder for project creation
+      return {
+        success: true,
+        output: `Project creation initiated: ${parsedCommand.parameters.title || 'New Project'}`,
+        command,
+        commandType
+      };
+    }
+    
+    // Check for workbench management commands
+    if (parsedCommand.target.includes('workbench') || parsedCommand.action.includes('analyze')) {
+      commandType = 'workbench';
+      
+      // Placeholder for workbench operations
+      return {
+        success: true,
+        output: `Workbench operation: ${parsedCommand.action}`,
+        command,
+        commandType
+      };
+    }
+    
+    // If we couldn't determine the command type
+    return defaultResult;
+  } catch (error) {
+    console.error("Error executing system command:", error);
+    return {
+      success: false,
+      output: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      command,
+      commandType: 'other'
+    };
+  }
+}
+
+/**
+ * Generate a task list based on conversation context
+ */
+export async function generateTaskListFromContext(
+  context: DetectedContext,
+  conversation: ChatMessage[]
+): Promise<{ title: string, description: string, tasks: { title: string, description: string, priority: 'high' | 'medium' | 'low', estimatedHours?: number }[] }> {
+  try {
+    // Check API quota before proceeding
+    const quotaCheck = apiQuotaManager.checkRateLimit('openai', 700);
+    if (quotaCheck.isLimited) {
+      console.log("OpenAI API rate limited, using simplified task list generation");
+      return generateSimpleTaskList(context);
+    }
+    
+    // Extract the conversation content
+    const conversationContent = conversation
+      .filter(m => m.role === 'user')
+      .slice(-5)
+      .map(m => m.content)
+      .join('\n\n');
+    
+    // Build a prompt to generate tasks
+    const prompt = `Based on this conversation about "${context.topic}", create a comprehensive task list for a research or development project.
+
+CONVERSATION EXCERPTS:
+${conversationContent}
+
+DETECTED CONTEXT TYPE: ${context.type}
+MAIN TOPIC: ${context.topic}
+KEY ENTITIES: ${context.entities.map(e => e.entity).join(', ')}
+
+Create a task list that includes:
+1. A project title and brief description
+2. 5-8 specific tasks that would help accomplish the goals discussed
+3. For each task, include a brief description, priority level (high/medium/low), and estimated hours
+
+Format your response as a JSON object:
+{
+  "title": "Project Title",
+  "description": "Brief project description",
+  "tasks": [
+    {
+      "title": "Task Title",
+      "description": "Task description",
+      "priority": "high|medium|low",
+      "estimatedHours": 2
+    }
+  ]
+}`;
+
+    // Call the OpenAI API
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.7, // Higher temperature for creative task generation
+    });
+
+    // Parse the response
+    const content = response.choices[0].message.content || '';
+    const taskList = JSON.parse(content);
+    
+    // Record API usage
+    apiQuotaManager.recordApiUsage('openai', response.usage?.total_tokens || 0);
+
+    // Validate the task list
+    if (!taskList.tasks || !Array.isArray(taskList.tasks)) {
+      return generateSimpleTaskList(context);
+    }
+    
+    return {
+      title: taskList.title || `${context.topic} Project`,
+      description: taskList.description || `Research project focused on ${context.topic}`,
+      tasks: taskList.tasks.map((task: any) => ({
+        title: task.title || 'Untitled Task',
+        description: task.description || '',
+        priority: ['high', 'medium', 'low'].includes(task.priority) ? 
+          task.priority as 'high' | 'medium' | 'low' : 'medium',
+        estimatedHours: typeof task.estimatedHours === 'number' ? task.estimatedHours : undefined
+      }))
+    };
+  } catch (error) {
+    console.error("Error generating task list:", error);
+    return generateSimpleTaskList(context);
+  }
+}
+
+/**
+ * Generate a simple task list without using AI
+ */
+function generateSimpleTaskList(
+  context: DetectedContext
+): { title: string, description: string, tasks: { title: string, description: string, priority: 'high' | 'medium' | 'low' }[] } {
+  const projectTitle = `${context.topic} Research`;
+  const projectDescription = `A research project to explore ${context.topic}`;
+  
+  // Generate default tasks based on research type
+  const tasks = [];
+  
+  // Add initial research task
+  tasks.push({
+    title: "Initial Research",
+    description: `Gather preliminary information about ${context.topic}`,
+    priority: 'high' as 'high' | 'medium' | 'low'
+  });
+  
+  // Add tasks based on keywords
+  for (let i = 0; i < Math.min(context.keywords.length, 3); i++) {
+    const keyword = context.keywords[i];
+    tasks.push({
+      title: `Explore ${keyword}`,
+      description: `Research the concept of ${keyword} in relation to ${context.topic}`,
+      priority: 'medium' as 'high' | 'medium' | 'low'
+    });
+  }
+  
+  // Add tasks based on entities
+  for (let i = 0; i < Math.min(context.entities.length, 2); i++) {
+    const entity = context.entities[i];
+    tasks.push({
+      title: `Analyze ${entity.entity}`,
+      description: `Examine the role of ${entity.entity} in the context of ${context.topic}`,
+      priority: 'medium' as 'high' | 'medium' | 'low'
+    });
+  }
+  
+  // Add synthesis task
+  tasks.push({
+    title: "Synthesize Findings",
+    description: "Combine research results into a cohesive understanding",
+    priority: 'high' as 'high' | 'medium' | 'low'
+  });
+  
+  // Add documentation task
+  tasks.push({
+    title: "Document Results",
+    description: "Create comprehensive documentation of research findings",
+    priority: 'medium' as 'high' | 'medium' | 'low'
+  });
+  
+  return {
+    title: projectTitle,
+    description: projectDescription,
+    tasks
+  };
 }
 
 /**

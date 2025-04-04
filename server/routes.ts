@@ -15,7 +15,13 @@ import {
   suggestResearchComponents,
   generateResearchInsights,
   parseNaturalLanguageCommand,
-  type DetectedContext
+  analyzeConversationForSystemCommands,
+  analyzeWorkbenchState,
+  executeSystemCommand,
+  generateTaskListFromContext,
+  type DetectedContext,
+  type SystemCommandResult,
+  type WorkbenchAnalysisResult
 } from "./context-agent";
 import {
   generateMindMap,
@@ -2551,6 +2557,237 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({
         error: "Failed to delete task comment",
         details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // API endpoints for context-aware agent
+  app.post("/api/context/analyze", async (req, res) => {
+    try {
+      const { messages, currentGraph } = req.body;
+      
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "Valid message history array is required" });
+      }
+
+      const context = await analyzeConversationContext(messages, currentGraph);
+      return res.json({ context });
+    } catch (error) {
+      console.error("Context analysis API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to analyze conversation context", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  app.post("/api/context/suggest-components", async (req, res) => {
+    try {
+      const { context, currentGraph } = req.body;
+      
+      if (!context || !context.type || !context.topic) {
+        return res.status(400).json({ error: "Valid context object is required" });
+      }
+
+      const components = await suggestResearchComponents(context, currentGraph);
+      return res.json({ components });
+    } catch (error) {
+      console.error("Research component suggestion API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to suggest research components", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  app.post("/api/context/insights", async (req, res) => {
+    try {
+      const { context, graph } = req.body;
+      
+      if (!context || !context.type || !context.topic) {
+        return res.status(400).json({ error: "Valid context object is required" });
+      }
+
+      const insights = await generateResearchInsights(context, graph);
+      return res.json({ insights });
+    } catch (error) {
+      console.error("Research insights API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to generate research insights", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  app.post("/api/context/parse-command", async (req, res) => {
+    try {
+      const { command, context } = req.body;
+      
+      if (!command || typeof command !== 'string') {
+        return res.status(400).json({ error: "Valid command string is required" });
+      }
+
+      if (!context || !context.type || !context.topic) {
+        return res.status(400).json({ error: "Valid context object is required" });
+      }
+
+      const parsedCommand = await parseNaturalLanguageCommand(command, context);
+      return res.json({ parsedCommand });
+    } catch (error) {
+      console.error("Command parsing API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to parse natural language command", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for analyzing conversation for system commands
+  app.post("/api/context/analyze-commands", async (req, res) => {
+    try {
+      const { messages, context } = req.body;
+      
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "Valid message history array is required" });
+      }
+
+      const commandAnalysis = await analyzeConversationForSystemCommands(messages, context);
+      return res.json({ analysis: commandAnalysis });
+    } catch (error) {
+      console.error("Command analysis API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to analyze conversation for commands", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for analyzing workbench state
+  app.post("/api/context/analyze-workbench", async (req, res) => {
+    try {
+      const { context } = req.body;
+      
+      const workbenchAnalysis: WorkbenchAnalysisResult = await analyzeWorkbenchState(context);
+      return res.json({ analysis: workbenchAnalysis });
+    } catch (error) {
+      console.error("Workbench analysis API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to analyze workbench state", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for executing system commands
+  app.post("/api/context/execute-command", async (req, res) => {
+    try {
+      const { command, context } = req.body;
+      
+      if (!command || typeof command !== 'string') {
+        return res.status(400).json({ error: "Valid command string is required" });
+      }
+
+      if (!context || !context.type || !context.topic) {
+        return res.status(400).json({ error: "Valid context object is required" });
+      }
+
+      const result: SystemCommandResult = await executeSystemCommand(command, context);
+      return res.json({ result });
+    } catch (error) {
+      console.error("Command execution API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to execute system command", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoint for generating task list from context
+  app.post("/api/context/generate-tasks", async (req, res) => {
+    try {
+      const { context, messages } = req.body;
+      
+      if (!context || !context.type || !context.topic) {
+        return res.status(400).json({ error: "Valid context object is required" });
+      }
+
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "Valid message history array is required" });
+      }
+
+      const taskList = await generateTaskListFromContext(context, messages);
+      return res.json({ taskList });
+    } catch (error) {
+      console.error("Task generation API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to generate task list", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // API endpoints for mind map management
+  app.post("/api/mind-map/create", async (req, res) => {
+    try {
+      const { centralTopic, context } = req.body;
+      
+      if (!centralTopic || typeof centralTopic !== 'string') {
+        return res.status(400).json({ error: "Valid central topic string is required" });
+      }
+
+      const mindMap = await generateMindMap(centralTopic, context);
+      return res.json({ mindMap });
+    } catch (error) {
+      console.error("Mind map creation API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to create mind map", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  app.post("/api/mind-map/expand-topic", async (req, res) => {
+    try {
+      const { mindMap, topicId, contextHint } = req.body;
+      
+      if (!mindMap || !mindMap.centralTopic || !mindMap.topics) {
+        return res.status(400).json({ error: "Valid mind map object is required" });
+      }
+
+      if (!topicId || typeof topicId !== 'string') {
+        return res.status(400).json({ error: "Valid topic ID string is required" });
+      }
+
+      const updatedMindMap = await expandMindMapTopic(mindMap, topicId, contextHint);
+      return res.json({ mindMap: updatedMindMap });
+    } catch (error) {
+      console.error("Mind map topic expansion API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to expand mind map topic", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  app.post("/api/mind-map/merge", async (req, res) => {
+    try {
+      const { primaryMap, secondaryMap } = req.body;
+      
+      if (!primaryMap || !primaryMap.centralTopic || !primaryMap.topics) {
+        return res.status(400).json({ error: "Valid primary mind map object is required" });
+      }
+
+      if (!secondaryMap || !secondaryMap.centralTopic || !secondaryMap.topics) {
+        return res.status(400).json({ error: "Valid secondary mind map object is required" });
+      }
+
+      const mergedMap = mergeMindMaps(primaryMap, secondaryMap);
+      return res.json({ mindMap: mergedMap });
+    } catch (error) {
+      console.error("Mind map merge API error:", error);
+      return res.status(500).json({ 
+        error: "Failed to merge mind maps", 
+        details: error instanceof Error ? error.message : "Unknown error" 
       });
     }
   });

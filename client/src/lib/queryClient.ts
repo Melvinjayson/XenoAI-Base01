@@ -245,6 +245,138 @@ export async function syncOfflineMutations(): Promise<{ success: boolean, count:
   }
 }
 
+// Context API helper functions
+
+/**
+ * Analyzes conversation for system commands
+ */
+export async function analyzeConversationForCommands(messages: any[]): Promise<{
+  hasSystemCommand: boolean;
+  command?: string;
+  action?: string;
+  target?: string;
+  parameters?: Record<string, any>;
+  confidence: number;
+}> {
+  try {
+    const response = await apiRequest('/api/context/analyze-commands', 'POST', { messages });
+    return response.analysis;
+  } catch (error) {
+    console.error('Error analyzing conversation for commands:', error);
+    // Return default response with no command detected
+    return { hasSystemCommand: false, confidence: 0 };
+  }
+}
+
+/**
+ * Executes a system command
+ */
+export async function executeSystemCommand(
+  command: string, 
+  context: { 
+    type: string; 
+    topic: string; 
+    confidence: number; 
+    keywords: string[]; 
+    entities: { entity: string; type: string; importance: number }[];
+    action: string;
+  }
+): Promise<{
+  success: boolean;
+  output: string;
+  command: string;
+  commandType: 'file_management' | 'project_creation' | 'knowledge_graph' | 'mind_map' | 'workbench' | 'other';
+}> {
+  try {
+    const response = await apiRequest('/api/context/execute-command', 'POST', { command, context });
+    return response.result;
+  } catch (error) {
+    console.error('Error executing system command:', error);
+    return {
+      success: false,
+      output: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      command,
+      commandType: 'other'
+    };
+  }
+}
+
+/**
+ * Analyzes workbench state
+ */
+export async function analyzeWorkbench(
+  context?: { 
+    type: string; 
+    topic: string; 
+    confidence: number; 
+    keywords: string[]; 
+    entities: { entity: string; type: string; importance: number }[];
+    action: string;
+  }
+): Promise<{
+  activeProjects: number;
+  fileCount: number;
+  knowledgeGraphs: number;
+  mindMaps: number;
+  recentActivities: string[];
+  suggestedActions: string[];
+  focusAreas: string[];
+}> {
+  try {
+    const response = await apiRequest('/api/context/analyze-workbench', 'POST', { context });
+    return response.analysis;
+  } catch (error) {
+    console.error('Error analyzing workbench:', error);
+    // Return default empty state
+    return {
+      activeProjects: 0,
+      fileCount: 0,
+      knowledgeGraphs: 0,
+      mindMaps: 0,
+      recentActivities: [],
+      suggestedActions: [],
+      focusAreas: []
+    };
+  }
+}
+
+/**
+ * Generates a task list from conversation context
+ */
+export async function generateTaskList(
+  context: { 
+    type: string; 
+    topic: string; 
+    confidence: number; 
+    keywords: string[]; 
+    entities: { entity: string; type: string; importance: number }[];
+    action: string;
+  },
+  messages: any[]
+): Promise<{
+  title: string;
+  description: string;
+  tasks: {
+    title: string;
+    description: string;
+    priority: 'high' | 'medium' | 'low';
+    estimatedHours?: number;
+  }[];
+}> {
+  try {
+    const response = await apiRequest('/api/context/generate-tasks', 'POST', { context, messages });
+    return response.taskList;
+  } catch (error) {
+    console.error('Error generating task list:', error);
+    // Return default empty task list
+    return {
+      title: 'Error: Failed to generate tasks',
+      description: 'There was an error generating tasks. Please try again.',
+      tasks: []
+    };
+  }
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

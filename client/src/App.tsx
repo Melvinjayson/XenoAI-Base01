@@ -20,6 +20,7 @@ import { GestureProvider } from "@/context/gesture-context";
 import { OfflineProvider, useOfflineContext } from "@/context/offline-context";
 import { UserProfileProvider } from "@/context/user-profile-context";
 import { ColorPaletteProvider } from "@/context/color-palette-context";
+import { MindMapProvider } from "@/context/mind-map-context";
 import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 import OfflineModeBanner from "@/components/offline-mode-banner";
@@ -120,12 +121,14 @@ function App() {
           <UserProfileProvider>
             <ColorPaletteProvider>
               <ChatProvider>
-                <GestureProvider>
-                  <OfflineProvider>
-                    <Router />
-                    <Toaster />
-                  </OfflineProvider>
-                </GestureProvider>
+                <MindMapProvider>
+                  <GestureProvider>
+                    <OfflineProvider>
+                      <Router />
+                      <Toaster />
+                    </OfflineProvider>
+                  </GestureProvider>
+                </MindMapProvider>
               </ChatProvider>
             </ColorPaletteProvider>
           </UserProfileProvider>
