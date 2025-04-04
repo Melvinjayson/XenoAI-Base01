@@ -11,6 +11,14 @@ import { uploadAndAnalyzeImage, extractColorsFromUrl } from "./color-analyzer";
 import { hexToRgb, rgbToHex } from "../client/src/lib/color-utils";
 import { apiQuotaManager } from "./api-quota-manager";
 import { 
+  generateContent, 
+  processCommand, 
+  getAssistance, 
+  speechToText as immersiveSpeechToText, 
+  generatePreview, 
+  serveStaticMockPreview 
+} from "./immersive-authoring";
+import { 
   analyzeConversationContext, 
   suggestResearchComponents,
   generateResearchInsights,
@@ -2794,6 +2802,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Create HTTP server
   const httpServer = createServer(app);
+  
+  // API endpoints for Immersive Authoring
+  app.post("/api/immersive-authoring/generate", generateContent);
+  app.post("/api/immersive-authoring/command", processCommand);
+  app.post("/api/immersive-authoring/assist", getAssistance);
+  app.post("/api/immersive-authoring/speech-to-text", immersiveSpeechToText);
+  app.post("/api/immersive-authoring/preview", generatePreview);
+  app.get("/api/immersive-authoring/static/:id", serveStaticMockPreview);
 
   // Set up WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
