@@ -53,7 +53,7 @@ export function useTextToSpeech() {
       console.log('Synthesizing speech with voice:', voiceId, 'language:', language);
       
       // Request speech synthesis from server
-      const data = await apiRequest('POST', '/api/synthesize', {
+      const data = await apiRequest('/api/synthesize', 'POST', {
         text,
         voiceId,
         language,

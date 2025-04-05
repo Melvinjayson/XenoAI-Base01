@@ -1,61 +1,26 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { Link, useLocation } from 'wouter';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from '@/components/ui/button';
-import {
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  Hourglass,
-  XCircle,
-  PlusCircle,
-  Loader2,
-  CalendarRange,
-  BarChart,
-  ListChecks,
-  Lightbulb,
-  Link2,
-  Plus,
-  ChevronLeft
-} from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { useState, useEffect } from "react";
+import { Plus, ListFilter, MoreVertical, Search, Check, ChevronDown, ChevronRight, Calendar, Flame, Clock, Target, Trash, PenLine, Upload, FileEdit, ChevronUp, AlertCircle, Tag, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { StickyHeader } from '@/components/ui/sticky-header';
-import { TaskUpdateDialog } from '@/components/project-management/task-update-dialog';
-import { AddProjectDialog } from '@/components/project-management/add-project-dialog';
-import { AddTaskDialog } from '@/components/project-management/add-task-dialog';
-import { AddResearchInsightDialog } from '@/components/project-management/add-research-insight-dialog';
-import { format } from 'date-fns';
-// Define custom interfaces for demo data
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { useChat } from "@/context/chat-context";
+import StickyHeader from "@/components/ui/sticky-header";
+
 interface Project {
   id: number;
   name: string;
@@ -93,6 +58,17 @@ interface Task {
   updatedAt: string;
 }
 
+interface Milestone {
+  id: number;
+  projectId: number;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ResearchInsight {
   id: number;
   projectId: number;
@@ -101,675 +77,1187 @@ interface ResearchInsight {
   source: string | null;
   confidence: number;
   tags: string[];
-  metadata: any; // Using any for demo data
+  metadata: {
+    linkedEntityIds?: string[];
+    relevantTasks?: number[];
+    benchmarks?: Record<string, string>;
+    [key: string]: unknown;
+  };
   createdAt: string;
   updatedAt: string;
 }
 
-// Demo data for initial render
-const demoProjects: Project[] = [
-  {
-    id: 1,
-    name: 'Knowledge Graph Enhancement',
-    description: 'Improve the visual representation and navigation of knowledge graphs',
-    status: 'in_progress',
-    priority: 'high',
-    startDate: new Date(2025, 3, 1).toISOString(),
-    dueDate: new Date(2025, 4, 15).toISOString(),
-    completedDate: null,
-    progress: 35,
-    owner: 'user1',
-    metadata: { tags: ['visualization', 'UX', 'graph'], color: '#6B4BFF' },
-    createdAt: new Date(2025, 3, 1).toISOString(),
-    updatedAt: new Date(2025, 3, 3).toISOString(),
-  },
-  {
-    id: 2,
-    name: 'Voice Interaction Optimization',
-    description: 'Enhance the voice recognition and speech synthesis capabilities',
-    status: 'at_risk',
-    priority: 'critical',
-    startDate: new Date(2025, 3, 5).toISOString(),
-    dueDate: new Date(2025, 3, 20).toISOString(),
-    completedDate: null,
-    progress: 15,
-    owner: 'user1',
-    metadata: { tags: ['voice', 'speech', 'interaction'], color: '#FF5630' },
-    createdAt: new Date(2025, 3, 5).toISOString(),
-    updatedAt: new Date(2025, 3, 7).toISOString(),
-  },
-  {
-    id: 3,
-    name: 'Multi-language Support',
-    description: 'Add support for additional languages with accurate translations',
-    status: 'on_track',
-    priority: 'medium',
-    startDate: new Date(2025, 2, 15).toISOString(),
-    dueDate: new Date(2025, 4, 30).toISOString(),
-    completedDate: null,
-    progress: 60,
-    owner: 'user1',
-    metadata: { tags: ['localization', 'translation', 'global'], color: '#00C2FF' },
-    createdAt: new Date(2025, 2, 15).toISOString(),
-    updatedAt: new Date(2025, 3, 2).toISOString(),
-  },
-];
-
-const demoTasks: Task[] = [
-  {
-    id: 1,
-    projectId: 1,
-    milestoneId: null,
-    title: 'Implement zoom and pan controls',
-    description: 'Add intuitive zoom and pan controls for the knowledge graph view',
-    status: 'in_progress',
-    priority: 'high',
-    startDate: new Date(2025, 3, 1).toISOString(),
-    dueDate: new Date(2025, 3, 10).toISOString(),
-    completedDate: null,
-    assignee: 'user1',
-    estimatedHours: 8,
-    actualHours: 4,
-    createdAt: new Date(2025, 3, 1).toISOString(),
-    updatedAt: new Date(2025, 3, 3).toISOString(),
-  },
-  {
-    id: 2,
-    projectId: 1,
-    milestoneId: null,
-    title: 'Redesign node appearance',
-    description: 'Update the visual design of nodes to improve clarity and information density',
-    status: 'todo',
-    priority: 'medium',
-    startDate: null,
-    dueDate: new Date(2025, 3, 15).toISOString(),
-    completedDate: null,
-    assignee: 'user1',
-    estimatedHours: 6,
-    actualHours: 0,
-    createdAt: new Date(2025, 3, 1).toISOString(),
-    updatedAt: new Date(2025, 3, 1).toISOString(),
-  },
-  {
-    id: 3,
-    projectId: 2,
-    milestoneId: null,
-    title: 'Fix voice interaction timeout issues',
-    description: 'Resolve the bug causing voice responses to time out after prolonged usage',
-    status: 'blocked',
-    priority: 'critical',
-    startDate: new Date(2025, 3, 5).toISOString(),
-    dueDate: new Date(2025, 3, 12).toISOString(),
-    completedDate: null,
-    assignee: 'user1',
-    estimatedHours: 5,
-    actualHours: 3,
-    createdAt: new Date(2025, 3, 5).toISOString(),
-    updatedAt: new Date(2025, 3, 7).toISOString(),
-  },
-];
-
-const demoInsights: ResearchInsight[] = [
-  {
-    id: 1,
-    projectId: 1,
-    title: 'Graph visualization best practices',
-    content: 'Research shows that users can only effectively process 7±2 nodes at a time. Implementing progressive disclosure and focused views could improve comprehension.',
-    source: 'Nielsen Norman Group',
-    confidence: 85,
-    tags: ['UX Research', 'Visualization', 'Cognitive Load'],
-    metadata: { 
-      linkedEntityIds: ['node1', 'node2'],
-      relevantTasks: [1, 2]
-    },
-    createdAt: new Date(2025, 3, 2).toISOString(),
-    updatedAt: new Date(2025, 3, 2).toISOString(),
-  },
-  {
-    id: 2,
-    projectId: 2,
-    title: 'Speech synthesis latency factors',
-    content: 'Analysis of modern TTS systems shows that network conditions account for 68% of voice response delays. Implementing client-side caching and predictive loading could reduce perceived latency.',
-    source: 'Internal testing',
-    confidence: 72,
-    tags: ['Performance', 'Voice UX', 'Latency'],
-    metadata: {
-      benchmarks: {
-        'average_response_time': '1.8s',
-        'p95_response_time': '3.2s'
-      },
-      relevantTasks: [3]
-    },
-    createdAt: new Date(2025, 3, 6).toISOString(),
-    updatedAt: new Date(2025, 3, 6).toISOString(),
-  },
-];
-
+// Helper functions for UI
 function getStatusIcon(status: string) {
-  switch (status) {
-    case 'on_track':
-      return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-    case 'at_risk':
-      return <AlertCircle className="h-5 w-5 text-amber-500" />;
-    case 'off_track':
-      return <XCircle className="h-5 w-5 text-red-500" />;
-    case 'in_progress':
-      return <Hourglass className="h-5 w-5 text-blue-500" />;
-    case 'not_started':
-      return <Clock className="h-5 w-5 text-gray-500" />;
+  switch (status.toLowerCase()) {
+    case 'in progress':
+      return <Clock className="w-4 h-4 text-blue-500" />;
     case 'completed':
-      return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+      return <Check className="w-4 h-4 text-green-500" />;
+    case 'not started':
+      return <AlertCircle className="w-4 h-4 text-gray-500" />;
+    case 'on hold':
+      return <AlertCircle className="w-4 h-4 text-amber-500" />;
+    case 'cancelled':
+      return <X className="w-4 h-4 text-red-500" />;
     default:
-      return <Clock className="h-5 w-5 text-gray-500" />;
+      return <Clock className="w-4 h-4 text-gray-500" />;
   }
 }
 
 function getStatusColor(status: string) {
-  switch (status) {
-    case 'on_track':
-      return 'bg-green-100 text-green-800 hover:bg-green-200';
-    case 'at_risk':
-      return 'bg-amber-100 text-amber-800 hover:bg-amber-200';
-    case 'off_track':
-      return 'bg-red-100 text-red-800 hover:bg-red-200';
-    case 'in_progress':
-      return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
-    case 'not_started':
-      return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+  switch (status.toLowerCase()) {
+    case 'in progress':
+      return 'bg-blue-100 text-blue-700 border-blue-300';
     case 'completed':
-      return 'bg-green-100 text-green-800 hover:bg-green-200';
+      return 'bg-green-100 text-green-700 border-green-300';
+    case 'not started':
+      return 'bg-gray-100 text-gray-700 border-gray-300';
+    case 'on hold':
+      return 'bg-amber-100 text-amber-700 border-amber-300';
+    case 'cancelled':
+      return 'bg-red-100 text-red-700 border-red-300';
     default:
-      return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+      return 'bg-gray-100 text-gray-700 border-gray-300';
   }
 }
 
 function getTaskStatusColor(status: string) {
-  switch (status) {
-    case 'done':
-      return 'bg-green-100 text-green-800';
-    case 'in_progress':
-      return 'bg-blue-100 text-blue-800';
+  switch (status.toLowerCase()) {
     case 'todo':
-      return 'bg-gray-100 text-gray-800';
-    case 'in_review':
-      return 'bg-purple-100 text-purple-800';
+      return 'bg-gray-100 text-gray-700 border-gray-300';
+    case 'in progress':
+      return 'bg-blue-100 text-blue-700 border-blue-300';
+    case 'done':
+      return 'bg-green-100 text-green-700 border-green-300';
     case 'blocked':
-      return 'bg-red-100 text-red-800';
+      return 'bg-red-100 text-red-700 border-red-300';
+    case 'review':
+      return 'bg-purple-100 text-purple-700 border-purple-300';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 text-gray-700 border-gray-300';
   }
 }
 
 function getPriorityColor(priority: string) {
-  switch (priority) {
-    case 'critical':
-      return 'bg-red-100 text-red-800';
+  switch (priority.toLowerCase()) {
     case 'high':
-      return 'bg-orange-100 text-orange-800';
+      return 'bg-red-100 text-red-700 border-red-300';
     case 'medium':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-amber-100 text-amber-700 border-amber-300';
     case 'low':
-      return 'bg-green-100 text-green-800';
+      return 'bg-green-100 text-green-700 border-green-300';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 text-gray-700 border-gray-300';
   }
 }
 
 function formatDate(dateString: string | null | undefined) {
-  if (!dateString) return 'Not set';
-  return new Date(dateString).toLocaleDateString();
+  if (!dateString) return '—';
+  return format(new Date(dateString), 'MMM d, yyyy');
 }
 
-// This component has been moved to its own file in /components/project-management/task-update-dialog.tsx
-
-export default function ProjectManagementPage(): JSX.Element {
-  const [activeProject, setActiveProject] = useState<number | null>(null);
-  const [taskToUpdate, setTaskToUpdate] = useState<Task | null>(null);
-  const [showAddProject, setShowAddProject] = useState(false);
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [showAddInsight, setShowAddInsight] = useState(false);
+// Project Creation Dialog
+function CreateProjectDialog({ 
+  open, 
+  onOpenChange 
+}: { 
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    status: 'Not Started',
+    priority: 'Medium',
+    startDate: null as string | null,
+    dueDate: null as string | null,
+  });
+  
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   
-  const { data: projects, isLoading: projectsLoading } = useQuery({
-    queryKey: ['/api/projects'],
-    queryFn: async () => {
-      // Connect to the real API
-      const response = await fetch('/api/projects');
-      if (!response.ok) throw new Error('Failed to fetch projects');
-      return response.json();
-    },
-  });
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
   
-  const { data: tasks, isLoading: tasksLoading } = useQuery({
-    queryKey: ['/api/tasks', activeProject],
-    queryFn: async () => {
-      // Connect to the real API
-      const response = await fetch(`/api/tasks${activeProject ? `?projectId=${activeProject}` : ''}`);
-      if (!response.ok) throw new Error('Failed to fetch tasks');
-      return response.json();
-    },
-    enabled: !!activeProject,
-  });
-  
-  const { data: insights, isLoading: insightsLoading } = useQuery({
-    queryKey: ['/api/research-insights', activeProject],
-    queryFn: async () => {
-      // Connect to the real API
-      const response = await fetch(`/api/research-insights${activeProject ? `?projectId=${activeProject}` : ''}`);
-      if (!response.ok) throw new Error('Failed to fetch insights');
-      return response.json();
-    },
-    enabled: !!activeProject,
-  });
-  
-  // Task update mutation
-  const taskUpdateMutation = useMutation({
-    mutationFn: async ({ taskId, data }: { taskId: number; data: Partial<Task> }) => {
-      const response = await apiRequest(`/api/tasks/${taskId}`, 'PATCH', data);
-      return response;
-    },
-    onSuccess: () => {
-      // Close the dialog and show success message
-      setTaskToUpdate(null);
+  const handleSubmit = async () => {
+    if (!formData.name.trim()) {
       toast({
-        title: 'Task updated',
-        description: 'The task status has been updated successfully.',
+        title: "Error",
+        description: "Project name is required",
+        variant: "destructive",
       });
-      
-      // Invalidate the tasks query to refresh the data
-      queryClient.invalidateQueries({ queryKey: ['/api/tasks', activeProject] });
-      
-      // Also invalidate the projects query to refresh progress
-      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error updating task',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  useEffect(() => {
-    if (projects && projects.length > 0 && !activeProject) {
-      setActiveProject(projects[0].id);
+      return;
     }
-  }, [projects, activeProject]);
+    
+    setIsSubmitting(true);
+    
+    try {
+      const response = await apiRequest('/api/projects', 'POST', {
+        ...formData,
+        progress: 0,
+        owner: 'Current User'
+      });
+      
+      toast({
+        title: "Success",
+        description: "Project created successfully",
+        variant: "default",
+      });
+      
+      // Refresh projects list
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create project. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Create New Project</DialogTitle>
+          <DialogDescription>
+            Add a new project to your workspace. Fill in the details below.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label htmlFor="name" className="text-sm font-medium">Project Name</label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              placeholder="Enter project name"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="description" className="text-sm font-medium">Description</label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => handleChange('description', e.target.value)}
+              placeholder="Enter project description"
+              rows={3}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="status" className="text-sm font-medium">Status</label>
+              <Select 
+                value={formData.status} 
+                onValueChange={(value) => handleChange('status', value)}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Not Started">Not Started</SelectItem>
+                  <SelectItem value="In Progress">In Progress</SelectItem>
+                  <SelectItem value="On Hold">On Hold</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                  <SelectItem value="Cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="priority" className="text-sm font-medium">Priority</label>
+              <Select 
+                value={formData.priority} 
+                onValueChange={(value) => handleChange('priority', value)}
+              >
+                <SelectTrigger id="priority">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="startDate" className="text-sm font-medium">Start Date</label>
+              <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {formData.startDate ? formatDate(formData.startDate) : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <CalendarComponent
+                    mode="single"
+                    selected={formData.startDate ? new Date(formData.startDate) : undefined}
+                    onSelect={(date) => {
+                      setFormData(prev => ({ ...prev, startDate: date ? date.toISOString() : null }));
+                      setStartDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="dueDate" className="text-sm font-medium">Due Date</label>
+              <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {formData.dueDate ? formatDate(formData.dueDate) : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <CalendarComponent
+                    mode="single"
+                    selected={formData.dueDate ? new Date(formData.dueDate) : undefined}
+                    onSelect={(date) => {
+                      setFormData(prev => ({ ...prev, dueDate: date ? date.toISOString() : null }));
+                      setDueDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Creating...' : 'Create Project'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
+// Add Task Dialog
+function CreateTaskDialog({ 
+  open, 
+  onOpenChange, 
+  projectId 
+}: { 
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  projectId: number;
+}) {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    status: 'Todo',
+    priority: 'Medium',
+    startDate: null as string | null,
+    dueDate: null as string | null,
+    estimatedHours: null as number | null,
+  });
+  
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  
+  const handleChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleSubmit = async () => {
+    if (!formData.title.trim()) {
+      toast({
+        title: "Error",
+        description: "Task title is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const response = await apiRequest('/api/tasks', 'POST', {
+        ...formData,
+        projectId,
+        assignee: null,
+        milestoneId: null,
+        actualHours: null
+      });
+      
+      toast({
+        title: "Success",
+        description: "Task created successfully",
+        variant: "default",
+      });
+      
+      // Refresh tasks list
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', projectId.toString()] });
+      
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error creating task:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create task. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Add New Task</DialogTitle>
+          <DialogDescription>
+            Add a new task to your project. Fill in the details below.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label htmlFor="title" className="text-sm font-medium">Task Title</label>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) => handleChange('title', e.target.value)}
+              placeholder="Enter task title"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="description" className="text-sm font-medium">Description</label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => handleChange('description', e.target.value)}
+              placeholder="Enter task description"
+              rows={3}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="status" className="text-sm font-medium">Status</label>
+              <Select 
+                value={formData.status} 
+                onValueChange={(value) => handleChange('status', value)}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todo">Todo</SelectItem>
+                  <SelectItem value="In Progress">In Progress</SelectItem>
+                  <SelectItem value="Review">Review</SelectItem>
+                  <SelectItem value="Done">Done</SelectItem>
+                  <SelectItem value="Blocked">Blocked</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="priority" className="text-sm font-medium">Priority</label>
+              <Select 
+                value={formData.priority} 
+                onValueChange={(value) => handleChange('priority', value)}
+              >
+                <SelectTrigger id="priority">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2 col-span-1">
+              <label htmlFor="estimatedHours" className="text-sm font-medium">Est. Hours</label>
+              <Input
+                id="estimatedHours"
+                type="number"
+                value={formData.estimatedHours !== null ? formData.estimatedHours : ''}
+                onChange={(e) => handleChange('estimatedHours', e.target.value ? Number(e.target.value) : null)}
+                placeholder="Hours"
+              />
+            </div>
+            
+            <div className="space-y-2 col-span-1">
+              <label htmlFor="startDate" className="text-sm font-medium">Start Date</label>
+              <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <Calendar className="mr-1 h-3 w-3" />
+                    {formData.startDate ? formatDate(formData.startDate) : <span className="text-sm">Select</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <CalendarComponent
+                    mode="single"
+                    selected={formData.startDate ? new Date(formData.startDate) : undefined}
+                    onSelect={(date) => {
+                      setFormData(prev => ({ ...prev, startDate: date ? date.toISOString() : null }));
+                      setStartDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            <div className="space-y-2 col-span-1">
+              <label htmlFor="dueDate" className="text-sm font-medium">Due Date</label>
+              <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <Calendar className="mr-1 h-3 w-3" />
+                    {formData.dueDate ? formatDate(formData.dueDate) : <span className="text-sm">Select</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <CalendarComponent
+                    mode="single"
+                    selected={formData.dueDate ? new Date(formData.dueDate) : undefined}
+                    onSelect={(date) => {
+                      setFormData(prev => ({ ...prev, dueDate: date ? date.toISOString() : null }));
+                      setDueDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Creating...' : 'Create Task'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Add Research Insight Dialog
+function AddResearchInsightDialog({ 
+  open, 
+  onOpenChange, 
+  projectId 
+}: { 
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  projectId: number;
+}) {
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    source: '',
+    confidence: 0.8,
+    tags: [] as string[],
+  });
+  
+  const [tagInput, setTagInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  
+  const handleChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleAddTag = () => {
+    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
+      setFormData(prev => ({ 
+        ...prev, 
+        tags: [...prev.tags, tagInput.trim()]
+      }));
+      setTagInput('');
+    }
+  };
+  
+  const handleRemoveTag = (tag: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t !== tag)
+    }));
+  };
+  
+  const handleSubmit = async () => {
+    if (!formData.title.trim() || !formData.content.trim()) {
+      toast({
+        title: "Error",
+        description: "Title and content are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const response = await apiRequest('/api/research-insights', 'POST', {
+        ...formData,
+        projectId,
+        metadata: {}
+      });
+      
+      toast({
+        title: "Success",
+        description: "Research insight added successfully",
+        variant: "default",
+      });
+      
+      // Refresh insights list
+      queryClient.invalidateQueries({ queryKey: ['/api/research-insights', projectId.toString()] });
+      
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error adding insight:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add research insight. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Add Research Insight</DialogTitle>
+          <DialogDescription>
+            Add research findings, observations, or analysis to your project.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label htmlFor="title" className="text-sm font-medium">Title</label>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) => handleChange('title', e.target.value)}
+              placeholder="Enter insight title"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="content" className="text-sm font-medium">Content</label>
+            <Textarea
+              id="content"
+              value={formData.content}
+              onChange={(e) => handleChange('content', e.target.value)}
+              placeholder="Enter insight details"
+              rows={5}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="source" className="text-sm font-medium">Source (Optional)</label>
+            <Input
+              id="source"
+              value={formData.source}
+              onChange={(e) => handleChange('source', e.target.value)}
+              placeholder="Enter source URL or reference"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="confidence" className="text-sm font-medium">Confidence Level: {Math.round(formData.confidence * 100)}%</label>
+            <Input
+              id="confidence"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={formData.confidence}
+              onChange={(e) => handleChange('confidence', parseFloat(e.target.value))}
+              className="w-full"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="tags" className="text-sm font-medium">Tags</label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="tags"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                placeholder="Add tags"
+                className="flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddTag();
+                  }
+                }}
+              />
+              <Button type="button" size="sm" onClick={handleAddTag}>Add</Button>
+            </div>
+            
+            <div className="flex flex-wrap gap-2 mt-2">
+              {formData.tags.map(tag => (
+                <Badge key={tag} className="flex items-center gap-1 pl-2 pr-1 py-1">
+                  <Tag className="h-3 w-3 mr-1" />
+                  {tag}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0 rounded-full"
+                    onClick={() => handleRemoveTag(tag)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Submitting...' : 'Add Insight'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function ProjectManagementPage(): JSX.Element {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [insights, setInsights] = useState<ResearchInsight[]>([]);
+  const [activeProject, setActiveProject] = useState<number | null>(null);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [showAddInsight, setShowAddInsight] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const { analyzeConversationForCommands } = useChat();
+  
+  useEffect(() => {
+    // Fetch projects data
+    const fetchProjects = async () => {
+      try {
+        const data = await apiRequest('/api/projects');
+        setProjects(data);
+        
+        // Set the first project as active if none is selected
+        if (data.length > 0 && !activeProject) {
+          setActiveProject(data[0].id);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load projects data",
+          variant: "destructive",
+        });
+        setLoading(false);
+      }
+    };
+    
+    fetchProjects();
+  }, []);
+  
+  useEffect(() => {
+    // Fetch tasks when active project changes
+    if (activeProject) {
+      const fetchTasks = async () => {
+        try {
+          const data = await apiRequest(`/api/tasks?projectId=${activeProject}`);
+          setTasks(data);
+        } catch (error) {
+          console.error("Error fetching tasks:", error);
+        }
+      };
+      
+      const fetchInsights = async () => {
+        try {
+          const data = await apiRequest(`/api/research-insights?projectId=${activeProject}`);
+          setInsights(data);
+        } catch (error) {
+          console.error("Error fetching research insights:", error);
+        }
+      };
+      
+      fetchTasks();
+      fetchInsights();
+    }
+  }, [activeProject]);
+  
   const activeProjectData = projects?.find((p: Project) => p.id === activeProject);
 
   return (
     <div className="min-h-screen flex flex-col">
       <StickyHeader 
         title="Project Management" 
-        subtitle="Track research projects, tasks, and insights"
-        showHomeButton
+        subtitle="Organize your research projects and track progress"
         rightContent={
-          <Button 
-            className="flex items-center gap-2"
-            onClick={() => setShowAddProject(true)}
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>New Project</span>
+          <Button onClick={() => setShowCreateProject(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Project
           </Button>
         }
       />
       
-      <div className="container mx-auto py-6 px-4 md:px-6 flex-grow">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Project List Sidebar */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle>Projects</CardTitle>
-                <CardDescription>
-                  Select a project to view details
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 p-0">
-                {projectsLoading ? (
-                  <div className="flex justify-center items-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex flex-col md:flex-row flex-1 gap-6 p-4 md:p-6">
+        {/* Projects List */}
+        <div className="w-full md:w-72 shrink-0">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Projects</CardTitle>
+              <CardDescription>
+                Manage your research projects
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {projects?.map((project: Project) => (
+                  <Button
+                    key={project.id}
+                    variant={activeProject === project.id ? "default" : "ghost"}
+                    className={cn("w-full justify-start mb-1", 
+                      activeProject === project.id ? "bg-primary text-primary-foreground" : ""
+                    )}
+                    onClick={() => setActiveProject(project.id)}
+                  >
+                    <div className="flex items-center w-full overflow-hidden">
+                      <div className="w-2 h-2 rounded-full mr-2" style={{ 
+                        backgroundColor: project.metadata?.color || '#6b7280' 
+                      }} />
+                      <span className="truncate">{project.name}</span>
+                      <Badge className={cn("ml-auto text-xs", getStatusColor(project.status))}>
+                        {project.status}
+                      </Badge>
+                    </div>
+                  </Button>
+                ))}
+                
+                {projects?.length === 0 && !loading && (
+                  <div className="text-center py-6 text-gray-500">
+                    <p className="mb-2">No projects yet</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowCreateProject(true)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Project
+                    </Button>
                   </div>
-                ) : (
-                  <ul className="text-sm">
-                    {projects?.map((project: Project) => (
-                      <li key={project.id}>
-                        <button
-                          onClick={() => setActiveProject(project.id)}
-                          className={`flex items-center w-full px-4 py-3 hover:bg-muted text-left border-l-4 ${
-                            activeProject === project.id
-                              ? 'border-l-primary bg-muted'
-                              : 'border-l-transparent'
-                          }`}
-                        >
-                          <div className="flex-grow">
-                            <div className="font-medium">{project.name}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="outline" className={getStatusColor(project.status)}>
-                                {project.status.replace('_', ' ')}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {project.progress}% complete
-                              </span>
-                            </div>
-                          </div>
-                          {getStatusIcon(project.status)}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
                 )}
-              </CardContent>
-              <CardFooter className="pt-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  size="sm"
-                  onClick={() => setShowAddProject(true)}
-                >
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Add Project
-                </Button>
-              </CardFooter>
-            </Card>
-        </div>
-
-        {/* Project Details */}
-        <div className="lg:col-span-3">
-          {!activeProjectData ? (
-            <div className="flex flex-col items-center justify-center h-full py-12">
-              <div className="text-center">
-                <h3 className="text-xl font-medium mb-2">No Project Selected</h3>
-                <p className="text-muted-foreground mb-4">
-                  Select a project from the sidebar or create a new one to get started
-                </p>
-                <Button onClick={() => setShowAddProject(true)}>
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Create New Project
-                </Button>
+                
+                {loading && (
+                  <div className="py-6 space-y-2">
+                    <div className="h-10 bg-gray-200 animate-pulse rounded-md" />
+                    <div className="h-10 bg-gray-200 animate-pulse rounded-md" />
+                    <div className="h-10 bg-gray-200 animate-pulse rounded-md" />
+                  </div>
+                )}
               </div>
-            </div>
-          ) : (
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Project Details */}
+        <div className="flex-1">
+          {activeProjectData ? (
             <div className="space-y-6">
-              {/* Project Header */}
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-2xl">{activeProjectData.name}</CardTitle>
-                      <CardDescription className="mt-1">
-                        {activeProjectData.description}
+                      <CardTitle className="text-xl">{activeProjectData.name}</CardTitle>
+                      <CardDescription>
+                        {activeProjectData.description || "No description provided"}
                       </CardDescription>
                     </div>
-                    <Badge className={getStatusColor(activeProjectData.status)}>
-                      {activeProjectData.status.replace('_', ' ')}
-                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <FileEdit className="mr-2 h-4 w-4" />
+                          Edit Project
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Export Data
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-red-600">
+                          <Trash className="mr-2 h-4 w-4" />
+                          Delete Project
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-muted-foreground mb-1">
-                        Start Date
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <CalendarRange className="h-4 w-4 text-muted-foreground" />
-                        {formatDate(activeProjectData.startDate)}
-                      </span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500">Status</span>
+                      <div className="flex items-center">
+                        {getStatusIcon(activeProjectData.status)}
+                        <span className="ml-1">{activeProjectData.status}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-muted-foreground mb-1">
-                        Due Date
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <CalendarRange className="h-4 w-4 text-muted-foreground" />
-                        {formatDate(activeProjectData.dueDate)}
-                      </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500">Priority</span>
+                      <div className="flex items-center">
+                        <Flame className="w-4 h-4 text-amber-500" />
+                        <span className="ml-1">{activeProjectData.priority}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-muted-foreground mb-1">
-                        Priority
-                      </span>
-                      <Badge variant="outline" className={getPriorityColor(activeProjectData.priority)}>
-                        {activeProjectData.priority}
-                      </Badge>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500">Start Date</span>
+                      <div className="flex items-center">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <span className="ml-1">{formatDate(activeProjectData.startDate)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500">Due Date</span>
+                      <div className="flex items-center">
+                        <Target className="w-4 h-4 text-gray-500" />
+                        <span className="ml-1">{formatDate(activeProjectData.dueDate)}</span>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">
-                        Progress: {activeProjectData.progress || 0}%
-                      </span>
-                      <span className="text-muted-foreground">
-                        {(activeProjectData.progress || 0) < 100 ? 'In progress' : 'Completed'}
-                      </span>
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Progress: {activeProjectData.progress}%</span>
                     </div>
-                    <Progress value={activeProjectData.progress || 0} />
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-primary rounded-full h-2" 
+                        style={{ width: `${activeProjectData.progress}%` }}
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Project Content Tabs */}
-              <Tabs defaultValue="tasks">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="tasks" className="flex items-center gap-2">
-                    <ListChecks className="h-4 w-4" />
-                    Tasks
-                  </TabsTrigger>
-                  <TabsTrigger value="insights" className="flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4" />
-                    Research Insights
-                  </TabsTrigger>
-                  <TabsTrigger value="analytics" className="flex items-center gap-2">
-                    <BarChart className="h-4 w-4" />
-                    Analytics
-                  </TabsTrigger>
+              
+              <Tabs defaultValue="tasks" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                  <TabsTrigger value="insights">Research Insights</TabsTrigger>
+                  <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 </TabsList>
-
-                {/* Tasks Tab */}
-                <TabsContent value="tasks" className="space-y-4">
-                  <div className="flex justify-between">
-                    <h3 className="text-lg font-medium">Project Tasks</h3>
-                    <Button size="sm" onClick={() => setShowAddTask(true)}>
-                      <PlusCircle className="h-4 w-4 mr-2" />
+                
+                <TabsContent value="tasks" className="space-y-4 mt-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Tasks</h3>
+                    <Button onClick={() => setShowAddTask(true)} size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
                       Add Task
                     </Button>
                   </div>
-
-                  {tasksLoading ? (
-                    <div className="flex justify-center items-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  ) : tasks && tasks.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4">
-                      {tasks.map((task: Task) => (
-                        <Card key={task.id}>
-                          <CardContent className="p-4">
-                            <div className="flex flex-col md:flex-row md:items-center gap-3">
-                              <div className="flex-grow">
+                  
+                  <div className="space-y-4">
+                    {tasks.length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 border rounded-md">
+                        <p className="mb-2">No tasks yet</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setShowAddTask(true)}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Create Task
+                        </Button>
+                      </div>
+                    ) : (
+                      tasks.map((task: Task) => (
+                        <Card key={task.id} className="overflow-hidden">
+                          <div className="flex items-center p-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium">{task.title}</h4>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {task.description}
-                                </p>
-                                <div className="flex flex-wrap items-center gap-2 mt-2">
-                                  <Badge className={getTaskStatusColor(task.status)}>
-                                    {task.status}
-                                  </Badge>
-                                  <Badge variant="outline" className={getPriorityColor(task.priority)}>
-                                    {task.priority}
-                                  </Badge>
-                                  {task.dueDate && (
-                                    <span className="text-xs flex items-center gap-1 text-muted-foreground">
-                                      <CalendarRange className="h-3 w-3" />
-                                      Due: {formatDate(task.dueDate)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 mt-3 md:mt-0">
-                                {task.status !== 'done' && (
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={() => setTaskToUpdate(task)}
-                                  >
-                                    Update
-                                  </Button>
-                                )}
+                                <Badge className={cn("text-xs", getTaskStatusColor(task.status))}>
+                                  {task.status}
+                                </Badge>
+                                <Badge className={cn("text-xs", getPriorityColor(task.priority))}>
+                                  {task.priority}
+                                </Badge>
+                                
                                 {insights?.some((i: ResearchInsight) => i.metadata && 'relevantTasks' in i.metadata && Array.isArray(i.metadata.relevantTasks) && i.metadata.relevantTasks.includes(task.id)) && (
-                                  <Button variant="outline" size="icon" className="h-8 w-8" title="View linked insights">
-                                    <Link2 className="h-4 w-4" />
-                                  </Button>
+                                  <Badge variant="outline" className="text-xs border-indigo-300 text-indigo-600">
+                                    Has Insights
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              {task.description && (
+                                <p className="text-gray-500 text-sm">{task.description}</p>
+                              )}
+                              
+                              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                {task.dueDate && (
+                                  <div className="flex items-center">
+                                    <Calendar className="w-3 h-3 mr-1" />
+                                    Due: {formatDate(task.dueDate)}
+                                  </div>
+                                )}
+                                
+                                {task.estimatedHours !== null && (
+                                  <div className="flex items-center">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    Est: {task.estimatedHours}h
+                                  </div>
+                                )}
+                                
+                                {task.assignee && (
+                                  <div className="flex items-center">
+                                    <Avatar className="w-4 h-4 mr-1">
+                                      <div className="bg-primary text-[8px] flex items-center justify-center text-primary-foreground font-medium">
+                                        {task.assignee.charAt(0).toUpperCase()}
+                                      </div>
+                                    </Avatar>
+                                    {task.assignee}
+                                  </div>
                                 )}
                               </div>
                             </div>
-                          </CardContent>
+                            
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>
+                                  <PenLine className="mr-2 h-4 w-4" />
+                                  Edit Task
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Check className="mr-2 h-4 w-4" />
+                                  Mark as Done
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-red-600">
+                                  <Trash className="mr-2 h-4 w-4" />
+                                  Delete Task
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 bg-muted rounded-md">
-                      <h4 className="text-lg font-medium mb-2">No tasks yet</h4>
-                      <p className="text-muted-foreground mb-4">
-                        Create your first task to start tracking progress
-                      </p>
-                      <Button onClick={() => setShowAddTask(true)}>
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Add Task
-                      </Button>
-                    </div>
-                  )}
+                      ))
+                    )}
+                  </div>
                 </TabsContent>
-
-                {/* Research Insights Tab */}
-                <TabsContent value="insights" className="space-y-4">
-                  <div className="flex justify-between">
+                
+                <TabsContent value="insights" className="space-y-4 mt-4">
+                  <div className="flex justify-between items-center">
                     <h3 className="text-lg font-medium">Research Insights</h3>
-                    <Button size="sm" onClick={() => setShowAddInsight(true)}>
-                      <PlusCircle className="h-4 w-4 mr-2" />
+                    <Button onClick={() => setShowAddInsight(true)} size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
                       Add Insight
                     </Button>
                   </div>
-
-                  {insightsLoading ? (
-                    <div className="flex justify-center items-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  ) : insights && insights.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4">
-                      {insights.map((insight: ResearchInsight) => (
-                        <Card key={insight.id}>
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between">
-                              <CardTitle className="text-lg">{insight.title}</CardTitle>
-                              <Badge variant="outline">
-                                Confidence: {insight.confidence}%
-                              </Badge>
-                            </div>
-                            {insight.source && (
-                              <CardDescription>Source: {insight.source}</CardDescription>
-                            )}
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm">{insight.content}</p>
-                            
-                            {insight.tags && insight.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-4">
-                                {insight.tags.map((tag: string, i: number) => (
-                                  <Badge key={i} variant="secondary">{tag}</Badge>
+                  
+                  <div className="space-y-4">
+                    {insights.length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 border rounded-md">
+                        <p className="mb-2">No research insights yet</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setShowAddInsight(true)}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Insight
+                        </Button>
+                      </div>
+                    ) : (
+                      insights.map((insight: ResearchInsight) => (
+                        <Accordion type="single" collapsible key={insight.id}>
+                          <AccordionItem value={`insight-${insight.id}`} className="border rounded-lg overflow-hidden">
+                            <AccordionTrigger className="px-4 py-3 hover:bg-gray-50">
+                              <div className="flex items-center gap-2 w-full text-left">
+                                <h4 className="font-medium">{insight.title}</h4>
+                                <div className="flex items-center gap-1 ml-auto mr-4">
+                                  {insight.tags.slice(0, 2).map(tag => (
+                                    <Badge key={tag} variant="outline" className="text-xs">
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                  {insight.tags.length > 2 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{insight.tags.length - 2}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-4 pb-4 pt-2">
+                              <p className="text-gray-700 mb-4">{insight.content}</p>
+                              
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {insight.tags.map(tag => (
+                                  <Badge key={tag} variant="outline" className="text-xs">
+                                    <Tag className="w-3 h-3 mr-1" />
+                                    {tag}
+                                  </Badge>
                                 ))}
                               </div>
-                            )}
-                          </CardContent>
-                          <CardFooter className="flex justify-between pt-0">
-                            <span className="text-xs text-muted-foreground">
-                              Created: {formatDate(insight.createdAt)}
-                            </span>
-                            
-                            {insight.metadata && 'relevantTasks' in insight.metadata && 
-                              Array.isArray(insight.metadata.relevantTasks) && 
-                              insight.metadata.relevantTasks.length > 0 && (
-                                <Button variant="outline" size="sm" className="flex items-center gap-2">
-                                  <Link2 className="h-3 w-3" />
-                                  <span>{insight.metadata.relevantTasks.length} Linked Tasks</span>
-                                </Button>
-                              )}
-                          </CardFooter>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 bg-muted rounded-md">
-                      <h4 className="text-lg font-medium mb-2">No research insights yet</h4>
-                      <p className="text-muted-foreground mb-4">
-                        Add research insights to inform your project decisions
-                      </p>
-                      <Button onClick={() => setShowAddInsight(true)}>
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Add Research Insight
-                      </Button>
-                    </div>
-                  )}
+                              
+                              <div className="flex items-center justify-between text-xs text-gray-500">
+                                <div className="flex items-center gap-4">
+                                  {insight.source && (
+                                    <a href={insight.source} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center">
+                                      <ExternalLink className="w-3 h-3 mr-1" />
+                                      Source
+                                    </a>
+                                  )}
+                                  
+                                  <div>
+                                    Confidence: {Math.round(insight.confidence * 100)}%
+                                  </div>
+                                  
+                                  <div>
+                                    Added: {formatDate(insight.createdAt)}
+                                  </div>
+                                </div>
+                                
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem>
+                                      <FileEdit className="mr-2 h-4 w-4" />
+                                      Edit Insight
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                      <Upload className="mr-2 h-4 w-4" />
+                                      Export
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-red-600">
+                                      <Trash className="mr-2 h-4 w-4" />
+                                      Delete Insight
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      ))
+                    )}
+                  </div>
                 </TabsContent>
-
-                {/* Analytics Tab */}
-                <TabsContent value="analytics">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Project Analytics</CardTitle>
-                      <CardDescription>
-                        Track progress and performance metrics for this project
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-[300px] flex items-center justify-center">
-                      <div className="text-center py-8">
-                        <BarChart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                        <h4 className="text-lg font-medium mb-2">Analytics Dashboard</h4>
-                        <p className="text-muted-foreground max-w-md mx-auto">
-                          Detailed analytics will be available here in the next update, showing task completion rates, insight impact, and project velocity metrics.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                
+                <TabsContent value="timeline" className="mt-4">
+                  <div className="text-center py-12 text-gray-500 border rounded-md">
+                    <h4 className="font-medium mb-2">Timeline View Coming Soon</h4>
+                    <p className="text-sm max-w-md mx-auto">
+                      This feature is under development. You'll soon be able to visualize your project 
+                      timeline with milestones, tasks, and key research insights.
+                    </p>
+                  </div>
                 </TabsContent>
               </Tabs>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full min-h-[400px]">
+              {loading ? (
+                <div className="space-y-4 w-full max-w-2xl">
+                  <div className="h-12 bg-gray-200 animate-pulse rounded-md w-1/2" />
+                  <div className="h-64 bg-gray-200 animate-pulse rounded-md" />
+                  <div className="h-40 bg-gray-200 animate-pulse rounded-md" />
+                </div>
+              ) : (
+                <div className="text-center p-6 border rounded-lg max-w-md">
+                  <h3 className="text-lg font-medium mb-2">No Project Selected</h3>
+                  <p className="text-gray-500 mb-4">
+                    Select a project from the sidebar or create a new one to get started with your research.
+                  </p>
+                  <Button onClick={() => setShowCreateProject(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create New Project
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
-
-      {/* Task Update Dialog */}
-      {taskToUpdate && (
-        <Dialog open={!!taskToUpdate} onOpenChange={(open) => !open && setTaskToUpdate(null)}>
-          <TaskUpdateDialog
-            task={taskToUpdate}
-            onClose={() => setTaskToUpdate(null)}
-            onUpdate={(taskId, data) => taskUpdateMutation.mutate({ taskId, data })}
-            isUpdating={taskUpdateMutation.isPending}
-          />
-        </Dialog>
+      
+      {/* Dialogs */}
+      {showCreateProject && (
+        <CreateProjectDialog 
+          open={showCreateProject} 
+          onOpenChange={setShowCreateProject} 
+        />
       )}
-
-      {/* Add Project Dialog */}
-      <AddProjectDialog 
-        open={showAddProject} 
-        onOpenChange={setShowAddProject} 
-      />
-
-      {/* Add Task Dialog */}
-      {activeProject && (
-        <AddTaskDialog
-          open={showAddTask}
-          onOpenChange={setShowAddTask}
+      
+      {showAddTask && activeProject && (
+        <CreateTaskDialog 
+          open={showAddTask} 
+          onOpenChange={setShowAddTask} 
           projectId={activeProject}
         />
       )}
-
-      {/* Add Research Insight Dialog */}
-      {activeProject && (
+      
+      {showAddInsight && activeProject && (
         <AddResearchInsightDialog
           open={showAddInsight}
           onOpenChange={setShowAddInsight}
