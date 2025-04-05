@@ -79,15 +79,13 @@ export function AddProjectDialog({ open, onOpenChange }: AddProjectDialogProps) 
       // Ensure we're passing a proper object structure to the API
       const projectData = {
         ...data,
-        // Include startDate as current date - converting to ISO string for proper date format
-        startDate: new Date().toISOString(),
-        // Ensure dueDate is properly formatted if it exists
-        dueDate: data.dueDate ? data.dueDate.toISOString() : null,
+        // Include startDate as current date (as Date object, not string)
+        startDate: new Date(),
+        // Ensure dueDate is kept as a Date object if it exists
+        dueDate: data.dueDate || null,
         // Make sure we're setting default values for required fields
         progress: 0,
-        // Add createdAt and updatedAt timestamps
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        // The server will handle createdAt and updatedAt timestamps
       };
       
       // Fix: The apiRequest function expects (endpoint, method, data) but was called with (method, endpoint, data)
