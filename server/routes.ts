@@ -48,6 +48,13 @@ import {
   type NodeType 
 } from "./knowledge-graph";
 import { selectModel, models } from "./model-selector";
+import { 
+  aiResearchAgent, 
+  type UserFeedback, 
+  type ActionExecutionResult, 
+  type CanvasSuggestion,
+  type UserBehaviorAnalysis
+} from "./ai-research-agent";
 import { WebSocketServer } from "ws";
 import path from "path";
 import multer from "multer";
@@ -1690,6 +1697,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Canvas suggestions API routes (for AI research agent)
+  app.get("/api/canvas-suggestions/:canvasId", async (req, res) => {
+    try {
+      const canvasId = req.params.canvasId;
+      
+      if (!canvasId) {
+        return res.status(400).json({ error: "Canvas ID is required" });
+      }
+      
+      const suggestions = await storage.getCanvasSuggestions(canvasId);
+      return res.json(suggestions);
+    } catch (error) {
+      console.error("Get canvas suggestions error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get canvas suggestions", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  app.post("/api/canvas-suggestions/:canvasId", async (req, res) => {
+    try {
+      const canvasId = req.params.canvasId;
+      const suggestions = req.body;
+      
+      if (!canvasId) {
+        return res.status(400).json({ error: "Canvas ID is required" });
+      }
+      
+      if (!Array.isArray(suggestions)) {
+        return res.status(400).json({ error: "Suggestions must be an array" });
+      }
+      
+      // Validate each suggestion
+      for (const suggestion of suggestions) {
+        if (!suggestion.type || !suggestion.title || !suggestion.description || !Array.isArray(suggestion.elements)) {
+          return res.status(400).json({ 
+            error: "Each suggestion must have type, title, description, and elements array" 
+          });
+        }
+        
+        // Ensure confidence is a number between 0 and 1
+        if (typeof suggestion.confidence !== 'number' || suggestion.confidence < 0 || suggestion.confidence > 1) {
+          suggestion.confidence = 0.5; // Default confidence if invalid
+        }
+      }
+      
+      const success = await storage.saveCanvasSuggestions(canvasId, suggestions);
+      
+      if (!success) {
+        return res.status(500).json({ error: "Failed to save canvas suggestions" });
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Save canvas suggestions error:", error);
+      return res.status(500).json({ 
+        error: "Failed to save canvas suggestions", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
   // Insight API routes
   app.post("/api/insights", async (req, res) => {
     try {
@@ -2821,6 +2891,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Task generation API error:", error);
       return res.status(500).json({ 
         error: "Failed to generate task list", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // AI Research Agent endpoints
+  
+  // API endpoint for registering entities for AI research agent processing
+  app.post("/api/ai-agent/register", async (req, res) => {
+    try {
+      const { entityType, entityId, priority } = req.body;
+      
+      if (!entityType || !entityId) {
+        return res.status(400).json({ error: "Entity type and ID are required" });
+      }
+      
+      aiResearchAgent.registerEntity(
+        entityType as 'project' | 'graph' | 'canvas' | 'mindmap',
+        entityId,
+        priority || 1
+      );
+      
+      return res.json({ 
+        success: true,
+        message: `Entity ${entityType}:${entityId} registered for AI processing` 
+      });
+    } catch (error) {
+      console.error("AI agent register entity error:", error);
+      return res.status(500).json({ 
+        error: "Failed to register entity with AI agent", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // API endpoint for submitting user feedback to AI research agent
+  app.post("/api/ai-agent/feedback", async (req, res) => {
+    try {
+      const { resourceType, resourceId, feedback } = req.body;
+      
+      if (!resourceType || !resourceId || !feedback || !feedback.type || !feedback.content) {
+        return res.status(400).json({ error: "Resource type, ID, and valid feedback object are required" });
+      }
+      
+      aiResearchAgent.addUserFeedback(
+        resourceType as 'project' | 'graph' | 'node' | 'insight' | 'canvas',
+        resourceId,
+        feedback as UserFeedback
+      );
+      
+      return res.json({ 
+        success: true,
+        message: `Feedback for ${resourceType}:${resourceId} registered` 
+      });
+    } catch (error) {
+      console.error("AI agent feedback error:", error);
+      return res.status(500).json({ 
+        error: "Failed to register feedback with AI agent", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // API endpoint for analyzing user behavior
+  app.post("/api/ai-agent/analyze-behavior", async (req, res) => {
+    try {
+      const { userId, sessions, interactions } = req.body;
+      
+      if (!userId || !sessions || !interactions) {
+        return res.status(400).json({ error: "User ID, sessions, and interactions are required" });
+      }
+      
+      const analysis = await aiResearchAgent.analyzeUserBehavior(
+        userId,
+        sessions,
+        interactions
+      );
+      
+      return res.json({ analysis });
+    } catch (error) {
+      console.error("AI agent behavior analysis error:", error);
+      return res.status(500).json({ 
+        error: "Failed to analyze user behavior", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // API endpoint for executing AI research actions
+  app.post("/api/ai-agent/execute-action", async (req, res) => {
+    try {
+      const { action, context, params } = req.body;
+      
+      if (!action || !context) {
+        return res.status(400).json({ error: "Action and context are required" });
+      }
+      
+      const result = await aiResearchAgent.executeResearchAction(
+        action,
+        context,
+        params || {}
+      );
+      
+      return res.json(result);
+    } catch (error) {
+      console.error("AI agent action execution error:", error);
+      return res.status(500).json({ 
+        error: "Failed to execute AI research action", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // API endpoint for getting canvas suggestions from AI agent
+  app.get("/api/ai-agent/canvas-suggestions/:canvasId", async (req, res) => {
+    try {
+      const canvasId = req.params.canvasId;
+      
+      if (!canvasId) {
+        return res.status(400).json({ error: "Canvas ID is required" });
+      }
+      
+      // Get the suggestions from storage (should have been generated by the agent)
+      const suggestions = await storage.getCanvasSuggestions(canvasId);
+      
+      // If no suggestions exist yet, register this canvas for processing
+      if (!suggestions || suggestions.length === 0) {
+        aiResearchAgent.registerEntity('canvas', canvasId, 2);
+        return res.json({ 
+          suggestions: [],
+          message: "Canvas registered for AI analysis, check back soon for suggestions" 
+        });
+      }
+      
+      return res.json({ suggestions });
+    } catch (error) {
+      console.error("AI agent canvas suggestions error:", error);
+      return res.status(500).json({ 
+        error: "Failed to get canvas suggestions", 
         details: error instanceof Error ? error.message : "Unknown error" 
       });
     }
