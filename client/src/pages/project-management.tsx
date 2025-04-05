@@ -421,59 +421,59 @@ export default function ProjectManagementPage(): JSX.Element {
           {/* Project List Sidebar */}
           <div className="lg:col-span-1">
             <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Projects</CardTitle>
-              <CardDescription>
-                Select a project to view details
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 p-0">
-              {projectsLoading ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : (
-                <ul className="text-sm">
-                  {projects?.map((project: Project) => (
-                    <li key={project.id}>
-                      <button
-                        onClick={() => setActiveProject(project.id)}
-                        className={`flex items-center w-full px-4 py-3 hover:bg-muted text-left border-l-4 ${
-                          activeProject === project.id
-                            ? 'border-l-primary bg-muted'
-                            : 'border-l-transparent'
-                        }`}
-                      >
-                        <div className="flex-grow">
-                          <div className="font-medium">{project.name}</div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className={getStatusColor(project.status)}>
-                              {project.status.replace('_', ' ')}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {project.progress}% complete
-                            </span>
+              <CardHeader className="pb-3">
+                <CardTitle>Projects</CardTitle>
+                <CardDescription>
+                  Select a project to view details
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 p-0">
+                {projectsLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <ul className="text-sm">
+                    {projects?.map((project: Project) => (
+                      <li key={project.id}>
+                        <button
+                          onClick={() => setActiveProject(project.id)}
+                          className={`flex items-center w-full px-4 py-3 hover:bg-muted text-left border-l-4 ${
+                            activeProject === project.id
+                              ? 'border-l-primary bg-muted'
+                              : 'border-l-transparent'
+                          }`}
+                        >
+                          <div className="flex-grow">
+                            <div className="font-medium">{project.name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className={getStatusColor(project.status)}>
+                                {project.status.replace('_', ' ')}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {project.progress}% complete
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                        {getStatusIcon(project.status)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-            <CardFooter className="pt-3">
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                size="sm"
-                onClick={() => setShowAddProject(true)}
-              >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add Project
-              </Button>
-            </CardFooter>
-          </Card>
+                          {getStatusIcon(project.status)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+              <CardFooter className="pt-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  size="sm"
+                  onClick={() => setShowAddProject(true)}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Add Project
+                </Button>
+              </CardFooter>
+            </Card>
         </div>
 
         {/* Project Details */}
