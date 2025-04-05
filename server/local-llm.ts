@@ -26,11 +26,11 @@ export interface LocalLLMConfig {
 const defaultConfig: LocalLLMConfig = {
   apiUrl: process.env.LOCAL_LLM_URL || 'http://localhost:11434/api/generate',
   modelName: process.env.LOCAL_LLM_MODEL || 'llama3',
-  temperature: 0.7,
-  maxTokens: 4096,
+  temperature: 0.8,
+  maxTokens: 2048,
   topP: 0.9,
   backend: (process.env.LOCAL_LLM_BACKEND as LocalLLMBackend) || 'builtin',
-  systemPrompt: "You are Xeno AI, a helpful and knowledgeable AI assistant. You specialize in research, knowledge organization, and clear explanations. Keep responses concise yet informative."
+  systemPrompt: "You are Xeno AI, an engaging and dynamic AI assistant. Keep voice responses natural and conversational. Use varied expressions and maintain context. Responses should be concise and focused."
 };
 
 /**

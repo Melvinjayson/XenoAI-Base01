@@ -17,6 +17,9 @@ export function useTextToSpeech() {
   const [currentVisualCommands, setCurrentVisualCommands] = useState<VisualizationCommand[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [lastSpokenText, setLastSpokenText] = useState<string>('');
+  const [lastSpeakTime, setLastSpeakTime] = useState(0);
+  const SPEAK_DEBOUNCE_MS = 1000;
   const MAX_RETRIES = 2;
   
   // Clean up when component unmounts or on page navigation
@@ -35,6 +38,13 @@ export function useTextToSpeech() {
     voiceId: string = 'default',
     language: string = 'en',
     visualCommands: VisualizationCommand[] = []
+) => {
+    // Prevent duplicate speaks
+    if (text === lastSpokenText && Date.now() - lastSpeakTime < SPEAK_DEBOUNCE_MS) {
+      return;
+    }
+    setLastSpokenText(text);
+    setLastSpeakTime(Date.now());
   ) => {
     try {
       setError(null);

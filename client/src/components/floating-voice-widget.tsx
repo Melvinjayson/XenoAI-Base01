@@ -39,24 +39,24 @@ export function FloatingVoiceWidget() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const mediaRecorder = new MediaRecorder(stream);
         microphoneRef.current = mediaRecorder;
-        
+
         setAudioChunks([]);
-        
+
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             setAudioChunks(prev => [...prev, event.data]);
           }
         };
-        
+
         mediaRecorder.onstop = handleAudioStop;
-        
+
         mediaRecorder.start();
         setIsRecording(true);
         toast({
           title: 'Recording started',
           description: 'Speak now. Recording will automatically stop after a pause.',
         });
-        
+
         // Auto-stop after 10 seconds of silence
         setTimeout(() => {
           if (isRecording && microphoneRef.current?.state === 'recording') {
@@ -83,28 +83,28 @@ export function FloatingVoiceWidget() {
 
   const handleAudioStop = async () => {
     if (audioChunks.length === 0) return;
-    
+
     try {
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
-      
+
       // Show loading toast
       toast({
         title: 'Processing audio',
         description: 'Converting speech to text...',
       });
-      
+
       // Send to backend for speech-to-text processing
       const response = await fetch('/api/speech-to-text', {
         method: 'POST',
         body: formData,
       });
-      
+
       if (!response.ok) {
         throw new Error('Error processing speech to text');
       }
-      
+
       const data = await response.json();
       if (data.text) {
         setQuery(data.text);
@@ -133,18 +133,18 @@ export function FloatingVoiceWidget() {
     const removeHandler = addMessageHandler('chat_response', (data) => {
       // Update UI with the response
       sendMessage(data.message.content || 'Response received');
-      
+
       // If processing was happening, stop it
       if (isProcessing) {
         setIsProcessing(false);
       }
-      
+
       // If insights are available, update them
       if (data.insights && Array.isArray(data.insights)) {
         setInsights(data.insights);
       }
     });
-    
+
     // Handle voice responses
     const voiceHandler = addMessageHandler('voice_response', (data) => {
       if (data.audioUrl) {
@@ -152,7 +152,7 @@ export function FloatingVoiceWidget() {
         const audio = new Audio(data.audioUrl);
         audio.play().catch(err => {
           console.error('Error playing audio:', err);
-          
+
           // If we received an empty audio URL due to server fallback, use browser TTS
           if (data.fallback && !data.audioUrl.trim()) {
             console.log('Using browser TTS as fallback because server TTS failed');
@@ -161,9 +161,9 @@ export function FloatingVoiceWidget() {
               try {
                 const latestMessage = document.querySelector('.chat-message.assistant:last-child .message-content');
                 const textToSpeak = latestMessage ? latestMessage.textContent || '' : 'Message received';
-                
+
                 const utterance = new SpeechSynthesisUtterance(textToSpeak);
-                
+
                 // Set language if available in data or from language context
                 if (data.language) {
                   utterance.lang = data.language;
@@ -184,16 +184,16 @@ export function FloatingVoiceWidget() {
                   };
                   utterance.lang = langMap[language] || 'en-US';
                 }
-                
+
                 // Set up event handlers
                 utterance.onend = () => {
                   console.log('Browser TTS playback completed');
                 };
-                
+
                 utterance.onerror = (e) => {
                   console.error('Browser TTS error:', e);
                 };
-                
+
                 window.speechSynthesis.speak(utterance);
               } catch (ttsError) {
                 console.error('Text-to-speech error:', ttsError);
@@ -208,9 +208,9 @@ export function FloatingVoiceWidget() {
           try {
             const latestMessage = document.querySelector('.chat-message.assistant:last-child .message-content');
             const textToSpeak = latestMessage ? latestMessage.textContent || '' : 'Message received';
-            
+
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
-            
+
             // Set language if available in data or from language context
             if (data.language) {
               utterance.lang = data.language;
@@ -231,38 +231,41 @@ export function FloatingVoiceWidget() {
               };
               utterance.lang = langMap[language] || 'en-US';
             }
-            
+
             // Set up event handlers
             utterance.onend = () => {
               console.log('Browser TTS playback completed');
             };
-            
+
             utterance.onerror = (e) => {
               console.error('Browser TTS error:', e);
             };
-            
+
             window.speechSynthesis.speak(utterance);
           } catch (ttsError) {
             console.error('Text-to-speech error:', ttsError);
           }
         }
       }
-      
+
       if (isProcessing) {
         setIsProcessing(false);
       }
-      
+
       // Show toast for fallback
       if (data.fallback && data.reason) {
-        toast({
-          title: 'Speech Synthesis Limited',
-          description: 'Using built-in speech instead of high-quality voice.',
-          variant: 'default',
-          duration: 3000,
-        });
+        if (!window.localStorage.getItem('voice-fallback-notified')) {
+          toast({
+            title: 'Speech Synthesis Limited',
+            description: 'Using built-in speech synthesizer. This message will only show once.',
+            variant: 'default',
+            duration: 4000,
+          });
+          window.localStorage.setItem('voice-fallback-notified', 'true');
+        }
       }
     });
-    
+
     // Handle errors
     const errorHandler = addMessageHandler('chat_error', (data) => {
       toast({
@@ -270,12 +273,12 @@ export function FloatingVoiceWidget() {
         description: data.error || 'An error occurred',
         variant: 'destructive',
       });
-      
+
       if (isProcessing) {
         setIsProcessing(false);
       }
     });
-    
+
     return () => {
       removeHandler();
       voiceHandler();
@@ -286,34 +289,34 @@ export function FloatingVoiceWidget() {
   const handleSendMessage = async (text?: string) => {
     const messageText = text || query;
     if (!messageText.trim() || !isConnected) return;
-    
+
     // Prevent duplicate requests if already processing
     if (isProcessing) {
       console.log("Already processing a voice request");
       return;
     }
-    
+
     try {
       // Update UI state immediately to provide feedback
       setQuery('');
       setIsProcessing(true);
-      
+
       // Show processing toast
       toast({
         title: 'Processing',
         description: 'Thinking...',
       });
-      
+
       // Use the standard sendMessage to update the chat context
       // This ensures the message shows up in the chat UI
       await sendMessage(messageText);
-      
+
       // Use WebSocket for enhanced communication with voice
       // Add retry logic for WebSocket communication
       let wsRetryCount = 0;
       const maxWsRetries = 3; // Increased retry count for better reliability
       let wsSuccess = false;
-      
+
       // Set up a timeout for the entire WebSocket operation
       const wsTimeout = setTimeout(() => {
         if (!wsSuccess) {
@@ -322,7 +325,7 @@ export function FloatingVoiceWidget() {
           // No need to throw an error here as the regular message was already sent
         }
       }, 10000); // 10 second timeout
-      
+
       try {
         while (wsRetryCount <= maxWsRetries && !wsSuccess) {
           try {
@@ -333,7 +336,7 @@ export function FloatingVoiceWidget() {
               wsRetryCount++;
               continue;
             }
-            
+
             // Attempt to send message
             const result = sendChatMessage(
               messageText, 
@@ -347,7 +350,7 @@ export function FloatingVoiceWidget() {
                 isFallbackEnabled: true // Enable fallback processing if AI services are limited
               }
             );
-            
+
             if (result === true) {
               wsSuccess = true; // Mark as successful if function returned true
             } else {
@@ -356,14 +359,14 @@ export function FloatingVoiceWidget() {
           } catch (wsError) {
             wsRetryCount++;
             console.error(`WebSocket send attempt ${wsRetryCount} failed:`, wsError);
-            
+
             // If we've reached max retries, don't retry anymore
             if (wsRetryCount > maxWsRetries) {
               // Don't throw, just log and continue with regular message
               console.error("Max WebSocket retries reached");
               break;
             }
-            
+
             // Wait before retrying (exponential backoff)
             await new Promise(resolve => setTimeout(resolve, 1000 * wsRetryCount));
           }
@@ -372,12 +375,12 @@ export function FloatingVoiceWidget() {
         // Clear the timeout
         clearTimeout(wsTimeout);
       }
-      
+
       // If websocket fails but normal message succeeded, don't show an error
       // Instead, trigger browser TTS as a fallback
       if (!wsSuccess) {
         console.log("WebSocket communication failed, but standard message was sent");
-        
+
         // Notify user that we're falling back to simpler response
         toast({
           title: 'Voice Response Unavailable',
@@ -385,7 +388,7 @@ export function FloatingVoiceWidget() {
           variant: 'default',
           duration: 3000,
         });
-        
+
         // Wait for the normal message to appear in the chat
         setTimeout(() => {
           // Try to use browser's built-in speech synthesis as fallback
@@ -396,7 +399,7 @@ export function FloatingVoiceWidget() {
                 const textToSpeak = latestMessage.textContent || '';
                 if (textToSpeak) {
                   const utterance = new SpeechSynthesisUtterance(textToSpeak);
-                  
+
                   // Set language based on current language context
                   if (language) {
                     // Map our language code to a browser-compatible one
@@ -415,16 +418,16 @@ export function FloatingVoiceWidget() {
                     };
                     utterance.lang = langMap[language] || 'en-US';
                   }
-                  
+
                   // Set up event handlers
                   utterance.onend = () => {
                     console.log('WebSocket fallback TTS completed');
                   };
-                  
+
                   utterance.onerror = (e) => {
                     console.error('WebSocket fallback TTS error:', e);
                   };
-                  
+
                   window.speechSynthesis.speak(utterance);
                 }
               }
@@ -434,14 +437,14 @@ export function FloatingVoiceWidget() {
           }
         }, 2000); // Wait 2 seconds for the message to appear
       }
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
-      
+
       // Determine a more specific error message
       let errorTitle = 'Error';
       let errorMessage = 'Could not send message. Please try again.';
-      
+
       if (error instanceof Error) {
         // Check if it's a network error
         if (error.message.includes('network') || error.message.includes('fetch')) {
@@ -454,7 +457,7 @@ export function FloatingVoiceWidget() {
                 error.message.includes('API key')) {
           errorTitle = 'Service Limit';
           errorMessage = 'AI service usage limit reached. Try again later or use simpler queries.';
-          
+
           // Add the error message to the chat as a message from the assistant
           setTimeout(() => {
             if (sendMessage) {
@@ -473,19 +476,19 @@ export function FloatingVoiceWidget() {
         // Include the specific error message for debugging
         errorMessage += ' (Error: ' + error.message.substring(0, 50) + (error.message.length > 50 ? '...' : '') + ')';
       }
-      
+
       toast({
         title: errorTitle,
         description: errorMessage,
         variant: 'destructive',
       });
-      
+
       // Try browser TTS fallback if this was a voice request
       if (isConnected && 'speechSynthesis' in window) {
         try {
           const fallbackMessage = "I'm sorry, I couldn't process your request right now. Please try again later.";
           const utterance = new SpeechSynthesisUtterance(fallbackMessage);
-          
+
           // Set language based on current language context
           if (language) {
             // Map our language code to a browser-compatible one
@@ -504,22 +507,22 @@ export function FloatingVoiceWidget() {
             };
             utterance.lang = langMap[language] || 'en-US';
           }
-          
+
           // Set up event handlers
           utterance.onend = () => {
             console.log('Error fallback TTS completed');
           };
-          
+
           utterance.onerror = (e) => {
             console.error('Error fallback TTS error:', e);
           };
-          
+
           window.speechSynthesis.speak(utterance);
         } catch (ttsError) {
           console.error('Fallback text-to-speech error:', ttsError);
         }
       }
-      
+
       setIsProcessing(false);
     }
   };
@@ -534,20 +537,20 @@ export function FloatingVoiceWidget() {
       });
       return;
     }
-    
+
     let content = '';
     let fileName = `xeno-insights-${new Date().toISOString().slice(0, 10)}`;
-    
+
     if (format === 'json') {
       content = JSON.stringify(insights, null, 2);
       fileName += '.json';
-      
+
       // For CSV format
     } else if (format === 'csv') {
       // Create CSV header based on insight properties
       const headers = ['type', 'description', 'relevance', 'confidence', 'rationale'];
       content = headers.join(',') + '\\n';
-      
+
       // Add each insight as a row
       insights.forEach(insight => {
         const row = [
@@ -560,7 +563,7 @@ export function FloatingVoiceWidget() {
         content += row.join(',') + '\\n';
       });
       fileName += '.csv';
-      
+
       // For TXT format  
     } else if (format === 'txt') {
       insights.forEach((insight, index) => {
@@ -574,7 +577,7 @@ export function FloatingVoiceWidget() {
       });
       fileName += '.txt';
     }
-    
+
     // Create download link
     const blob = new Blob([content], { type: `text/${format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'plain'}` });
     const url = URL.createObjectURL(blob);
@@ -585,7 +588,7 @@ export function FloatingVoiceWidget() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: 'Export successful',
       description: `Insights exported as ${format.toUpperCase()}`,
@@ -599,18 +602,18 @@ export function FloatingVoiceWidget() {
       if (e.altKey && e.key === 'm') {
         toggleWidget();
       }
-      
+
       // Alt+R to toggle recording
       if (isOpen && e.altKey && e.key === 'r') {
         toggleRecording();
       }
-      
+
       // Escape to close widget
       if (isOpen && e.key === 'Escape') {
         setIsOpen(false);
       }
     };
-    
+
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -634,7 +637,7 @@ export function FloatingVoiceWidget() {
         </div>
       );
     }
-    
+
     return (
       <div className="p-4">
         <div className="mb-4">
@@ -660,7 +663,7 @@ export function FloatingVoiceWidget() {
             ))}
           </div>
         </div>
-        
+
         <div className="mb-4">
           <h3 className="text-lg font-semibold mb-2">Top Insights</h3>
           <div className="space-y-2">
@@ -682,7 +685,7 @@ export function FloatingVoiceWidget() {
               ))}
           </div>
         </div>
-        
+
         <div className="flex flex-wrap gap-2">
           <Button 
             variant="outline" 
@@ -750,13 +753,13 @@ export function FloatingVoiceWidget() {
                   </Button>
                 </div>
               </div>
-              
+
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="w-full">
                   <TabsTrigger value="chat" className="flex-1">Chat</TabsTrigger>
                   <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="chat" className="focus-visible:outline-none focus-visible:ring-0">
                   <div className="h-[350px] overflow-y-auto p-3" id="chat-messages">
                     {messages.length === 0 ? (
@@ -771,7 +774,7 @@ export function FloatingVoiceWidget() {
                       ))
                     )}
                   </div>
-                  
+
                   <div className="p-3 border-t flex items-end gap-2">
                     <Textarea
                       placeholder="Ask me anything..."
@@ -810,7 +813,7 @@ export function FloatingVoiceWidget() {
                     </div>
                   </div>
                 </TabsContent>
-                
+
                 <TabsContent value="analytics" className="focus-visible:outline-none focus-visible:ring-0">
                   <div className="h-[410px] overflow-y-auto">
                     <InsightViz />
