@@ -184,24 +184,14 @@ export function FloatingVoiceWidget() {
     const messageText = text || query;
     if (!messageText.trim() || !isConnected) return;
     
+    // Prevent duplicate requests if already processing
+    if (isProcessing) {
+      console.log("Already processing a voice request");
+      return;
+    }
+    
     try {
-      // Use the standard sendMessage to update the chat context
-      await sendMessage(messageText);
-      
-      // Use WebSocket for enhanced communication with voice
-      sendChatMessage(
-        messageText, 
-        messages, 
-        true, // Request voice response
-        { 
-          language,
-          preferredVoice: "default",
-          topK: 3, // For better search results
-          includeInsights: true // Request insights data
-        }
-      );
-      
-      // Update UI state
+      // Update UI state immediately to provide feedback
       setQuery('');
       setIsProcessing(true);
       
@@ -210,6 +200,49 @@ export function FloatingVoiceWidget() {
         title: 'Processing',
         description: 'Thinking...',
       });
+      
+      // Use the standard sendMessage to update the chat context
+      // This ensures the message shows up in the chat UI
+      await sendMessage(messageText);
+      
+      // Use WebSocket for enhanced communication with voice
+      // Add retry logic for WebSocket communication
+      let wsRetryCount = 0;
+      const maxWsRetries = 2;
+      let wsSuccess = false;
+      
+      while (wsRetryCount <= maxWsRetries && !wsSuccess) {
+        try {
+          sendChatMessage(
+            messageText, 
+            messages, 
+            true, // Request voice response
+            { 
+              language,
+              preferredVoice: "default",
+              topK: 3, // For better search results
+              includeInsights: true // Request insights data
+            }
+          );
+          wsSuccess = true; // Mark as successful if no error thrown
+        } catch (wsError) {
+          wsRetryCount++;
+          console.error(`WebSocket send attempt ${wsRetryCount} failed:`, wsError);
+          
+          // If we've reached max retries, don't retry anymore
+          if (wsRetryCount > maxWsRetries) {
+            throw wsError;
+          }
+          
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * wsRetryCount));
+        }
+      }
+      
+      // If websocket fails but normal message succeeded, don't show an error
+      if (!wsSuccess) {
+        console.log("WebSocket communication failed, but standard message was sent");
+      }
       
     } catch (error) {
       console.error('Error sending message:', error);

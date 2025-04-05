@@ -77,16 +77,48 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       
       // Send the request with a timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // Reduced timeout to 20 seconds
+      const timeoutId = setTimeout(() => {
+        console.log("Request timeout triggered, aborting");
+        controller.abort();
+      }, 30000); // Increased timeout to 30 seconds for better reliability
       
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestParams),
-        signal: controller.signal
-      });
+      // Add retry logic for network issues
+      let retryCount = 0;
+      const maxRetries = 2;
+      let response;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestParams),
+            signal: controller.signal
+          });
+          
+          // If successful, break out of retry loop
+          break;
+        } catch (fetchError) {
+          retryCount++;
+          console.log(`Fetch attempt ${retryCount} failed:`, fetchError);
+          
+          // If we've reached max retries or it's not a network error, rethrow
+          if (retryCount > maxRetries || !(fetchError instanceof Error) || 
+              fetchError.name !== 'TypeError') {
+            throw fetchError;
+          }
+          
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        }
+      }
       
       clearTimeout(timeoutId);
+      
+      // Check if response exists (should always exist unless an error was thrown)
+      if (!response) {
+        throw new Error("Failed to get response after retries");
+      }
       
       // Check for error responses
       if (!response.ok) {

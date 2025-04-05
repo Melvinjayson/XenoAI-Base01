@@ -112,7 +112,8 @@ function Router() {
           <Route component={NotFound} />
         </Switch>
         
-        {showVoiceWidget && <FloatingVoiceWidget />}
+        {/* Voice widget disabled to fix UI issues */}
+        {/* {showVoiceWidget && <FloatingVoiceWidget />} */}
         {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
         <OfflineDialog />
       </div>
@@ -187,7 +188,8 @@ function App() {
                           <OfflineProvider>
                             <CompanionProvider>
                               <Router />
-                              <CompanionWrapper />
+                              {/* Companion disabled to fix UI issues */}
+                              {/* <CompanionWrapper /> */}
                               <Toaster />
                             </CompanionProvider>
                           </OfflineProvider>
