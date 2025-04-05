@@ -31,14 +31,14 @@ function cleanupOldAudioFiles() {
     const files = fs.readdirSync(AUDIO_DIR);
     const now = Date.now();
     const maxAge = 48 * 60 * 60 * 1000; // 48 hours
-    
+
     files.forEach(file => {
       if (!file.startsWith('speech_')) return; // Only process our speech files
-      
+
       const filePath = path.join(AUDIO_DIR, file);
       const stats = fs.statSync(filePath);
       const fileAge = now - stats.mtimeMs;
-      
+
       if (fileAge > maxAge) {
         try {
           fs.unlinkSync(filePath);
@@ -125,26 +125,26 @@ function optimizeTextForVoice(text: string, maxLength: number = 500): string {
   if (text.length <= maxLength) {
     return enhanceShortVoiceResponse(text);
   }
-  
+
   // If text is too long, try to find a good stopping point (end of sentence)
   const truncatedText = text.substring(0, maxLength);
   const lastPeriod = truncatedText.lastIndexOf('.');
   const lastQuestion = truncatedText.lastIndexOf('?');
   const lastExclamation = truncatedText.lastIndexOf('!');
-  
+
   // Find the last sentence ending
   let endIndex = Math.max(lastPeriod, lastQuestion, lastExclamation);
   if (endIndex < 0) endIndex = truncatedText.lastIndexOf(' ');
   if (endIndex < 0) endIndex = maxLength;
-  
+
   // Create a truncated version with a good ending point
   let optimizedText = text.substring(0, endIndex + 1);
-  
+
   // Add a note about truncation if we're cutting significant content
   if (text.length > maxLength * 1.5) {
     optimizedText = `${optimizedText} I've summarized this for voice. You can read the full answer in the chat.`;
   }
-  
+
   // Make the voice response more conversational and natural
   return enhanceShortVoiceResponse(optimizedText);
 }
@@ -153,7 +153,7 @@ function optimizeTextForVoice(text: string, maxLength: number = 500): string {
 function enhanceShortVoiceResponse(text: string): string {
   // Don't modify very short responses
   if (text.length < 20) return text;
-  
+
   // List of conversational starters to occasionally add variety
   const conversationalStarters = [
     "So, ", 
@@ -165,7 +165,7 @@ function enhanceShortVoiceResponse(text: string): string {
     "I'd say ", 
     "I think "
   ];
-  
+
   // List of verbal punctuation to make speech sound more natural
   const verbalBreathers = [
     ", right?",
@@ -174,11 +174,11 @@ function enhanceShortVoiceResponse(text: string): string {
     " — as you might expect",
     " — interestingly enough"
   ];
-  
+
   // Probability controls (we don't want to add these to every response)
   const shouldAddStarter = Math.random() < 0.4; // 40% chance
   const shouldAddBreather = text.length > 100 && Math.random() < 0.3; // 30% chance for longer texts
-  
+
   // Add conversational starter to beginning of text
   if (shouldAddStarter) {
     const starter = conversationalStarters[Math.floor(Math.random() * conversationalStarters.length)];
@@ -189,7 +189,7 @@ function enhanceShortVoiceResponse(text: string): string {
       text = starter + text.charAt(0).toLowerCase() + text.substring(1);
     }
   }
-  
+
   // Add verbal breather in the middle of a longer text
   if (shouldAddBreather) {
     const sentences = text.split('. ');
@@ -197,13 +197,13 @@ function enhanceShortVoiceResponse(text: string): string {
       // Choose a sentence in the middle to add the breather
       const middleIndex = Math.floor(sentences.length / 2);
       const breather = verbalBreathers[Math.floor(Math.random() * verbalBreathers.length)];
-      
+
       // Add the breather at the end of the selected sentence
       sentences[middleIndex] = sentences[middleIndex] + breather;
       text = sentences.join('. ');
     }
   }
-  
+
   return text;
 }
 
@@ -211,32 +211,32 @@ export async function synthesizeSpeech(
   request: VoiceSynthesisRequest
 ): Promise<VoiceSynthesisResponse> {
   const { text, voiceId: requestedVoiceId = 'default', language = 'en' } = request;
-  
+
   // Skip empty text
   if (!text || text.trim() === '') {
     return { audioUrl: '' };
   }
-  
+
   // Optimize the text for voice synthesis
   const optimizedText = optimizeTextForVoice(text);
-  
+
   // Create a more stable cache key with MD5 hash to handle very similar texts
   const hash = crypto.createHash('md5').update(`${requestedVoiceId}:${language}:${optimizedText}`).digest('hex');
   const cacheKey = `voice:${hash}`;
-  
+
   // Check if we have a cached version
   const cachedAudio = audioCache.get(cacheKey);
   if (cachedAudio && Date.now() - cachedAudio.timestamp < CACHE_EXPIRY_MS) {
     console.log("Using cached audio for:", optimizedText.substring(0, 30) + "...");
     return { audioUrl: cachedAudio.data };
   }
-  
+
   // Check if this exact request is already being processed
   if (activeSynthesisRequests.has(cacheKey)) {
     console.log("Request already in progress, joining existing request");
     return activeSynthesisRequests.get(cacheKey)!;
   }
-  
+
   // Create a new synthesis request and store it
   const synthesisPromise = (async () => {
     try {
@@ -246,59 +246,63 @@ export async function synthesizeSpeech(
         language,
         hash: hash.substring(0, 8)
       });
-      
+
       // Check if we have ElevenLabs API key
       if (!process.env.ELEVENLABS_API_KEY) {
         console.log("No ElevenLabs API key found, using fallback synthesis");
         return await fallbackSynthesis(optimizedText, language);
       }
-      
+
       // Check API quota limits
       const estimatedTokens = optimizedText.length;
       const rateLimitInfo = apiQuotaManager.checkRateLimit('elevenlabs', estimatedTokens);
       if (rateLimitInfo.isLimited) {
         console.log(`ElevenLabs API quota limit reached: ${rateLimitInfo.reason}`);
         console.log(`Next reset at: ${new Date(rateLimitInfo.resetTime).toLocaleString()}`);
-        return await fallbackSynthesis(optimizedText, language);
+        return {
+          audioUrl: '',
+          fallback: true,
+          reason: 'ElevenLabs quota exceeded - using browser fallback'
+        };
       }
-      
+
       // Get the voice to use
       const selectedVoice = voices[requestedVoiceId] || voices.default;
       console.log("Selected voice:", selectedVoice.name);
-      
+
       // Check file system first - we might have a file with same hash
       const existingFiles = fs.readdirSync(AUDIO_DIR).filter(file => file.includes(hash.substring(0, 8)));
       if (existingFiles.length > 0) {
         const audioUrl = `/audio/${existingFiles[0]}`;
         console.log("Found existing audio file with same hash:", existingFiles[0]);
-        
+
         // Cache the result
         audioCache.set(cacheKey, {
           data: audioUrl,
           timestamp: Date.now(),
         });
-        
+
         return { audioUrl };
       }
-      
+
       // Generate a unique filename with hash prefix for easy identification
       const timestamp = Date.now();
       const audioFilename = `speech_${hash.substring(0, 8)}_${timestamp}.mp3`;
       const audioFilepath = path.join(AUDIO_DIR, audioFilename);
-      
+
       console.log("Audio will be saved to:", audioFilepath);
-      
+
       // Call ElevenLabs API directly
       const apiKey = process.env.ELEVENLABS_API_KEY;
       const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice.voice_id}`;
-      
+
       // Use the latest model for better quality
       const modelId = 'eleven_turbo_v2';
-      
+
       console.log("Calling ElevenLabs API...");
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-      
+
       try {
         const response = await fetch(apiUrl, {
           method: 'POST',
@@ -314,32 +318,32 @@ export async function synthesizeSpeech(
           }),
           signal: controller.signal
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`ElevenLabs API responded with status: ${response.status}, message: ${errorText}`);
         }
-        
+
         console.log("ElevenLabs API response received successfully");
-        
+
         // Record successful API usage
         apiQuotaManager.recordApiUsage('elevenlabs', estimatedTokens);
-        
+
         // Save the audio file
         const arrayBuffer = await response.arrayBuffer();
-        
+
         // Check if the response is valid
         if (arrayBuffer.byteLength === 0) {
           throw new Error("ElevenLabs API returned an empty response");
         }
-        
+
         // Ensure the audio directory exists
         if (!fs.existsSync(AUDIO_DIR)) {
           fs.mkdirSync(AUDIO_DIR, { recursive: true });
         }
-        
+
         // Write the file
         try {
           fs.writeFileSync(audioFilepath, Buffer.from(arrayBuffer));
@@ -349,17 +353,17 @@ export async function synthesizeSpeech(
           console.error("Error writing audio file:", writeError);
           throw new Error(`Failed to write audio file: ${writeError.message}`);
         }
-        
+
         // Create the URL path for the audio file
         const audioUrl = `/audio/${audioFilename}`;
         console.log("Audio URL for client:", audioUrl);
-        
+
         // Cache the result
         audioCache.set(cacheKey, {
           data: audioUrl,
           timestamp: Date.now(),
         });
-        
+
         return { audioUrl };
       } catch (fetchError) {
         clearTimeout(timeoutId);
@@ -373,10 +377,10 @@ export async function synthesizeSpeech(
       activeSynthesisRequests.delete(cacheKey);
     }
   })();
-  
+
   // Store the promise for potential duplicate requests
   activeSynthesisRequests.set(cacheKey, synthesisPromise);
-  
+
   return synthesisPromise;
 }
 
@@ -402,62 +406,66 @@ async function fallbackSynthesis(text: string, language: string = 'en'): Promise
     if (!fs.existsSync(AUDIO_DIR)) {
       fs.mkdirSync(AUDIO_DIR, { recursive: true });
     }
-    
+
     // Log the fallback
     console.log('Using fallback speech synthesis for:', text.substring(0, 50) + '...');
-    
+
     // Generate a hash of the text to use as a cache key
     const hash = crypto.createHash('md5').update(`${language}:${text}`).digest('hex').substring(0, 8);
     const timestamp = Date.now();
     const audioFilename = `speech_openai_${hash}_${timestamp}.mp3`;
     const audioFilepath = path.join(AUDIO_DIR, audioFilename);
-    
+
     // Try OpenAI TTS first if API key is available
     if (process.env.OPENAI_API_KEY) {
       try {
         console.log('Attempting OpenAI TTS synthesis...');
-        
-        // Check OpenAI API quota limits
+
+        // Check API quota limits
         const estimatedTokens = text.length;
         const rateLimitInfo = apiQuotaManager.checkRateLimit('openai', estimatedTokens);
         if (rateLimitInfo.isLimited) {
           console.log(`OpenAI API quota limit reached: ${rateLimitInfo.reason}`);
           console.log(`Next reset at: ${new Date(rateLimitInfo.resetTime).toLocaleString()}`);
-          throw new Error("OpenAI quota limit reached");
+          return {
+            audioUrl: '',
+            fallback: true,
+            reason: 'API quota exceeded - using browser fallback'
+          };
         }
-        
+
         // Select appropriate voice based on language
         const languageKey = language.split('-')[0]; // Extract base language code
         const voiceId = languageToOpenAIVoice[language] || 
                         languageToOpenAIVoice[languageKey] || 
                         'alloy'; // Default to alloy if no match
-        
+
         // Call OpenAI TTS API
         const mp3Response = await openai.audio.speech.create({
           model: 'tts-1', // tts-1 is the standard model, tts-1-hd is higher quality but more expensive
           voice: voiceId,
           input: text,
         });
-        
+
         // Convert response to buffer
         const buffer = Buffer.from(await mp3Response.arrayBuffer());
-        
+
         // Save the file
         fs.writeFileSync(audioFilepath, buffer);
         console.log('OpenAI TTS synthesis successful, saved to:', audioFilepath);
-        
+
         // Record successful API usage
         apiQuotaManager.recordApiUsage('openai', estimatedTokens);
-        
+
         // Return audio URL
         const audioUrl = `/audio/${audioFilename}`;
-        
+
         // Cache the result
         audioCache.set(`voice:${hash}`, {
           data: audioUrl,
           timestamp: Date.now(),
         });
-        
+
         return { 
           audioUrl,
           fallback: true, // Still marked as fallback for tracking
@@ -467,12 +475,12 @@ async function fallbackSynthesis(text: string, language: string = 'en'): Promise
         console.error('OpenAI TTS synthesis failed:', openaiError);
       }
     }
-    
+
     // Create a simple text file with information about the fallback
     // This helps with troubleshooting and ensures the directory is writable
     const infoFilename = `fallback_info_${hash}_${timestamp}.txt`;
     const infoFilepath = path.join(AUDIO_DIR, infoFilename);
-    
+
     // Write a simple info file to confirm file system access
     try {
       fs.writeFileSync(infoFilepath, `Fallback requested at ${new Date().toISOString()}\nLanguage: ${language}\nText length: ${text.length} characters\nText preview: ${text.substring(0, 100)}...`);
@@ -482,7 +490,7 @@ async function fallbackSynthesis(text: string, language: string = 'en'): Promise
       // If we can't write files, there might be a permission issue
       console.warn("Possible file system permission issue detected in audio directory");
     }
-    
+
     // Determine reason for fallback
     let fallbackReason = 'Using browser TTS as fallback';
     if (!process.env.ELEVENLABS_API_KEY) {
@@ -492,9 +500,9 @@ async function fallbackSynthesis(text: string, language: string = 'en'): Promise
     } else {
       fallbackReason = 'All TTS services failed';
     }
-    
+
     console.log(`Final fallback reason: ${fallbackReason}`);
-    
+
     // Generate a fallback response with an empty URL
     // The client-side will detect this and use browser's built-in TTS
     return { 
