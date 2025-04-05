@@ -50,6 +50,9 @@ export function isQuerySuitableForLocalProcessing(query: string): boolean {
     /^(what time is it|what's the date|what day is)/i, // Time/date questions
     /^(help me|assist|can you help)/i,                 // Help requests
     /^(how can you|what can you do)/i,                 // Capability questions
+    /^(what('s| is) (wrong|not working|the issue|happening))/i, // Issue/problem queries
+    /^(it('s| is) not working)/i,                      // Problem statements
+    /^(can('t| not) (work|access|connect|load))/i,     // Access/connection issues
   ];
   
   // Check if the query matches any simple patterns
@@ -58,7 +61,7 @@ export function isQuerySuitableForLocalProcessing(query: string): boolean {
   }
   
   // Short queries are likely simple
-  if (query.split(" ").length < 10) {
+  if (query.split(" ").length < 12) {
     return true;
   }
   

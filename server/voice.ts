@@ -151,8 +151,8 @@ function optimizeTextForVoice(text: string, maxLength: number = 500): string {
 
 // Function to make short voice responses more natural and conversational
 function enhanceShortVoiceResponse(text: string): string {
-  // Don't modify very short responses
-  if (text.length < 20) return text;
+  // Always return unmodified response when in fallback mode
+  if (process.env.USE_FALLBACK_VOICE === 'true' || text.length < 20) return text;
 
   // List of conversational starters to occasionally add variety
   const conversationalStarters = [
