@@ -46,6 +46,7 @@ const formSchema = z.object({
     message: 'Project name must be at least 3 characters.',
   }),
   description: z.string().optional(),
+  startDate: z.date().optional(), // Add startDate field
   dueDate: z.date().optional(),
   owner: z.string().min(1, { message: 'Owner is required' }),
   priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
@@ -71,21 +72,23 @@ export function AddProjectDialog({ open, onOpenChange }: AddProjectDialogProps) 
       owner: 'user1', // Default owner - in a real app, this would be the current user's ID
       priority: 'medium',
       status: 'not_started',
+      startDate: new Date(), // Initialize with current date
     },
   });
 
   const createProjectMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      // Ensure we're passing a proper object structure to the API
+      // Fix: JSON serialization will convert Date objects to strings
+      // We need to handle this on the server side by parsing the ISO strings back to Date objects
+      // For now, we'll convert all date objects to ISO strings, and the server will parse them
       const projectData = {
         ...data,
-        // Include startDate as current date (as Date object, not string)
-        startDate: new Date(),
-        // Ensure dueDate is kept as a Date object if it exists
-        dueDate: data.dueDate || null,
+        // Include startDate as current date - convert to ISO string for consistent serialization
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : new Date().toISOString(),
+        // Ensure dueDate is properly formatted if it exists
+        dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
         // Make sure we're setting default values for required fields
-        progress: 0,
-        // The server will handle createdAt and updatedAt timestamps
+        progress: 0
       };
       
       // Fix: The apiRequest function expects (endpoint, method, data) but was called with (method, endpoint, data)

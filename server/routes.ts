@@ -2016,7 +2016,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/projects", async (req, res) => {
     try {
       const projectData = req.body;
-      const validatedData = insertProjectSchema.parse(projectData);
+      
+      // Pre-process dates before validation
+      // Convert ISO date strings to Date objects
+      const processedData = {
+        ...projectData,
+        startDate: projectData.startDate ? new Date(projectData.startDate) : null,
+        dueDate: projectData.dueDate ? new Date(projectData.dueDate) : null,
+        completedDate: projectData.completedDate ? new Date(projectData.completedDate) : null
+      };
+      
+      const validatedData = insertProjectSchema.parse(processedData);
       
       const project = await storage.createProject(validatedData);
       return res.status(201).json(project);
