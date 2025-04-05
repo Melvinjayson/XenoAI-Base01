@@ -38,14 +38,13 @@ export function useTextToSpeech() {
     voiceId: string = 'default',
     language: string = 'en',
     visualCommands: VisualizationCommand[] = []
-) => {
+  ) => {
     // Prevent duplicate speaks
     if (text === lastSpokenText && Date.now() - lastSpeakTime < SPEAK_DEBOUNCE_MS) {
       return;
     }
     setLastSpokenText(text);
     setLastSpeakTime(Date.now());
-  ) => {
     try {
       setError(null);
       setRetryCount(0);
