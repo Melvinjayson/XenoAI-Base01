@@ -87,7 +87,8 @@ export function AddProjectDialog({ open, onOpenChange }: AddProjectDialogProps) 
         progress: 0,
       };
       
-      const response = await apiRequest('POST', '/api/projects', projectData);
+      // Fix: The apiRequest function expects (endpoint, method, data) but was called with (method, endpoint, data)
+      const response = await apiRequest('/api/projects', 'POST', projectData);
       return response;
     },
     onSuccess: () => {
