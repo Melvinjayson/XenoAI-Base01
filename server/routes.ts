@@ -2256,7 +2256,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks", async (req, res) => {
     try {
       const taskData = req.body;
-      const validatedData = insertTaskSchema.parse(taskData);
+      
+      // Pre-process dates before validation
+      const processedData = {
+        ...taskData,
+        startDate: taskData.startDate ? new Date(taskData.startDate) : null,
+        dueDate: taskData.dueDate ? new Date(taskData.dueDate) : null,
+        completedDate: taskData.completedDate ? new Date(taskData.completedDate) : null
+      };
+      
+      const validatedData = insertTaskSchema.parse(processedData);
       
       const task = await storage.createTask(validatedData);
       return res.status(201).json(task);
@@ -2277,7 +2286,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const taskData = req.body;
-      const task = await storage.updateTask(taskId, taskData);
+      
+      // Pre-process dates before validation
+      const processedData = {
+        ...taskData,
+        startDate: taskData.startDate ? new Date(taskData.startDate) : undefined,
+        dueDate: taskData.dueDate ? new Date(taskData.dueDate) : undefined,
+        completedDate: taskData.completedDate ? new Date(taskData.completedDate) : undefined
+      };
+      
+      const task = await storage.updateTask(taskId, processedData);
       
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
@@ -2359,7 +2377,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/research-insights", async (req, res) => {
     try {
       const insightData = req.body;
-      const validatedData = insertResearchInsightSchema.parse(insightData);
+      
+      // Pre-process dates before validation
+      const processedData = {
+        ...insightData,
+        discoveryDate: insightData.discoveryDate ? new Date(insightData.discoveryDate) : null,
+        lastReviewDate: insightData.lastReviewDate ? new Date(insightData.lastReviewDate) : null
+      };
+      
+      const validatedData = insertResearchInsightSchema.parse(processedData);
       
       const insight = await storage.createResearchInsight(validatedData);
       return res.status(201).json(insight);
@@ -2380,7 +2406,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const insightData = req.body;
-      const insight = await storage.updateResearchInsight(insightId, insightData);
+      
+      // Pre-process dates before updating
+      const processedData = {
+        ...insightData,
+        discoveryDate: insightData.discoveryDate ? new Date(insightData.discoveryDate) : undefined,
+        lastReviewDate: insightData.lastReviewDate ? new Date(insightData.lastReviewDate) : undefined
+      };
+      
+      const insight = await storage.updateResearchInsight(insightId, processedData);
       
       if (!insight) {
         return res.status(404).json({ error: "Research insight not found" });
