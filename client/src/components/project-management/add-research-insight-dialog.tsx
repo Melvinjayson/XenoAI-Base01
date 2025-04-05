@@ -88,7 +88,7 @@ export function AddResearchInsightDialog({
         title: 'Research insight created successfully',
         description: 'Your new research insight has been added to the project.',
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/insights`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/research-insights', projectId] });
       form.reset();
       onOpenChange(false);
     },

@@ -420,7 +420,7 @@ export default function ProjectManagementPage(): JSX.Element {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Project List Sidebar */}
           <div className="lg:col-span-1">
-          <Card>
+            <Card>
             <CardHeader className="pb-3">
               <CardTitle>Projects</CardTitle>
               <CardDescription>

@@ -100,7 +100,7 @@ export function AddTaskDialog({ open, onOpenChange, projectId }: AddTaskDialogPr
         title: 'Task created successfully',
         description: 'Your new task has been created.',
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/tasks`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', projectId] });
       form.reset();
       onOpenChange(false);
     },
