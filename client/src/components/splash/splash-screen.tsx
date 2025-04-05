@@ -1,175 +1,92 @@
-import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useLocation } from "wouter";
-import { useLocalStorage } from "@/hooks/use-local-storage";
-import { useLanguage } from "@/context/language-context";
-import { LanguageSelector } from "@/components/language-selector";
-import { Button } from "@/components/ui/button";
-import { Brain, Search, Network, LucideIcon } from "lucide-react";
-
-interface FeatureCard {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-}
-
-const features: FeatureCard[] = [
-  {
-    icon: Brain,
-    title: "AI-Powered Learning",
-    description: "Intelligent analysis and personalized insights"
-  },
-  {
-    icon: Search,
-    title: "Smart Discovery",
-    description: "Find and connect knowledge effortlessly"
-  },
-  {
-    icon: Network,
-    title: "Knowledge Mapping",
-    description: "Visualize and understand complex topics"
-  }
-];
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useColorPalette } from '@/context/color-palette-context';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export function SplashScreen() {
-  const [progress, setProgress] = useState(0);
-  const [firstVisit, setFirstVisit] = useLocalStorage("xeno-first-visit", true);
-  const [, setLocation] = useLocation();
-  const { translate } = useLanguage();
+  const navigate = useNavigate();
+  const { loading, error } = useColorPalette();
+  const [showError, setShowError] = useState(false);
 
   useEffect(() => {
-    const loadingInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(loadingInterval);
-          return 100;
-        }
-        return prev + 5;
-      });
-    }, 100);
-
-    return () => clearInterval(loadingInterval);
-  }, []);
-
-  const handleStart = () => {
-    const audio = new Audio("/audio/click.mp3");
-    audio.volume = 0.3;
-    audio.play();
-
-    if (firstVisit) {
-      setLocation("/onboarding");
-      setFirstVisit(false);
-    } else {
-      setLocation("/");
+    if (error) {
+      setShowError(true);
     }
-  };
+  }, [error]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background gradient orbs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-primary/10 rounded-full blur-3xl animate-pulse delay-1000" />
+    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-background flex flex-col items-center justify-center p-4 space-y-8">
+      <div className="text-center space-y-4">
+        <div className="bg-primary/10 p-6 rounded-2xl mb-6">
+          <img src="/icons/icon-512x512.svg" alt="Xeno AI Logo" className="w-24 h-24 mx-auto" />
+        </div>
+
+        <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-600">
+          XENO AI
+        </h1>
+
+        <p className="text-muted-foreground text-lg max-w-md mx-auto">
+          Your intelligent companion for knowledge discovery and learning
+        </p>
       </div>
 
-      <div className="z-10 flex flex-col items-center max-w-4xl w-full gap-6 md:gap-12 px-4">
-        {/* Logo and Title */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", duration: 1 }}
-            className="w-20 h-20 md:w-24 md:h-24 mb-4 md:mb-6 mx-auto relative"
-          >
-            <div className="absolute inset-0 bg-primary/20 rounded-2xl rotate-45 animate-pulse" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Brain className="w-10 h-10 md:w-12 md:h-12 text-primary" />
-            </div>
-          </motion.div>
-          <h1 className="text-3xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
-            XENO AI
-          </h1>
-          <p className="mt-3 md:mt-4 text-sm md:text-base text-muted-foreground max-w-[280px] md:max-w-md mx-auto">
-            Your intelligent companion for knowledge discovery and learning
-          </p>
-        </motion.div>
-
-        {/* Feature Cards */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full"
-        >
-          {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 * (index + 1) }}
-              className="bg-card/50 backdrop-blur-sm p-6 rounded-xl border border-border/50"
-            >
-              <feature.icon className="w-8 h-8 text-primary mb-4" />
-              <h3 className="font-semibold mb-2">{feature.title}</h3>
-              <p className="text-sm text-muted-foreground">{feature.description}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        {/* Progress and Start Button */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="flex flex-col items-center gap-6"
-        >
-          <AnimatePresence mode="wait">
-            {progress < 100 ? (
-              <motion.div
-                key="progress"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="w-64 bg-muted rounded-full h-1 overflow-hidden"
-              >
-                <motion.div
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${progress}%` }}
-                  className="h-full bg-primary rounded-full"
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="button"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: "spring" }}
-              >
-                <Button
-                  size="lg"
-                  onClick={handleStart}
-                  className="bg-primary/90 hover:bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all"
-                >
-                  Start Exploring
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <p className="text-sm text-muted-foreground">
-            {progress === 100 ? "Ready to begin" : "Preparing your experience..."}
-          </p>
-        </motion.div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl w-full mt-12">
+        <Feature
+          icon="🧠"
+          title="AI-Powered Learning"
+          description="Intelligent analysis and personalized insights"
+        />
+        <Feature
+          icon="🔍"
+          title="Smart Discovery"
+          description="Find and connect knowledge effortlessly"
+        />
+        <Feature
+          icon="🗺️"
+          title="Knowledge Mapping"
+          description="Visualize and understand complex topics"
+        />
       </div>
 
-      {/* Language Selector */}
-      <div className="absolute top-4 right-4 z-20">
-        <LanguageSelector />
-      </div>
+      {showError && (
+        <Alert variant="destructive" className="max-w-md">
+          <AlertDescription>
+            Failed to load color palettes. Using default theme.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Button
+        size="lg"
+        className="mt-8"
+        onClick={() => navigate('/home')}
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading...
+          </>
+        ) : (
+          'Start Exploring'
+        )}
+      </Button>
+
+      <p className="text-sm text-muted-foreground mt-4">
+        Ready to begin your learning journey
+      </p>
+    </div>
+  );
+}
+
+function Feature({ icon, title, description }: { icon: string; title: string; description: string }) {
+  return (
+    <div className="bg-background/60 backdrop-blur-sm rounded-lg p-6 shadow-lg">
+      <div className="text-4xl mb-4">{icon}</div>
+      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <p className="text-muted-foreground">{description}</p>
     </div>
   );
 }
