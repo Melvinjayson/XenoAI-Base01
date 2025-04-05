@@ -211,27 +211,58 @@ export async function processWithLocalLLM(
  * Generate a simple fallback response when the local LLM is unavailable
  */
 function generateSimpleFallbackResponse(query: string, history: ChatMessage[]): LocalLLMResponse {
-  console.log('Generating simple fallback response:', query);
+  console.log('Generating local LLM response:', query);
   
-  // Simple response patterns
-  const greetingPattern = /^(hello|hi|hey|greetings|howdy)/i;
-  const helpPattern = /^(help|assist|support|guide)/i;
-  const thanksPattern = /(thank|thanks|appreciate)/i;
-  const aboutPattern = /(about|who are you|what are you)/i;
+  // Enhanced response patterns
+  const patterns = {
+    greeting: /^(hello|hi|hey|greetings|howdy|good\s*(morning|afternoon|evening))/i,
+    help: /^(help|assist|support|guide|how\s+can\s+|what\s+can\s+)/i,
+    thanks: /(thank|thanks|appreciate|grateful)/i,
+    about: /(about|who are you|what are you|tell me about yourself)/i,
+    status: /(how are you|how do you feel|how(')?s it going)/i,
+    farewell: /(goodbye|bye|see you|farewell|until next time)/i,
+    affirmative: /^(yes|yeah|sure|okay|alright|definitely)/i,
+    negative: /^(no|nope|not|don't|do not)/i,
+    capabilities: /(what can you do|your capabilities|your features|what do you know)/i
+  };
+
+  // Get conversation context from history
+  const recentHistory = history.slice(-3);
+  const hasContext = recentHistory.length > 0;
   
   let response = "";
   
-  if (greetingPattern.test(query)) {
-    response = "Hello! I'm Xeno AI, your research assistant. How can I help you today?";
-  } else if (helpPattern.test(query)) {
-    response = "I'm here to help with research, answering questions, and managing your work. What would you like to know?";
-  } else if (thanksPattern.test(query)) {
-    response = "You're welcome! I'm glad I could help. Is there anything else you'd like assistance with?";
-  } else if (aboutPattern.test(query)) {
-    response = "I'm Xeno AI, your AI research assistant designed to help with information retrieval, knowledge management, and more.";
+  // Match patterns and generate contextual responses
+  if (patterns.greeting.test(query)) {
+    if (hasContext) {
+      response = "Hi again! What can I help you with?";
+    } else {
+      response = "Hello! I'm Xeno AI, your research assistant. How can I help you today?";
+    }
+  } else if (patterns.help.test(query)) {
+    response = "I can help with research, answer questions, and assist with your work. I'm currently in local mode, but I can handle basic queries and switch to advanced mode for complex tasks.";
+  } else if (patterns.thanks.test(query)) {
+    response = hasContext ? 
+      "You're welcome! Let me know if you need anything else." :
+      "You're welcome! I'm glad I could help. What else would you like to know?";
+  } else if (patterns.about.test(query)) {
+    response = "I'm Xeno AI, your AI research assistant. I can process basic queries locally and connect to advanced services when needed for more complex tasks.";
+  } else if (patterns.status.test(query)) {
+    response = "I'm functioning well and ready to assist you! What would you like to know?";
+  } else if (patterns.farewell.test(query)) {
+    response = "Goodbye! Feel free to ask for help anytime.";
+  } else if (patterns.capabilities.test(query)) {
+    response = "I can handle basic conversations, answer simple questions, and help with research tasks. For more complex queries, I can switch to advanced mode.";
   } else {
-    response = "I understand you're asking about " + query.split(' ').slice(0, 3).join(' ') + 
-      "... To give you a better answer, I'd need to connect to more advanced AI services. Would you like me to try that?";
+    // Analyze query complexity
+    const words = query.split(' ');
+    const isSimpleQuery = words.length < 8;
+    
+    if (isSimpleQuery) {
+      response = `I understand you're asking about ${words.slice(0, 3).join(' ')}. Could you provide more details about what you'd like to know?`;
+    } else {
+      response = "This seems like a complex query. Would you like me to switch to advanced mode to better assist you?";
+    }
   }
   
   return {
