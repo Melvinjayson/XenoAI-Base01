@@ -66,12 +66,12 @@ const MindMapNode: React.FC<MindMapNodeProps> = ({
   const parentEdges = edges.filter(edge => edge.target === node.id);
   
   const nodeTypeStyles: Record<string, { bg: string, border: string, text: string }> = {
-    concept: { bg: '#E8F4FD', border: '#B4DAEF', text: '#0E67A7' },
-    insight: { bg: '#F5EBFF', border: '#E0CAFD', text: '#7922CC' },
-    question: { bg: '#FFF9E6', border: '#FAEAB3', text: '#946C00' },
-    evidence: { bg: '#E5F8EF', border: '#BFE9D6', text: '#137758' },
-    task: { bg: '#FFE8E8', border: '#FFCBCB', text: '#C92A2A' },
-    default: { bg: '#F3F4F6', border: '#D1D5DB', text: '#374151' },
+    concept: { bg: '#E8F4FD', border: '#2B8DD4', text: '#05355C' },
+    insight: { bg: '#F5EBFF', border: '#9B4DE3', text: '#4A0B8C' },
+    question: { bg: '#FFF9E6', border: '#E6A700', text: '#663D00' },
+    evidence: { bg: '#E5F8EF', border: '#28AE74', text: '#0A4E2E' },
+    task: { bg: '#FFE8E8', border: '#E35D5D', text: '#8C1D1D' },
+    default: { bg: '#F3F4F6', border: '#9CA3AF', text: '#1F2937' },
   };
   
   // Use the node type to determine styling, with fallback to default

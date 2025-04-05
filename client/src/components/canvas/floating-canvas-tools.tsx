@@ -69,40 +69,45 @@ const FloatingCanvasTools = ({
   const [selectedColor, setSelectedColor] = useState(colors[0]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const toggleTools = () => {
     setIsOpen(!isOpen);
   };
-  
+
   const selectTool = (tool: string) => {
-    const newTool = tool === activeTool ? null : tool;
-    setActiveTool(newTool);
-    
-    // Call the callback when a drawing tool is selected
-    if (onSelectDrawingTool && ['pencil', 'brush', 'eraser'].includes(tool)) {
-      onSelectDrawingTool(tool, selectedColor, strokeWidth);
+    try{
+      const newTool = tool === activeTool ? null : tool;
+      setActiveTool(newTool);
+
+      // Call the callback when a drawing tool is selected
+      if (onSelectDrawingTool && ['pencil', 'brush', 'eraser'].includes(tool)) {
+        onSelectDrawingTool(tool, selectedColor, strokeWidth);
+      }
+    } catch (error) {
+      console.error("Error selecting tool:", error);
+      // Add error handling here (e.g., display a toast message)
     }
   };
-  
+
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0 && onFileUpload) {
       onFileUpload(e.target.files[0]);
     }
   };
-  
+
   const triggerFileUpload = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
-  
+
   // Position styles
   const positionStyle = position === 'left' 
     ? { left: '20px' } 
     : { right: '20px' };
-  
+
   if (!isVisible) return null;
-  
+
   return (
     <motion.div 
       className="fixed top-1/2 -translate-y-1/2 z-50"
@@ -128,7 +133,7 @@ const FloatingCanvasTools = ({
             {isOpen ? <ChevronUp className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
           </Button>
         </div>
-        
+
         {/* Drawing tools */}
         <AnimatePresence>
           {isOpen && (
@@ -153,7 +158,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Free-hand drawing</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -168,7 +173,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Paint brush</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -183,7 +188,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Draw shapes</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -201,7 +206,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Add text</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -216,7 +221,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Erase elements</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -234,7 +239,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Add knowledge node</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -249,7 +254,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Upload files to canvas</TooltipContent>
                 </Tooltip>
-                
+
                 {/* Hidden file input */}
                 <input 
                   type="file" 
@@ -262,7 +267,7 @@ const FloatingCanvasTools = ({
             </motion.div>
           )}
         </AnimatePresence>
-        
+
         {/* Shape panel (only shown when shape tool is selected) */}
         <AnimatePresence>
           {isOpen && activeTool === 'shapes' && (
@@ -286,7 +291,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Rectangle</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -300,7 +305,7 @@ const FloatingCanvasTools = ({
                   </TooltipTrigger>
                   <TooltipContent>Circle</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -318,7 +323,7 @@ const FloatingCanvasTools = ({
             </motion.div>
           )}
         </AnimatePresence>
-        
+
         {/* Color picker */}
         {isOpen && (
           <div className="mt-2">
@@ -340,7 +345,7 @@ const FloatingCanvasTools = ({
                 />
               ))}
             </div>
-            
+
             {activeTool && ['pencil', 'brush', 'shapes'].includes(activeTool) && (
               <div className="mt-2">
                 <span className="text-xs text-gray-500 mb-1 block">Stroke Width</span>
@@ -363,7 +368,7 @@ const FloatingCanvasTools = ({
             )}
           </div>
         )}
-        
+
         {/* Settings */}
         {isOpen && (
           <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
@@ -387,7 +392,7 @@ const FloatingCanvasTools = ({
                     }`} />
                   </div>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Show Grid</span>
                   <div

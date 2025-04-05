@@ -405,3 +405,41 @@ export const insertTaskCommentSchema = z.object({
   userId: z.number().nullable(),
   content: z.string()
 });
+import { z } from 'zod';
+
+export const insertProjectSchema = z.object({
+  name: z.string().min(1, "Project name is required"),
+  description: z.string().optional(),
+  dueDate: z.string().optional().nullable(),
+  owner: z.string(),
+  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+  status: z.enum(['not_started', 'in_progress', 'blocked', 'completed']).default('not_started'),
+  createdAt: z.date().default(() => new Date()),
+  updatedAt: z.date().default(() => new Date()),
+});
+
+export const insertTaskSchema = z.object({
+  projectId: z.number(),
+  title: z.string().min(1, "Task title is required"),
+  description: z.string().optional(),
+  status: z.enum(['todo', 'in_progress', 'blocked', 'in_review', 'done']).default('todo'),
+  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+  startDate: z.date().optional().nullable(),
+  dueDate: z.date().optional().nullable(),
+  assignee: z.string().optional().nullable(),
+  estimatedHours: z.number().positive().optional().nullable(),
+});
+
+export const insertResearchInsightSchema = z.object({
+  projectId: z.number(),
+  title: z.string().min(1, "Title is required"),
+  content: z.string().min(1, "Content is required"),
+  source: z.string().optional().nullable(),
+  confidence: z.number().min(0).max(100).default(50),
+  tags: z.array(z.string()).optional(),
+  discoveryDate: z.date().default(() => new Date()),
+});
+
+export type Project = z.infer<typeof insertProjectSchema>;
+export type Task = z.infer<typeof insertTaskSchema>;
+export type ResearchInsight = z.infer<typeof insertResearchInsightSchema>;
