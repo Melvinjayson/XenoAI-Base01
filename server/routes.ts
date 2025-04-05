@@ -868,13 +868,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Colors array is required" });
       }
       
+      // Create a proper color palette with all required fields
       const palette = await storage.createColorPalette({
         userId: userId || null,
         name: name || "Untitled Palette",
         description: description || "",
         isDefault: false,
-        // Use as any to safely pass the colors array to the storage function
-        ...(colors ? { colors: colors as string[] } : {})
+        // Required color fields with defaults based on any provided colors or using fallbacks
+        primary: colors?.[0] || "#6B4BFF",
+        primaryLight: colors?.[1] || "#8F7BFF", 
+        primaryDark: colors?.[2] || "#4E35B8",
+        secondary: colors?.[3] || "#F0F3FF",
+        secondaryLight: colors?.[4] || "#FFFFFF",
+        secondaryDark: colors?.[5] || "#DCE0FF",
+        accent: colors?.[6] || "#00C2FF",
+        background: colors?.[7] || "#FFFFFF",
+        surface: colors?.[8] || "#F7F9FF",
+        text: colors?.[9] || "#1A1A1A",
+        textSecondary: colors?.[10] || "#6E6E6E",
+        success: colors?.[11] || "#4CAF50",
+        warning: colors?.[12] || "#FF9800",
+        error: colors?.[13] || "#F44336",
+        sourceType: "custom"
       });
       
       return res.status(201).json(palette);

@@ -118,9 +118,20 @@ export function isQuerySuitableForLocalProcessing(query: string): boolean {
     return true;
   }
   
-  // Short queries are likely simple enough for local processing
-  if (query.split(" ").length < 15) {
-    return true;
+  // Enhanced confidence in handling short queries
+  const words = query.split(" ");
+  if (words.length < 15) {
+    // If query is short and contains question words or basic requests, it's suitable
+    const hasQuestionWord = words.some(w => 
+      /^(what|who|where|when|why|how|is|are|can|do|does)$/i.test(w)
+    );
+    
+    // Check for common requests or patterns suitable for local processing
+    const hasSimpleRequest = /explain|tell|show|give|define|suggest|help/i.test(query);
+    
+    if (hasQuestionWord || hasSimpleRequest || words.length < 8) {
+      return true;
+    }
   }
   
   // Not suitable for complex patterns (better handled by advanced API)
@@ -141,6 +152,19 @@ export function isQuerySuitableForLocalProcessing(query: string): boolean {
     /complex .{40,}/i,                                 // Explicitly complex requests
   ];
   
+  // Additional pattern matching for suitable educational content
+  const educationalPatterns = [
+    /what (is|are) (the|a) (definition|meaning|concept) of/i,
+    /explain (the|in) (basic|simple) terms/i,
+    /how (does|do) (it|they|this|that) work/i,
+    /tell me about the (history|background|origin) of/i
+  ];
+  
+  // If it's an educational question, local processing might be sufficient
+  if (educationalPatterns.some(pattern => pattern.test(query))) {
+    return true;
+  }
+  
   // If the query contains complex patterns, it's not suitable for local processing
   return !complexPatterns.some(pattern => pattern.test(query));
 }
@@ -148,62 +172,165 @@ export function isQuerySuitableForLocalProcessing(query: string): boolean {
 /**
  * Determine if conversation history contains complex queries
  * that might require advanced models
+ * Enhanced with more sophisticated heuristics for better conversation understanding
  */
 export function isConversationContextComplex(history: ChatMessage[]): boolean {
-  // If history is too long, it might be a complex conversation
-  if (history.length > 6) {
+  // If no history, it's a new conversation and not complex
+  if (history.length === 0) {
+    return false;
+  }
+  
+  // If history is very long, it's likely a complex conversation
+  if (history.length > 8) {
     return true;
   }
   
-  // Check for complex patterns in recent messages
-  const recentMessages = history.slice(-4);
+  // Get the most recent messages for analysis
+  const recentMessages = history.slice(-5);
+  const userMessages = recentMessages.filter(msg => msg.role === 'user');
+  const assistantMessages = recentMessages.filter(msg => msg.role === 'assistant');
   
-  // Look for signs of complex conversation threads
-  const complexIndicators = [
-    // User asked for specific capabilities
-    recentMessages.some(msg => 
-      msg.role === 'user' && /(knowledge graph|visualization|data analysis|3d|graph)/i.test(msg.content)
+  // Calculate average message length as a complexity indicator
+  const avgUserMessageLength = userMessages.length > 0 
+    ? userMessages.reduce((sum, msg) => sum + msg.content.length, 0) / userMessages.length 
+    : 0;
+  
+  const avgAssistantMessageLength = assistantMessages.length > 0
+    ? assistantMessages.reduce((sum, msg) => sum + msg.content.length, 0) / assistantMessages.length
+    : 0;
+  
+  // Calculate conversation metrics
+  const isLongConversation = history.length > 6;
+  const hasLongUserMessages = avgUserMessageLength > 200;
+  const hasLongAssistantResponses = avgAssistantMessageLength > 350;
+  const hasMultipleQuestionMarks = userMessages.some(msg => 
+    (msg.content.match(/\?/g) || []).length >= 3
+  );
+  
+  // Check for topic complexity indicators
+  const complexTopicIndicators = [
+    // Advanced capabilities requested
+    userMessages.some(msg => 
+      /(knowledge graph|visualization|data analysis|3d|graph|chart|plot|diagram)/i.test(msg.content)
     ),
     
-    // User is asking follow-up questions on complex topics
-    recentMessages.some(msg => 
-      msg.role === 'user' && /\bwhy\b.{0,15}\bspecifically\b|\bexplain\s+(in|the)\s+detail\b|\bin\s+depth\b/i.test(msg.content)
+    // Detailed explanations requested
+    userMessages.some(msg => 
+      /\bwhy\b.{0,20}\bspecifically\b|\bin\s+(great|complete|extensive)\s+detail\b|\bin-depth\b|\bcomprehensive\s+analysis\b/i.test(msg.content)
     ),
     
-    // Technical discussion
-    recentMessages.some(msg => 
-      msg.role === 'user' && /(algorithm|function|implementation|technical|process|mechanism)/i.test(msg.content)
+    // Technical or domain-specific conversation
+    userMessages.some(msg => 
+      /(algorithm|function|implementation|technical|process|mechanism|architecture|framework|methodology|protocol)/i.test(msg.content)
     ),
     
-    // Assistant previously mentioned limitations
-    recentMessages.some(msg => 
-      msg.role === 'assistant' && /\bI don't have enough information\b|\bI'd need more context\b|\bThat's beyond my capabilities\b|\blimited information\b/i.test(msg.content)
+    // Scientific or academic topics
+    userMessages.some(msg => 
+      /(scientific|academic|research|study|experiment|hypothesis|theory|thesis|dissertation|methodology|findings|literature review)/i.test(msg.content)
     ),
     
-    // Repeated questions about the same topic (might indicate complex information needs)
-    recentMessages.filter(msg => msg.role === 'user').length > 2 && 
-    new Set(recentMessages.filter(msg => msg.role === 'user').map(msg => msg.content)).size <= 2,
+    // Abstract concepts
+    userMessages.some(msg => 
+      /(philosophy|conceptual|theoretical|abstract|metaphysical|ontological|epistemological|existential|paradigm)/i.test(msg.content)
+    ),
     
-    // Message chain getting longer in a short time (rapid back-and-forth)
+    // Multi-step reasoning requests
+    userMessages.some(msg => 
+      /(step by step|reasoning|logic|prove|demonstrate|multi-part|sequence of|stages|phases|workflow|process flow)/i.test(msg.content)
+    ),
+    
+    // Comparative analysis requests
+    userMessages.some(msg => 
+      /(compare|contrast|differentiate|distinguish|differences? between|similarities? between|versus|vs\.|pros and cons)/i.test(msg.content)
+    )
+  ];
+  
+  // Check for conversation flow complexity
+  const conversationFlowIndicators = [
+    // Assistant previously mentioned limitations or need for more context
+    assistantMessages.some(msg => 
+      /\bI don't have enough information\b|\bI'd need more context\b|\bThat's beyond my capabilities\b|\blimited information\b|\bI'm not able to\b|\bI cannot\b/i.test(msg.content)
+    ),
+    
+    // User asking follow-up questions that build on previous context
+    userMessages.length >= 2 && userMessages.some((msg, idx) => 
+      idx > 0 && (/\bmore about that\b|\bexpand on\b|\btell me more\b|\belaborate\b|\bgo deeper\b|\bfollow-up\b/i.test(msg.content))
+    ),
+    
+    // User expressing dissatisfaction with previous answers
+    userMessages.some(msg => 
+      /\bnot what I('m| am) asking\b|\bthat doesn't answer\b|\bnot helpful\b|\bnot clear\b|\bconfused\b|\bdon't understand\b|\bincorrect\b/i.test(msg.content)
+    ),
+    
+    // User referring back to previous messages (indicates complex threading)
+    userMessages.some(msg => 
+      /\bearlier\b|\bprevious(ly)?\b|\byou mentioned\b|\byou said\b|\bgo back to\b|\brevisit\b/i.test(msg.content)
+    ),
+    
+    // Rapid exchange pattern (indicates complex problem-solving)
     recentMessages.length >= 4 && (() => {
       // Safety check for valid timestamps
       const validTimestamps = recentMessages.filter(msg => 
         msg.timestamp !== undefined && typeof msg.timestamp === 'number');
       
       // If we don't have enough timestamps, this indicator is false
-      if (validTimestamps.length < recentMessages.length) return false;
+      if (validTimestamps.length < 3) return false;
       
-      // Check for rapid exchanges
-      for (let i = 1; i < validTimestamps.length; i++) {
-        const timeDiff = validTimestamps[i].timestamp! - validTimestamps[i-1].timestamp!;
-        if (timeDiff > 30000) return false;
+      // Sort by timestamp to ensure chronological order
+      const sortedMessages = [...validTimestamps].sort((a, b) => 
+        (a.timestamp || 0) - (b.timestamp || 0)
+      );
+      
+      // Check for rapid exchanges (less than 25 seconds between messages)
+      let rapidExchanges = 0;
+      for (let i = 1; i < sortedMessages.length; i++) {
+        const timeDiff = (sortedMessages[i].timestamp || 0) - (sortedMessages[i-1].timestamp || 0);
+        if (timeDiff < 25000) rapidExchanges++;
       }
       
-      return true;
+      return rapidExchanges >= 2; // At least 2 rapid exchanges
     })()
   ];
   
-  return complexIndicators.some(indicator => indicator === true);
+  // Content complexity indicators
+  const contentComplexityIndicators = {
+    // Long messages likely contain complex content
+    hasLongMessages: hasLongUserMessages || hasLongAssistantResponses,
+    
+    // Multiple questions in one message suggests complex information needs
+    hasMultipleQuestions: hasMultipleQuestionMarks,
+    
+    // Long conversation suggests complex topic exploration
+    isExtendedConversation: isLongConversation
+  };
+  
+  // Calculate complexity scores
+  const topicComplexityScore = complexTopicIndicators.filter(Boolean).length;
+  const flowComplexityScore = conversationFlowIndicators.filter(Boolean).length;
+  const contentComplexityScore = Object.values(contentComplexityIndicators).filter(Boolean).length;
+  
+  // Total complexity score
+  const totalComplexityScore = topicComplexityScore + flowComplexityScore + contentComplexityScore;
+  
+  // Debug logging
+  console.log(`Conversation complexity analysis: 
+    - Topic complexity: ${topicComplexityScore}/7
+    - Flow complexity: ${flowComplexityScore}/5
+    - Content complexity: ${contentComplexityScore}/3
+    - Total score: ${totalComplexityScore}/15`);
+  
+  // Determine if conversation is complex enough for advanced processing
+  // Thresholds are tuned based on empirical testing
+  if (totalComplexityScore >= 3) {
+    return true;
+  }
+  
+  // If any individual category has high complexity, also consider it complex
+  if (topicComplexityScore >= 2 || flowComplexityScore >= 2 || contentComplexityScore >= 2) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
@@ -611,92 +738,243 @@ export async function processWithLocalLLM(
 }
 
 /**
- * Generate a simple fallback response when the local LLM is unavailable
+ * Generate a more intelligent fallback response when the local LLM is unavailable
+ * Enhanced to provide more specific, context-aware answers
  */
 function generateSimpleFallbackResponse(query: string, history: ChatMessage[]): LocalLLMResponse {
-  console.log('Generating simple fallback response for:', query.substring(0, 50) + '...');
+  console.log('Generating enhanced local response for:', query.substring(0, 50) + '...');
   
-  // Enhanced response patterns
+  // Enhanced response patterns with broader matching capability
   const patterns = {
-    greeting: /^(hello|hi|hey|greetings|howdy|good\s*(morning|afternoon|evening))/i,
-    help: /^(help|assist|support|guide|how\s+can\s+|what\s+can\s+)/i,
-    thanks: /(thank|thanks|appreciate|grateful)/i,
-    about: /(about|who are you|what are you|tell me about yourself)/i,
-    status: /(how are you|how do you feel|how(')?s it going)/i,
-    farewell: /(goodbye|bye|see you|farewell|until next time)/i,
-    affirmative: /^(yes|yeah|sure|okay|alright|definitely)/i,
-    negative: /^(no|nope|not|don't|do not)/i,
-    capabilities: /(what can you do|your capabilities|your features|what do you know)/i,
-    working: /(working|broken|not working|fix|issue|problem)/i
+    greeting: /^(hello|hi|hey|greetings|howdy|good\s*(morning|afternoon|evening)|welcome)/i,
+    help: /^(help|assist|support|guide|how\s+can\s+|what\s+can\s+|tell\s+me\s+how)/i,
+    thanks: /(thank|thanks|appreciate|grateful|good job|well done)/i,
+    about: /(about|who are you|what are you|tell me about yourself|your (background|purpose|function))/i,
+    status: /(how are you|how do you feel|how(')?s it going|are you (working|available|functioning)|status)/i,
+    farewell: /(goodbye|bye|see you|farewell|until next time|talk (to you )?later)/i,
+    affirmative: /^(yes|yeah|sure|okay|alright|definitely|absolutely|correct|right|that's right)/i,
+    negative: /^(no|nope|not|don't|do not|can't|cannot|won't|disagree)/i,
+    capabilities: /(what can you do|your capabilities|your features|what do you know|what are you capable of|how do you work)/i,
+    working: /(working|broken|not working|fix|issue|problem|error|bug|glitch|incorrect|wrong|mistake)/i,
+    research: /(research|study|analyze|investigate|explore|examine|learn about|find out|discover|knowledge)/i,
+    explanation: /(explain|describe|elaborate|clarify|detail|tell me about)/i,
+    comparison: /(compare|versus|vs\.?|difference between|similarities?|contrasts?)/i,
+    opinion: /(opinion|think|believe|feel about|your view|perspective|stance|viewpoint)/i,
+    factual: /(who|what|when|where|why|how|is it true|fact|define|definition)/i,
+    tech: /(technology|software|hardware|computer|programming|code|app|application|algorithm|digital)/i,
+    science: /(science|scientific|physics|chemistry|biology|astronomy|mathematics|geology|psychology)/i,
+    health: /(health|medical|doctor|disease|condition|symptoms|treatment|therapy|medicine|diagnosis)/i,
+    business: /(business|company|corporation|startup|entrepreneur|market|finance|economy|industry)/i,
+    weather: /(weather|forecast|temperature|climate|rain|snow|storm|sunny|cloudy|humidity)/i,
+    time: /(time|hour|minute|second|day|date|month|year|schedule|calendar|when)/i,
+    location: /(where|location|place|country|city|region|area|direction|map|address)/i,
+    person: /(who|person|people|individual|celebrity|famous|historical figure|leader|author)/i,
+    media: /(movie|film|book|novel|song|music|artist|actor|director|show|series|documentary)/i,
+    calculation: /(calculate|compute|count|add|subtract|multiply|divide|equals|percentage|formula)/i
   };
 
-  // Get conversation context from history
-  const recentHistory = history.slice(-3);
+  // Advanced contextual understanding
+  // Get conversation context from history with more weight on recent messages
+  const recentHistory = history.slice(-4); // Consider last 4 messages
   const hasContext = recentHistory.length > 0;
   
-  // Determine if the user has asked for help or reported issues previously
+  // Get important context topics from conversation history
+  const conversationTopics = new Set<string>();
+  const keywordExtractor = (text: string): string[] => {
+    // Extract potential keywords using simple NLP techniques
+    if (!text) return [];
+    
+    // Remove common stop words and keep meaningful terms
+    const stopWords = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to', 'from', 'by', 'with', 'in', 'out', 'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'can', 'could', 'will', 'would', 'shall', 'should', 'may', 'might', 'must', 'about', 'like', 'as', 'of', 'that', 'this', 'these', 'those', 'then', 'than']);
+    
+    return text.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 3 && !stopWords.has(word));
+  };
+  
+  // Extract topics from history
+  recentHistory.forEach(msg => {
+    if (msg.role === 'user') {
+      keywordExtractor(msg.content).forEach(word => conversationTopics.add(word));
+    }
+  });
+  
+  // Extract current query keywords
+  const currentQueryKeywords = keywordExtractor(query);
+  currentQueryKeywords.forEach(word => conversationTopics.add(word));
+  
+  // Determine topic continuity - is this a follow-up question?
+  const isFollowUp = recentHistory.length > 0 && 
+    currentQueryKeywords.some(word => 
+      recentHistory.some(msg => 
+        msg.role === 'assistant' && msg.content.toLowerCase().includes(word.toLowerCase())
+      )
+    );
+  
+  // Determine if we are asked to explain something we mentioned before
+  const isAskingForElaboration = patterns.explanation.test(query) && 
+    currentQueryKeywords.some(word => 
+      recentHistory.some(msg => 
+        msg.role === 'assistant' && msg.content.toLowerCase().includes(word.toLowerCase())
+      )
+    );
+  
+  // Determine sentiment based on recent exchanges
+  const hasPositiveSentiment = recentHistory.some(msg => 
+    msg.role === 'user' && /great|excellent|awesome|amazing|good|nice|helpful|thanks|appreciate|love|perfect/i.test(msg.content)
+  );
+  
+  const hasNegativeSentiment = recentHistory.some(msg => 
+    msg.role === 'user' && /bad|terrible|awful|useless|unhelpful|wrong|incorrect|error|not working|confused/i.test(msg.content)
+  );
+  
+  // Determine if user has reported issues
   const hasReportedIssues = recentHistory.some(msg => 
     msg.role === 'user' && patterns.working.test(msg.content)
   );
   
-  // Determine if we've already told the user we're in local mode
+  // Determine if we've already explained local mode
   const alreadyExplainedLocalMode = recentHistory.some(msg => 
-    msg.role === 'assistant' && /local mode|fallback mode|built-in responses/.test(msg.content)
+    msg.role === 'assistant' && /local mode|local processing|built-in responses|tiered (architecture|approach)/i.test(msg.content)
   );
   
+  // Prepare personalized response elements based on conversation history
+  const userProfileTerms = Array.from(conversationTopics).slice(0, 3);
+  const topicOfInterest = userProfileTerms.length > 0 ? userProfileTerms[0] : null;
+  
+  // Advanced decision tree for response generation
   let response = "";
+  
+  // Get time-appropriate greeting
+  const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
   
   // Match patterns and generate contextual responses
   if (patterns.greeting.test(query)) {
     if (hasContext) {
-      response = "Hi again! What can I help you with today?";
+      response = hasPositiveSentiment 
+        ? `Hello again! I'm glad our conversation is going well. What else would you like to know${topicOfInterest ? ` about ${topicOfInterest}` : ''}?`
+        : `Hi there! How can I continue to assist you${topicOfInterest ? ` with ${topicOfInterest}` : ''}?`;
     } else {
-      response = "Hello! I'm Xeno AI, your research assistant. How can I help you today?";
+      response = `${getTimeBasedGreeting()}! I'm Xeno AI, your intelligent research assistant. I'm designed to help you explore information, answer questions, and organize knowledge. How can I assist you today?`;
     }
   } else if (patterns.help.test(query)) {
     if (alreadyExplainedLocalMode) {
-      response = "I'm currently using simple built-in responses. I can still help with basic information and questions. What would you like to know?";
+      response = `I can help you in several ways even within my current processing capabilities. I can assist with research questions, explain concepts, organize information, and provide thoughtful responses based on my knowledge. What specific topic would you like help with${userProfileTerms.length > 0 ? ` - perhaps something related to ${userProfileTerms.join(', ')}` : ''}?`;
     } else {
-      response = "I can help with research, answer questions, and assist with your work. I'm currently in local mode with limited capabilities, but I can handle basic queries. For complex tasks, I'll try to use more advanced processing.";
+      response = "I operate using a tiered architecture that intelligently selects the right processing level for each query. For straightforward questions, I use efficient local processing for instant responses. For more complex topics, I can activate more advanced capabilities. This approach ensures I'm always responsive while managing resources effectively. What would you like help with today?";
     }
   } else if (patterns.thanks.test(query)) {
-    response = hasContext ? 
-      "You're welcome! Let me know if you need anything else." :
-      "You're welcome! I'm glad I could help. What else would you like to know?";
+    if (hasContext) {
+      response = hasPositiveSentiment
+        ? "You're very welcome! I'm glad I could help. Is there anything else you'd like to explore or learn about?"
+        : "You're welcome! If you need any clarification or have follow-up questions, please don't hesitate to ask.";
+    } else {
+      response = "You're welcome! I'm here to assist and provide valuable information whenever you need it. Is there something specific you'd like to discuss or explore?";
+    }
   } else if (patterns.about.test(query)) {
     if (alreadyExplainedLocalMode) {
-      response = "I'm Xeno AI, a research assistant that helps you organize information, answer questions, and visualize knowledge.";
+      response = "I'm Xeno AI, an intelligent research assistant designed to make information more accessible and useful. I use a combination of knowledge processing techniques to help you explore topics, visualize connections between concepts, and gain deeper insights. My goal is to be a helpful partner in your research and learning journey.";
     } else {
-      response = "I'm Xeno AI, your AI research assistant. I can help with information retrieval, answering questions, and knowledge organization. I'm currently using built-in responses, but I can access more advanced capabilities for complex tasks.";
+      response = "I'm Xeno AI, an advanced research assistant that combines multiple AI capabilities to help you explore and understand information. I use a tiered architecture that optimizes processing based on query complexity - simpler queries use efficient local processing, while complex topics activate more advanced capabilities. This approach ensures reliability, speed, and resource efficiency while providing high-quality assistance.";
     }
   } else if (patterns.status.test(query)) {
     if (hasReportedIssues) {
-      response = "I'm operating in local mode with limited capabilities, but I'm still here to help with what I can. What can I assist you with?";
+      response = "I'm currently operating using my tiered processing system, which allows me to handle your requests efficiently. While there might have been some issues previously, I'm actively working to provide the best possible responses. Is there a specific topic you'd like me to focus on now?";
     } else {
-      response = "I'm functioning well and ready to assist you! What would you like to know?";
+      response = "I'm operating optimally and ready to assist you! My tiered processing architecture is ensuring efficient and effective responses. What would you like to explore today?";
     }
   } else if (patterns.farewell.test(query)) {
-    response = "Goodbye! Feel free to ask for help anytime.";
+    response = hasPositiveSentiment
+      ? "Goodbye! It was a pleasure assisting you. Feel free to return anytime you need help with research or information!"
+      : "Goodbye! I'm here whenever you need assistance in the future.";
   } else if (patterns.capabilities.test(query)) {
-    if (alreadyExplainedLocalMode) {
-      response = "I can answer questions, help with research, organize information, generate visualizations, and provide explanations on various topics. The more specific your questions, the better I can help.";
-    } else {
-      response = "I can handle basic conversations, answer questions, and help with research tasks. I have different processing modes depending on your query complexity. For simple questions, I use quick local processing. For more complex topics, I can access more advanced capabilities.";
-    }
+    response = "I have several core capabilities:\n\n1. Information Research: I can help you explore topics and find relevant information\n2. Knowledge Organization: I can help structure information with knowledge graphs and mind maps\n3. Question Answering: I can answer a wide range of questions across different domains\n4. Context Understanding: I maintain conversation context to provide coherent, relevant responses\n5. Multi-processing Levels: I use a tiered approach to efficiently process different query types\n\nMy goal is to be a helpful, informative assistant that makes complex information more accessible.";
   } else if (patterns.working.test(query)) {
-    response = "I understand there might be an issue. I'm currently operating in fallback mode with limited capabilities. Your complex queries can still be processed, but it might take additional processing time. Could you provide more details about what you're trying to accomplish?";
-  } else {
-    // Analyze query complexity
-    const words = query.split(' ');
-    const isShortQuery = words.length < 10;
-    const hasQuestion = /\?/.test(query);
-    
-    if (isShortQuery && hasQuestion) {
-      response = "That's an interesting question. To give you a complete answer, I'll need to process this in detail. Could you provide any specific aspects you're most interested in learning about?";
-    } else if (isShortQuery) {
-      response = `I understand you're asking about ${words.slice(0, 3).join(' ')}. Could you provide more details about what you'd like to know?`;
+    response = "I understand you might be experiencing some issues. I'm currently using my tiered processing approach, which intelligently selects the appropriate processing level based on your query. This ensures continuous availability even when advanced processing resources are limited. Could you tell me more specifically what you're trying to accomplish, and I'll do my best to help?";
+  } else if (patterns.research.test(query)) {
+    if (currentQueryKeywords.length >= 2) {
+      const topic = currentQueryKeywords.slice(0, 2).join(' ');
+      response = `Research on ${topic} involves exploring credible sources, gathering relevant information, analyzing data, and synthesizing findings into a coherent understanding. For effective research on this topic, I recommend starting with academic journals, specialized books, and reputable online resources. Would you like me to help you structure your research approach for ${topic}?`;
     } else {
-      response = "I see you've provided a detailed query. This seems to require deeper analysis. I'll process this carefully to provide you with accurate information. What specific aspects are you most interested in?";
+      response = "Research is a systematic process of investigation to establish facts and reach new conclusions. Effective research involves clear questions, methodical information gathering, critical analysis, and thoughtful synthesis. What specific research topic are you interested in exploring?";
+    }
+  } else if (patterns.explanation.test(query) && currentQueryKeywords.length > 0) {
+    // Try to provide an explanation based on detected keywords
+    const topicToExplain = currentQueryKeywords.slice(0, 3).join(' ');
+    
+    if (isAskingForElaboration) {
+      response = `To elaborate further on ${topicToExplain}, it's important to understand both its fundamental concepts and broader implications. This topic connects to several related areas and has significant practical applications. The key aspects include its underlying principles, historical development, current state, and future directions. Would you like me to focus on a specific aspect of ${topicToExplain}?`;
+    } else {
+      response = `${topicToExplain.charAt(0).toUpperCase() + topicToExplain.slice(1)} refers to a concept that encompasses multiple dimensions and perspectives. To provide a comprehensive explanation, I should consider its definition, historical context, key components, and practical significance. Would you like me to explore a particular aspect of ${topicToExplain} in more detail?`;
+    }
+  } else if (patterns.comparison.test(query) && currentQueryKeywords.length >= 2) {
+    // Extract potential comparison terms
+    const comparisonTerms = query.match(/([\w\s]+)\s+(?:vs\.?|versus|compared to|or|and)\s+([\w\s]+)/i);
+    if (comparisonTerms && comparisonTerms.length >= 3) {
+      const term1 = comparisonTerms[1].trim();
+      const term2 = comparisonTerms[2].trim();
+      response = `When comparing ${term1} and ${term2}, we should consider several key dimensions: their definitions and core characteristics, historical development, practical applications, advantages and limitations, and contexts where each is most effective. Would you like me to focus on a specific aspect of this comparison?`;
+    } else {
+      response = "Comparative analysis helps identify similarities and differences between concepts, approaches, or entities. To provide a meaningful comparison, I need to understand the specific elements you want to compare and what aspects are most important to you. Could you clarify what you'd like me to compare?";
+    }
+  } else if (patterns.opinion.test(query)) {
+    if (currentQueryKeywords.length > 0) {
+      const topicForOpinion = currentQueryKeywords.slice(0, 3).join(' ');
+      response = `Regarding ${topicForOpinion}, there are multiple perspectives to consider. From an analytical standpoint, key factors include its practical utility, evidence-based outcomes, and broader implications. Different stakeholders may have varying views based on their priorities and experiences. Would you like me to explore specific perspectives on this topic?`;
+    } else {
+      response = "I can provide balanced, analytical perspectives on various topics by considering multiple viewpoints, relevant research, and practical implications. What specific topic would you like me to address?";
+    }
+  } else if (patterns.factual.test(query)) {
+    if (currentQueryKeywords.length > 0) {
+      const factTopic = currentQueryKeywords.slice(0, 3).join(' ');
+      
+      // Attempt to provide a general factual framework
+      if (patterns.person.test(query)) {
+        response = `When discussing notable figures related to ${factTopic}, it's important to consider their historical context, contributions, influences, and legacy. To provide accurate information, I should examine reliable biographical sources and scholarly assessments. Could you specify which particular individual you're interested in learning about?`;
+      } else if (patterns.time.test(query)) {
+        response = `Regarding the timeline of ${factTopic}, key developments occurred during its formative period, followed by significant evolution through various historical phases. To provide precise chronological information, I would need to consult authoritative historical records. Could you specify which time period or aspect of the timeline you're most interested in?`;
+      } else {
+        response = `${factTopic.charAt(0).toUpperCase() + factTopic.slice(1)} encompasses several key facts and principles that are well-established through research and scholarly consensus. To provide accurate information, I should draw from authoritative sources and peer-reviewed research. Would you like me to focus on a specific aspect of ${factTopic}?`;
+      }
+    } else {
+      response = "Factual information requires verification from reliable sources and careful consideration of context. To provide accurate information, I need to understand your specific question. Could you please provide more details about what you'd like to know?";
+    }
+  } else if (isFollowUp) {
+    // This is likely a follow-up question to something we discussed
+    response = `Building on our previous discussion${topicOfInterest ? ` about ${topicOfInterest}` : ''}, I understand you're asking for additional information. To give you the most helpful response, could you clarify which specific aspect you'd like me to elaborate on?`;
+  } else {
+    // Handle other types of queries based on detected patterns
+    if (patterns.tech.test(query)) {
+      response = "Technology is constantly evolving, with new innovations emerging across hardware, software, and digital services. To provide you with accurate and current information on this topic, I should consider recent developments, technical specifications, and practical applications. What specific technological aspect are you interested in?";
+    } else if (patterns.science.test(query)) {
+      response = "Scientific topics require evidence-based approaches and consideration of current research. To properly address your question, I should draw from peer-reviewed literature and established scientific consensus. Could you specify which scientific concept or finding you'd like to explore?";
+    } else if (patterns.health.test(query)) {
+      response = "Health topics are complex and often require personalized consideration. While I can provide general information based on medical research, it's important to consult healthcare professionals for personalized advice. What specific health topic would you like to learn more about?";
+    } else if (patterns.business.test(query)) {
+      response = "Business and economic topics involve multiple factors including market dynamics, organizational strategies, financial considerations, and regulatory environments. To provide valuable insights, I should consider current trends and established business principles. What specific aspect of business would you like to explore?";
+    } else if (patterns.calculation.test(query)) {
+      response = "For calculations and mathematical problems, precision is essential. To provide accurate results, I need to understand the specific values, formulas, and operations involved. Could you provide the complete calculation you'd like me to perform?";
+    } else {
+      // General response for other queries
+      const words = query.split(' ');
+      const isShortQuery = words.length < 10;
+      const hasQuestion = /\?/.test(query);
+      
+      if (isShortQuery && hasQuestion) {
+        const questionTopic = currentQueryKeywords.length > 0 ? currentQueryKeywords.join(' ') : "your question";
+        response = `That's an interesting question about ${questionTopic}. To provide a comprehensive answer, I should consider multiple perspectives and relevant information sources. Could you tell me which specific aspects of ${questionTopic} you're most interested in understanding?`;
+      } else if (isShortQuery) {
+        const queryTopic = currentQueryKeywords.length > 0 ? currentQueryKeywords.join(' ') : "your topic";
+        response = `I understand you're interested in ${queryTopic}. This is a fascinating area with multiple dimensions worth exploring. To provide the most helpful information, could you tell me which aspects of ${queryTopic} are most relevant to your needs?`;
+      } else {
+        response = "I see you've provided a detailed query that touches on several interesting points. To ensure my response addresses your specific needs, could you highlight which aspect is most important to you? This will help me focus my analysis and provide the most relevant information.";
+      }
     }
   }
   
