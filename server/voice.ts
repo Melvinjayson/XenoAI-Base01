@@ -151,56 +151,72 @@ function optimizeTextForVoice(text: string, maxLength: number = 500): string {
 
 // Function to make short voice responses more natural and conversational
 function enhanceShortVoiceResponse(text: string): string {
-  // Always return unmodified response when in fallback mode
-  if (process.env.USE_FALLBACK_VOICE === 'true' || text.length < 20) return text;
-
-  // List of conversational starters to occasionally add variety
+  // Always return unmodified response in these cases
+  if (process.env.USE_FALLBACK_VOICE === 'true' || text.length < 30) return text;
+  
+  // Create a hash of the text to ensure consistent but varied responses
+  // This prevents the same filler being added to the same text repeatedly
+  const textHash = text.length.toString() + text.charCodeAt(0) + text.charCodeAt(text.length - 1);
+  const hashValue = parseInt(textHash) % 100; // Create a number between 0-99
+  
+  // List of conversation enhancers - carefully selected for natural speech
   const conversationalStarters = [
-    "So, ", 
-    "Well, ", 
-    "Actually, ", 
-    "You know, ", 
-    "Let me see... ", 
-    "Hmm, ", 
-    "I'd say ", 
-    "I think "
+    "", // Empty option to sometimes leave text as-is (no starter)
+    "", 
+    "", 
+    "", // Multiple empty entries to reduce likelihood of adding starters
+    "To answer that, ", 
+    "I think ",
+    "Based on what I know, ",
+    "From my understanding, "
   ];
 
-  // List of verbal punctuation to make speech sound more natural
+  // Verbal punctuation for natural flow
   const verbalBreathers = [
-    ", right?",
-    ", you see?",
-    ", you know?",
-    " — as you might expect",
-    " — interestingly enough"
+    "",
+    "",
+    "",
+    " — which is interesting",
+    " — and that's important to note",
+    " — if that makes sense"
   ];
 
-  // Probability controls (we don't want to add these to every response)
-  const shouldAddStarter = Math.random() < 0.4; // 40% chance
-  const shouldAddBreather = text.length > 100 && Math.random() < 0.3; // 30% chance for longer texts
+  // Use the hash to deterministically choose whether to add flair
+  // This makes responses consistent for the same input but varied across inputs
+  // Only add starters ~25% of the time to prevent overuse
+  const shouldAddStarter = hashValue % 4 === 0;
+  // Only add breathers ~15% of the time for longer texts
+  const shouldAddBreather = text.length > 120 && hashValue % 7 === 0;
 
-  // Add conversational starter to beginning of text
-  if (shouldAddStarter) {
-    const starter = conversationalStarters[Math.floor(Math.random() * conversationalStarters.length)];
-    // Only add the starter if the text doesn't already begin with something similar
-    const firstWord = text.split(' ')[0].toLowerCase();
-    if (!conversationalStarters.some(s => firstWord === s.trim().toLowerCase())) {
+  // Determine if the text already has conversational markers
+  const hasConversationalMarker = /^(Well|So|Actually|Now|Hmm|Let me|I think|I'd say|You know)/i.test(text);
+  
+  // Add conversational starter to beginning of text if appropriate
+  if (shouldAddStarter && !hasConversationalMarker) {
+    // Use hash value to deterministically select a starter
+    const starterIndex = Math.floor(hashValue / 10) % conversationalStarters.length;
+    const starter = conversationalStarters[starterIndex];
+    
+    if (starter) { // Only proceed if we didn't select an empty starter
       // Convert first letter to lowercase after the starter
       text = starter + text.charAt(0).toLowerCase() + text.substring(1);
     }
   }
 
-  // Add verbal breather in the middle of a longer text
+  // Add verbal breather in the middle of a longer text for natural flow
   if (shouldAddBreather) {
     const sentences = text.split('. ');
-    if (sentences.length > 2) {
+    if (sentences.length > 3) { // Only for texts with multiple sentences
       // Choose a sentence in the middle to add the breather
       const middleIndex = Math.floor(sentences.length / 2);
-      const breather = verbalBreathers[Math.floor(Math.random() * verbalBreathers.length)];
-
-      // Add the breather at the end of the selected sentence
-      sentences[middleIndex] = sentences[middleIndex] + breather;
-      text = sentences.join('. ');
+      const breatherIndex = hashValue % verbalBreathers.length;
+      const breather = verbalBreathers[breatherIndex];
+      
+      if (breather) { // Only proceed if we didn't select an empty breather
+        // Add the breather at the end of the selected sentence
+        sentences[middleIndex] = sentences[middleIndex] + breather;
+        text = sentences.join('. ');
+      }
     }
   }
 

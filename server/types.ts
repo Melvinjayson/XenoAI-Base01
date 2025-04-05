@@ -35,6 +35,9 @@ export interface AssetData {
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  timestamp?: number; // Optional timestamp for tracking conversation flow
+  id?: string; // Optional unique identifier for the message
+  metadata?: Record<string, any>; // Optional metadata for additional context
 }
 
 export interface ChatResponse {

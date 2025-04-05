@@ -10,6 +10,7 @@ import { queryPerplexity, perplexitySearchConversation } from "./perplexity";
 import { uploadAndAnalyzeImage, extractColorsFromUrl } from "./color-analyzer";
 import { hexToRgb, rgbToHex } from "../client/src/lib/color-utils";
 import { apiQuotaManager } from "./api-quota-manager";
+import { processWithLocalLLM, isQuerySuitableForLocalProcessing, isConversationContextComplex } from "./local-llm";
 import { 
   generateContent, 
   processCommand, 
@@ -177,6 +178,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!message) {
         return res.status(400).json({ error: "Message is required" });
+      }
+      
+      // Log the chat request
+      console.log(`Chat request received: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
+      
+      // Try to use local LLM processing first for suitable queries
+      // Only bypass local processing if forceAdvancedModel is true or if query requires advanced features
+      let usedLocalLLM = false;
+      
+      if (!forceAdvancedModel && 
+          isQuerySuitableForLocalProcessing(message) && 
+          !isConversationContextComplex(history || [])) {
+        
+        try {
+          console.log("Using local LLM for chat processing");
+          // Process with local LLM (or simulation)
+          const localResponse = await processWithLocalLLM(message, history || [], {
+            systemPrompt: "You are Xeno AI, a helpful research assistant. You provide concise, accurate information."
+          });
+          
+          if (localResponse) {
+            console.log("Successfully generated response with local LLM");
+            usedLocalLLM = true;
+            
+            return res.json({
+              message: localResponse.message,
+              isLocal: true,
+              backend: localResponse.backend || 'local',
+              modelInfo: localResponse.modelName || 'Local LLM',
+              sources: [],
+              fallback: false
+            });
+          }
+        } catch (localError) {
+          console.error("Local LLM processing failed:", localError);
+          // Continue to advanced processing
+        }
       }
 
       // Log the model preference for debugging

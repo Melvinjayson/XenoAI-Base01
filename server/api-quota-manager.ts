@@ -8,6 +8,9 @@ interface QuotaUsage {
   resetTime: number;
   dailyQuota: number;
   hourlyQuota: number;
+  consecutiveFailures?: number; // Track consecutive API failures
+  lastFailureTime?: number;     // When the last failure occurred
+  backoffUntil?: number;        // Timestamp until which we should back off
 }
 
 interface RateLimitInfo {
@@ -19,6 +22,11 @@ interface RateLimitInfo {
 /**
  * API Quota Manager to prevent quota exceeded errors
  * Tracks and manages API usage across different services
+ * 
+ * Enhanced to support tiered fallback architecture with:
+ * - Quota tracking for local LLM usage
+ * - Exponential backoff for failed API calls
+ * - Dynamic quota adjustment based on observed rate limits
  */
 export class ApiQuotaManager {
   private quotaMap: Map<ApiService, QuotaUsage>;
@@ -28,10 +36,28 @@ export class ApiQuotaManager {
     this.quotaMap = new Map();
     
     // Initialize default values for each service
-    this.initializeService('elevenlabs', 10000, 50); // 10,000 daily quota, 50 requests per hour
-    this.initializeService('openai', 100000, 200); // 100,000 daily quota, 200 requests per hour
-    this.initializeService('perplexity', 50000, 100); // 50,000 daily quota, 100 requests per hour
-    this.initializeService('local-llm', 1000000, 10000); // Very high limits for local LLM since it doesn't have API restrictions
+    // Load from environment variables if available to allow dynamic configuration
+    
+    // ElevenLabs defaults: 10,000 daily characters, max 50 requests per hour
+    const elevenLabsDaily = parseInt(process.env.ELEVENLABS_DAILY_QUOTA || '10000');
+    const elevenLabsHourly = parseInt(process.env.ELEVENLABS_HOURLY_QUOTA || '50');
+    this.initializeService('elevenlabs', elevenLabsDaily, elevenLabsHourly);
+    
+    // OpenAI defaults: 100,000 daily tokens, max 200 requests per hour
+    const openaiDaily = parseInt(process.env.OPENAI_DAILY_QUOTA || '100000');
+    const openaiHourly = parseInt(process.env.OPENAI_HOURLY_QUOTA || '200');
+    this.initializeService('openai', openaiDaily, openaiHourly);
+    
+    // Perplexity defaults: 50,000 daily tokens, max 100 requests per hour
+    const perplexityDaily = parseInt(process.env.PERPLEXITY_DAILY_QUOTA || '50000');
+    const perplexityHourly = parseInt(process.env.PERPLEXITY_HOURLY_QUOTA || '100');
+    this.initializeService('perplexity', perplexityDaily, perplexityHourly);
+    
+    // Local LLM: very high limits since it doesn't have API restrictions
+    // Just track for monitoring and potential resource management
+    const localLlmDaily = parseInt(process.env.LOCAL_LLM_DAILY_QUOTA || '1000000');
+    const localLlmHourly = parseInt(process.env.LOCAL_LLM_HOURLY_QUOTA || '10000');
+    this.initializeService('local-llm', localLlmDaily, localLlmHourly);
   }
 
   public static getInstance(): ApiQuotaManager {
@@ -106,6 +132,17 @@ export class ApiQuotaManager {
     
     const usage = this.quotaMap.get(service)!;
     
+    // Check if service is in backoff mode due to recent failures
+    const now = Date.now();
+    if (usage.backoffUntil && now < usage.backoffUntil) {
+      const waitTime = Math.ceil((usage.backoffUntil - now) / 1000); // seconds
+      return {
+        isLimited: true,
+        resetTime: usage.backoffUntil,
+        reason: `Service ${service} is in backoff mode due to recent failures. Try again in ${waitTime} seconds.`
+      };
+    }
+    
     // Check hourly limit
     if (usage.requestsThisHour >= usage.hourlyQuota) {
       const resetTime = usage.lastUpdated + (60 * 60 * 1000);
@@ -127,7 +164,61 @@ export class ApiQuotaManager {
     
     return { isLimited: false, resetTime: 0, reason: '' };
   }
-
+  
+  /**
+   * Record an API failure and implement exponential backoff
+   * @param service The API service that failed
+   * @param errorMessage The error message (optional)
+   */
+  public recordApiFailure(service: ApiService, errorMessage?: string): void {
+    this.checkAndResetQuotas(service);
+    
+    const usage = this.quotaMap.get(service)!;
+    const now = Date.now();
+    
+    // Initialize failure tracking if not present
+    if (usage.consecutiveFailures === undefined) {
+      usage.consecutiveFailures = 0;
+    }
+    
+    // Increment consecutive failures
+    usage.consecutiveFailures++;
+    usage.lastFailureTime = now;
+    
+    // Implement exponential backoff
+    if (usage.consecutiveFailures > 3) {
+      // Calculate backoff time: 2^(failures-3) * 30 seconds
+      // This gives: 4th failure = 30s, 5th = 1m, 6th = 2m, 7th = 4m, etc.
+      const backoffSeconds = Math.min(1800, Math.pow(2, usage.consecutiveFailures - 3) * 30);
+      usage.backoffUntil = now + (backoffSeconds * 1000);
+      
+      console.log(`Service ${service} failed ${usage.consecutiveFailures} times. ` +
+                 `Backing off for ${backoffSeconds} seconds until ${new Date(usage.backoffUntil).toLocaleTimeString()}`);
+      
+      // Reduce quota to prevent further overuse
+      const reduceBy = Math.min(0.5, 0.1 * usage.consecutiveFailures);
+      this.adjustQuota(
+        service,
+        Math.floor(usage.dailyQuota * (1 - reduceBy)),
+        Math.floor(usage.hourlyQuota * (1 - reduceBy))
+      );
+      
+      // Log detailed error if provided
+      if (errorMessage) {
+        console.log(`Service ${service} error details: ${errorMessage}`);
+      }
+    } else {
+      console.log(`Service ${service} failed ${usage.consecutiveFailures} times.`);
+    }
+    
+    this.quotaMap.set(service, usage);
+  }
+  
+  /**
+   * Record a successful API call, resetting consecutive failures
+   * @param service The API service that was used successfully
+   * @param tokensUsed Number of tokens/credits used in this call
+   */
   public recordApiUsage(service: ApiService, tokensUsed: number = 0): void {
     this.checkAndResetQuotas(service);
     
@@ -135,6 +226,13 @@ export class ApiQuotaManager {
     usage.requestsToday += 1;
     usage.requestsThisHour += 1;
     usage.tokensToday += tokensUsed;
+    
+    // Reset consecutive failures counter on successful call
+    if (usage.consecutiveFailures && usage.consecutiveFailures > 0) {
+      console.log(`Service ${service} successful call, resetting failure count from ${usage.consecutiveFailures} to 0`);
+      usage.consecutiveFailures = 0;
+      usage.backoffUntil = undefined; // Remove any backoff restriction
+    }
     
     this.quotaMap.set(service, usage);
     
