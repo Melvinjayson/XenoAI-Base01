@@ -187,6 +187,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isVoiceResponse) {
         console.log("Preparing chat for voice response");
       }
+      
+      // Check if OpenAI API key is available
+      const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+      
+      // If API key is missing, use fallback response directly
+      if (!hasOpenAIKey) {
+        console.log('No OpenAI API key found, using fallback response');
+        return res.json({
+          message: "I'm currently running in limited mode because my AI services are unavailable. You can still use local features like project management, but my conversational abilities are restricted. To enable full functionality, an OpenAI API key is needed.",
+          fallback: true,
+          reason: "API key not configured"
+        });
+      }
 
       // Pass filters and model preferences to chat function
       const response = await chat(
@@ -200,9 +213,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(response);
     } catch (error) {
       console.error("Chat API error:", error);
-      return res.status(500).json({ 
-        error: "Failed to process your request", 
-        details: error instanceof Error ? error.message : "Unknown error" 
+      
+      // Provide a more graceful fallback even when errors occur
+      return res.json({ 
+        message: "I encountered an error while processing your request. My AI services might be temporarily unavailable. You can still use local features like project management.",
+        fallback: true,
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });

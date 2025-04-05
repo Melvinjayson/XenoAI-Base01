@@ -56,6 +56,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
     requestInProgress.current = true; // Set request flag
+    
+    // Set a timeout safety net to reset the loading state if the request takes too long
+    const safetyTimeout = setTimeout(() => {
+      if (requestInProgress.current) {
+        console.log("Request safety timeout triggered");
+        requestInProgress.current = false;
+        setIsLoading(false);
+        
+        // Add a system message to indicate the timeout
+        const timeoutMessage: Message = {
+          id: `system-${Date.now()}`,
+          role: "assistant",
+          content: "I'm having trouble connecting to the server. Please try again in a moment.",
+          timestamp: Date.now(),
+          fallback: true,
+        };
+        setMessages((prev) => [...prev, timeoutMessage]);
+      }
+    }, 15000); // 15 second timeout
 
     try {
       // Prepare request parameters
@@ -177,21 +196,62 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       
       // More specific error message
       let errorMessage = "Failed to get response. Please try again.";
+      let errorType = "general";
       
       if (error instanceof Error) {
         if (error.name === "AbortError") {
           errorMessage = "Request timed out. Please try again or check your connection.";
+          errorType = "timeout";
         } else if (error.message.includes("API Error")) {
           errorMessage = error.message;
+          // Detect if this is likely an API key or quota issue
+          if (error.message.includes("429") || 
+              error.message.includes("Rate limit") || 
+              error.message.includes("quota") ||
+              error.message.includes("API key")) {
+            errorType = "api_limit";
+          }
         }
       }
       
+      // Add a fallback assistant message to the chat
+      const fallbackMessage: Message = {
+        id: `assistant-fallback-${Date.now()}`,
+        role: "assistant",
+        content: errorType === "api_limit" 
+          ? "I'm having trouble connecting to my AI services due to resource limits. I can still help with basic tasks and local features."
+          : "I couldn't process your request. Please try again or try a simpler question.",
+        timestamp: Date.now(),
+        fallback: true,
+      };
+      
+      setMessages((prev) => [...prev, fallbackMessage]);
+      
+      // Show toast notification
       toast({
-        title: "Error",
+        title: errorType === "api_limit" ? "API Service Limited" : "Error",
         description: errorMessage,
         variant: "destructive",
       });
+      
+      // If this is an API limit issue, store in session storage to avoid repeated notifications
+      if (errorType === "api_limit" && !sessionStorage.getItem('api_limit_notified')) {
+        sessionStorage.setItem('api_limit_notified', 'true');
+        
+        // Show a more detailed toast about API limitations
+        toast({
+          title: "AI Services Limited",
+          description: "Some advanced features are currently limited. Please try again later or use simpler queries.",
+          variant: "destructive",
+          duration: 8000,
+        });
+      }
     } finally {
+      // Don't forget to clear the safety timeout
+      if (safetyTimeout) {
+        clearTimeout(safetyTimeout);
+      }
+      
       setIsLoading(false);
       requestInProgress.current = false; // Clear request flag
     }

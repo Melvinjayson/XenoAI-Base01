@@ -152,11 +152,56 @@ export function FloatingVoiceWidget() {
         const audio = new Audio(data.audioUrl);
         audio.play().catch(err => {
           console.error('Error playing audio:', err);
+          
+          // If we received an empty audio URL due to server fallback, use browser TTS
+          if (data.fallback && !data.audioUrl.trim()) {
+            console.log('Using browser TTS as fallback because server TTS failed');
+            // Use browser's built-in speech synthesis as last resort
+            if ('speechSynthesis' in window) {
+              try {
+                const latestMessage = document.querySelector('.chat-message.assistant:last-child .message-content');
+                const textToSpeak = latestMessage ? latestMessage.textContent || '' : 'Message received';
+                
+                const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                // Set language if available in data
+                if (data.language) {
+                  utterance.lang = data.language;
+                }
+                window.speechSynthesis.speak(utterance);
+              } catch (ttsError) {
+                console.error('Text-to-speech error:', ttsError);
+              }
+            }
+          }
         });
+      } else if (data.fallback) {
+        // If we have fallback but no audio URL, use browser TTS directly
+        console.log('Using browser TTS as server returned fallback with no audio URL');
+        if ('speechSynthesis' in window) {
+          try {
+            const latestMessage = document.querySelector('.chat-message.assistant:last-child .message-content');
+            const textToSpeak = latestMessage ? latestMessage.textContent || '' : 'Message received';
+            
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            window.speechSynthesis.speak(utterance);
+          } catch (ttsError) {
+            console.error('Text-to-speech error:', ttsError);
+          }
+        }
       }
       
       if (isProcessing) {
         setIsProcessing(false);
+      }
+      
+      // Show toast for fallback
+      if (data.fallback && data.reason) {
+        toast({
+          title: 'Speech Synthesis Limited',
+          description: 'Using built-in speech instead of high-quality voice.',
+          variant: 'default',
+          duration: 3000,
+        });
       }
     });
     
@@ -208,49 +253,172 @@ export function FloatingVoiceWidget() {
       // Use WebSocket for enhanced communication with voice
       // Add retry logic for WebSocket communication
       let wsRetryCount = 0;
-      const maxWsRetries = 2;
+      const maxWsRetries = 3; // Increased retry count for better reliability
       let wsSuccess = false;
       
-      while (wsRetryCount <= maxWsRetries && !wsSuccess) {
-        try {
-          sendChatMessage(
-            messageText, 
-            messages, 
-            true, // Request voice response
-            { 
-              language,
-              preferredVoice: "default",
-              topK: 3, // For better search results
-              includeInsights: true // Request insights data
-            }
-          );
-          wsSuccess = true; // Mark as successful if no error thrown
-        } catch (wsError) {
-          wsRetryCount++;
-          console.error(`WebSocket send attempt ${wsRetryCount} failed:`, wsError);
-          
-          // If we've reached max retries, don't retry anymore
-          if (wsRetryCount > maxWsRetries) {
-            throw wsError;
-          }
-          
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, 1000 * wsRetryCount));
+      // Set up a timeout for the entire WebSocket operation
+      const wsTimeout = setTimeout(() => {
+        if (!wsSuccess) {
+          console.log("WebSocket operation timed out after 10 seconds");
+          // We'll handle the failure in the !wsSuccess check below
+          // No need to throw an error here as the regular message was already sent
         }
+      }, 10000); // 10 second timeout
+      
+      try {
+        while (wsRetryCount <= maxWsRetries && !wsSuccess) {
+          try {
+            // Check WebSocket connection state first
+            if (!isConnected) {
+              console.warn("WebSocket not connected, waiting before retry");
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              wsRetryCount++;
+              continue;
+            }
+            
+            // Attempt to send message
+            const result = sendChatMessage(
+              messageText, 
+              messages, 
+              true, // Request voice response
+              { 
+                language,
+                preferredVoice: "default",
+                topK: 3, // For better search results
+                includeInsights: true, // Request insights data
+                isFallbackEnabled: true // Enable fallback processing if AI services are limited
+              }
+            );
+            
+            if (result === true) {
+              wsSuccess = true; // Mark as successful if function returned true
+            } else {
+              throw new Error("WebSocket send returned false");
+            }
+          } catch (wsError) {
+            wsRetryCount++;
+            console.error(`WebSocket send attempt ${wsRetryCount} failed:`, wsError);
+            
+            // If we've reached max retries, don't retry anymore
+            if (wsRetryCount > maxWsRetries) {
+              // Don't throw, just log and continue with regular message
+              console.error("Max WebSocket retries reached");
+              break;
+            }
+            
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * wsRetryCount));
+          }
+        }
+      } finally {
+        // Clear the timeout
+        clearTimeout(wsTimeout);
       }
       
       // If websocket fails but normal message succeeded, don't show an error
+      // Instead, trigger browser TTS as a fallback
       if (!wsSuccess) {
         console.log("WebSocket communication failed, but standard message was sent");
+        
+        // Notify user that we're falling back to simpler response
+        toast({
+          title: 'Voice Response Unavailable',
+          description: 'Using text response instead. Please try again later.',
+          variant: 'default',
+          duration: 3000,
+        });
+        
+        // Wait for the normal message to appear in the chat
+        setTimeout(() => {
+          // Try to use browser's built-in speech synthesis as fallback
+          if ('speechSynthesis' in window && !isProcessing) {
+            try {
+              const latestMessage = document.querySelector('.chat-message.assistant:last-child .message-content');
+              if (latestMessage) {
+                const textToSpeak = latestMessage.textContent || '';
+                if (textToSpeak) {
+                  const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                  if (language) {
+                    // Map our language code to a browser-compatible one
+                    const langMap: Record<string, string> = {
+                      'en': 'en-US',
+                      'fr': 'fr-FR',
+                      'es': 'es-ES',
+                      'de': 'de-DE',
+                      'it': 'it-IT',
+                      'pt': 'pt-PT',
+                      'ja': 'ja-JP',
+                      'ko': 'ko-KR',
+                      'zh': 'zh-CN',
+                    };
+                    utterance.lang = langMap[language] || 'en-US';
+                  }
+                  window.speechSynthesis.speak(utterance);
+                }
+              }
+            } catch (ttsError) {
+              console.error('Text-to-speech fallback error:', ttsError);
+            }
+          }
+        }, 2000); // Wait 2 seconds for the message to appear
       }
       
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      // Determine a more specific error message
+      let errorTitle = 'Error';
+      let errorMessage = 'Could not send message. Please try again.';
+      
+      if (error instanceof Error) {
+        // Check if it's a network error
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorTitle = 'Network Error';
+          errorMessage = 'Check your internet connection and try again.';
+        }
+        // Check if it's an API limit error
+        else if (error.message.includes('rate limit') || 
+                error.message.includes('quota') || 
+                error.message.includes('API key')) {
+          errorTitle = 'Service Limit';
+          errorMessage = 'AI service usage limit reached. Try again later or use simpler queries.';
+          
+          // Add the error message to the chat as a message from the assistant
+          setTimeout(() => {
+            if (sendMessage) {
+              try {
+                sendMessage(
+                  "I'm experiencing some limitations with my AI services right now. " +
+                  "I can still help with basic features, but some advanced capabilities might be limited. " +
+                  "Please try again later or try a different question."
+                );
+              } catch (innerError) {
+                console.error('Error adding fallback message:', innerError);
+              }
+            }
+          }, 500);
+        }
+        // Include the specific error message for debugging
+        errorMessage += ' (Error: ' + error.message.substring(0, 50) + (error.message.length > 50 ? '...' : '') + ')';
+      }
+      
       toast({
-        title: 'Error',
-        description: 'Could not send message. Please try again.',
+        title: errorTitle,
+        description: errorMessage,
         variant: 'destructive',
       });
+      
+      // Try browser TTS fallback if this was a voice request
+      if (isConnected && 'speechSynthesis' in window) {
+        try {
+          const fallbackMessage = "I'm sorry, I couldn't process your request right now. Please try again later.";
+          const utterance = new SpeechSynthesisUtterance(fallbackMessage);
+          window.speechSynthesis.speak(utterance);
+        } catch (ttsError) {
+          console.error('Fallback text-to-speech error:', ttsError);
+        }
+      }
+      
       setIsProcessing(false);
     }
   };

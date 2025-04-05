@@ -19,6 +19,9 @@ export class WebSocketClient {
   private socket: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
+  private connectionTimeout: NodeJS.Timeout | null = null;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
   private messageHandlers: Map<string, Set<MessageCallback>> = new Map();
   private state: WebSocketState = {
     isConnected: false,
@@ -50,6 +53,12 @@ export class WebSocketClient {
       return;
     }
 
+    // Clear any existing connection timeout
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+
     this.updateState({ isConnecting: true, hasError: false, errorMessage: null });
 
     try {
@@ -59,6 +68,38 @@ export class WebSocketClient {
       
       console.log('Connecting to WebSocket:', wsUrl);
       this.socket = new WebSocket(wsUrl);
+
+      // Set connection timeout (8 seconds)
+      this.connectionTimeout = setTimeout(() => {
+        if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
+          console.log('WebSocket connection timeout - forcing reconnection');
+          
+          // Force close the socket
+          if (this.socket) {
+            this.socket.close();
+            this.socket = null;
+          }
+          
+          this.updateState({
+            isConnecting: false,
+            hasError: true,
+            errorMessage: 'Connection timeout'
+          });
+          
+          // Increment reconnect attempts
+          this.reconnectAttempts++;
+          
+          // Only reconnect if under max attempts
+          if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.scheduleReconnect();
+          } else {
+            console.error(`Maximum reconnect attempts (${this.maxReconnectAttempts}) reached`);
+            this.updateState({
+              errorMessage: 'Failed to connect after multiple attempts'
+            });
+          }
+        }
+      }, 8000);
 
       this.socket.onopen = this.handleOpen.bind(this);
       this.socket.onmessage = this.handleMessage.bind(this);
@@ -72,13 +113,33 @@ export class WebSocketClient {
         hasError: true, 
         errorMessage: error instanceof Error ? error.message : 'Failed to connect' 
       });
-      this.scheduleReconnect();
+      
+      // Increment reconnect attempts
+      this.reconnectAttempts++;
+      
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.scheduleReconnect();
+      } else {
+        console.error(`Maximum reconnect attempts (${this.maxReconnectAttempts}) reached`);
+      }
     }
   }
 
   private handleOpen() {
     console.log('WebSocket connected');
     this.updateState({ isConnected: true, isConnecting: false });
+    
+    // Reset reconnect attempts counter on successful connection
+    this.reconnectAttempts = 0;
+    
+    // Clear connection timeout if it exists
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    
+    // Send immediate ping to verify connection
+    this.sendMessage('ping', {});
     
     // Set up ping interval
     this.pingInterval = setInterval(() => {
@@ -129,9 +190,26 @@ export class WebSocketClient {
       this.pingInterval = null;
     }
     
+    // Clear connection timeout if it exists
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    
     // If not a normal closure, schedule reconnect
     if (event.code !== 1000) {
-      this.scheduleReconnect();
+      // Increment reconnect attempts
+      this.reconnectAttempts++;
+      
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.scheduleReconnect();
+      } else {
+        console.error(`Maximum reconnect attempts (${this.maxReconnectAttempts}) reached`);
+        this.updateState({
+          hasError: true,
+          errorMessage: 'Failed to connect after multiple attempts'
+        });
+      }
     }
   }
 
@@ -142,6 +220,24 @@ export class WebSocketClient {
       hasError: true, 
       errorMessage: 'Connection error' 
     });
+    
+    // Clear connection timeout if it exists
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    
+    // Attempt to close the socket if it's still open
+    if (this.socket) {
+      try {
+        this.socket.close();
+      } catch (e) {
+        console.error('Error closing socket after error:', e);
+      }
+      this.socket = null;
+    }
+    
+    // We'll let the handleClose method handle reconnection
   }
 
   private scheduleReconnect() {
@@ -161,6 +257,7 @@ export class WebSocketClient {
       this.socket = null;
     }
     
+    // Clear all timers
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
@@ -171,9 +268,19 @@ export class WebSocketClient {
       this.reconnectTimer = null;
     }
     
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    
+    // Reset reconnect attempts
+    this.reconnectAttempts = 0;
+    
     this.updateState({ 
       isConnected: false, 
-      isConnecting: false 
+      isConnecting: false,
+      hasError: false,
+      errorMessage: null
     });
   }
 
@@ -198,9 +305,22 @@ export class WebSocketClient {
   }
 
   public sendMessage(type: string, data: any) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      console.warn('Cannot send message, WebSocket not connected');
+    // Check if socket exists and is in open state
+    if (!this.socket) {
+      console.warn('Cannot send message, WebSocket instance does not exist');
       this.connect();
+      return false;
+    }
+    
+    if (this.socket.readyState !== WebSocket.OPEN) {
+      console.warn(`Cannot send message, WebSocket not in OPEN state (current state: ${this.socket.readyState})`);
+      
+      // If socket is in CLOSING or CLOSED state, we need to reconnect
+      if (this.socket.readyState >= WebSocket.CLOSING) {
+        this.socket = null;
+        this.connect();
+      }
+      
       return false;
     }
     
@@ -215,6 +335,18 @@ export class WebSocketClient {
       return true;
     } catch (error) {
       console.error('Error sending WebSocket message:', error);
+      
+      // If we get an error sending, the connection might be dead
+      // Force a reconnection on the next attempt
+      if (this.socket) {
+        try {
+          this.socket.close();
+        } catch (e) {
+          console.error('Error closing socket after send failure:', e);
+        }
+        this.socket = null;
+      }
+      
       return false;
     }
   }
