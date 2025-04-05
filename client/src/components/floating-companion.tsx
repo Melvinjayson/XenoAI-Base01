@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCompanion } from '@/context/companion-context';
+import { useLocation } from "wouter"; // Added import
 
 interface FloatingCompanionProps {
   className?: string;
@@ -58,10 +59,10 @@ export function FloatingCompanion({
 
   const handleDrag = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    
+
     const x = e.clientX - dragPosition.x;
     const y = e.clientY - dragPosition.y;
-    
+
     e.currentTarget.style.left = `${x}px`;
     e.currentTarget.style.top = `${y}px`;
   };
@@ -69,7 +70,7 @@ export function FloatingCompanion({
   const handleDragEnd = () => {
     setIsDragging(false);
   };
-  
+
   const toggleExpanded = () => {
     if (isMinimized) {
       setIsMinimized(false);
@@ -78,12 +79,12 @@ export function FloatingCompanion({
       setIsExpanded(!isExpanded);
     }
   };
-  
+
   const minimize = () => {
     setIsExpanded(false);
     setTimeout(() => setIsMinimized(true), 300);
   };
-  
+
   // Animation effect for character
   useEffect(() => {
     const interval = setInterval(() => {
@@ -94,10 +95,10 @@ export function FloatingCompanion({
         }, 2000);
       }
     }, 5000);
-    
+
     return () => clearInterval(interval);
   }, []);
-  
+
   // Position classes
   const positionClasses = {
     'bottom-right': 'bottom-4 right-4',
@@ -105,7 +106,7 @@ export function FloatingCompanion({
     'top-right': 'top-4 right-4',
     'top-left': 'top-4 left-4',
   };
-  
+
   return (
     <div 
       className={cn(
@@ -141,7 +142,7 @@ export function FloatingCompanion({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -160,7 +161,7 @@ export function FloatingCompanion({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -182,7 +183,7 @@ export function FloatingCompanion({
           </div>
         </div>
       )}
-      
+
       {/* Main companion button */}
       <div className={cn(
         "relative bg-primary rounded-full shadow-lg transition-all duration-300",
@@ -209,7 +210,7 @@ export function FloatingCompanion({
             {characterStyle === 2 && <Sparkles size={isMinimized ? 20 : 28} />}
           </div>
         </button>
-        
+
         {/* Minimize button (only when expanded) */}
         {isExpanded && !isMinimized && (
           <button
@@ -221,7 +222,7 @@ export function FloatingCompanion({
           </button>
         )}
       </div>
-      
+
       {/* Companion speech bubble */}
       {!isMinimized && (
         <div className={cn(
@@ -234,7 +235,7 @@ export function FloatingCompanion({
             <div className="text-xs text-gray-500">Click for options</div>
             <ChevronRight size={14} className="text-primary"/>
           </div>
-          
+
           {/* Speech bubble pointer */}
           <div className="absolute bottom-[-8px] right-[20px] w-4 h-4 bg-white dark:bg-gray-900 border-r border-b border-gray-200 dark:border-gray-700 transform rotate-45"></div>
         </div>
