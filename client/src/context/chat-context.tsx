@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useRef } from "react";
 import { 
   apiRequest,
   analyzeConversationForCommands as apiAnalyzeCommands,
@@ -33,8 +33,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [lastSearchResult, setLastSearchResult] = useState<SearchResult | null>(null);
   const { toast } = useToast();
 
+  // Add a reference for tracking ongoing requests
+  const requestInProgress = useRef<boolean>(false);
+
   const sendMessage = async (content: string, filters?: SearchFilters) => {
     if (!content.trim()) return;
+    
+    // Prevent duplicate requests
+    if (requestInProgress.current) {
+      console.log("Request already in progress, ignoring duplicate send");
+      return;
+    }
 
     // Add user message to chat
     const userMessage: Message = {
@@ -46,6 +55,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    requestInProgress.current = true; // Set request flag
 
     try {
       // Prepare request parameters
@@ -67,7 +77,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       
       // Send the request with a timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // Reduced timeout to 20 seconds
       
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -134,6 +144,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
     } finally {
       setIsLoading(false);
+      requestInProgress.current = false; // Clear request flag
     }
   };
 

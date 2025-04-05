@@ -29,13 +29,25 @@ export default function EnhancedInputArea({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
+  // Track send button state
+  const [isSending, setIsSending] = useState(false);
+  
   const handleSend = async () => {
+    if (isSending) return; // Prevent multiple clicks
+    
     if (inputValue.trim()) {
+      setIsSending(true);
       try {
-        await onSend(inputValue, activeFilters || undefined);
+        // Send the message and clear input immediately for better UX
+        const messageToSend = inputValue;
         setInputValue("");
+        await onSend(messageToSend, activeFilters || undefined);
       } catch (error) {
         console.error("Error sending message:", error);
+        // Restore input value if there was an error
+        setInputValue(inputValue);
+      } finally {
+        setIsSending(false);
       }
     } else {
       onMicClick();
@@ -204,12 +216,19 @@ export default function EnhancedInputArea({
           <button 
             className={cn(
               "text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors",
-              isListening ? "bg-destructive" : "bg-primary"
+              isListening ? "bg-destructive" : isSending ? "bg-primary/70" : "bg-primary"
             )}
             onClick={() => handleSend()}
+            disabled={isSending || isListening}
             aria-label={isListening ? "Stop listening" : inputValue ? "Send message" : "Start voice recording"}
           >
-            {inputValue ? <Send className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {isSending ? (
+              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : inputValue ? (
+              <Send className="w-5 h-5" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
           </button>
         </div>
         
