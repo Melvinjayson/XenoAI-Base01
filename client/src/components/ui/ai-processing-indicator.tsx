@@ -133,12 +133,8 @@ export function AIProcessingIndicator({
     }
   }, [state]);
 
-  // Only render when the AI is actively doing something (not idle)
-  if (state === 'idle') return null;
-  
-  // Only show the indicator when the AI is speaking, listening, or actively processing
-  const shouldShow = ['speaking', 'listening', 'thinking', 'analyzing', 'processing', 'connecting'].includes(state);
-  
+  // Only show when AI is speaking, listening or processing
+  const shouldShow = ['speaking', 'listening', 'processing'].includes(state);
   if (!shouldShow) return null;
 
   return (
