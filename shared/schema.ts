@@ -1,425 +1,407 @@
-import { pgTable, text, serial, integer, json, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Canvas element types
-export type CanvasElementType = 'text' | 'shape' | 'connection' | 'node' | 'image' | 'insight';
+// Advanced search filter options interface
+export interface SearchFilterOptions {
+  timeRange: string;
+  dateRange: {
+    from: Date | undefined;
+    to: Date | undefined;
+  };
+  sources: string[];
+  contentType: string[];
+  relevance: number;
+  location: string;
+  language?: string[];
+  excludeTerms?: string[];
+  includeTerms?: string[];
+  fileType?: string[];
+  readingLevel?: string;
+  sortBy?: string;
+  minLength?: number;
+  maxLength?: number;
+  verifiedSourcesOnly?: boolean;
+}
 
-// Chat message schema
-export const messages = pgTable("messages", {
-  id: serial("id").primaryKey(),
-  role: text("role").notNull(), // user or assistant
-  content: text("content").notNull(),
-  timestamp: timestamp("timestamp").notNull().defaultNow(),
-  sources: json("sources").$type<{name: string, value: string}[]>(),
-  userId: text("user_id"),
-  sessionId: text("session_id").notNull(),
+// File Management schemas
+export interface File {
+  id: number;
+  path: string;
+  sessionId: string;
+  userId: number | null;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  createdAt: Date;
+}
+
+export interface InsertFile {
+  path: string;
+  sessionId: string;
+  userId: number | null;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}
+
+export const insertFileSchema = z.object({
+  path: z.string(),
+  sessionId: z.string(),
+  userId: z.number().nullable(),
+  filename: z.string(),
+  originalName: z.string(),
+  mimeType: z.string(),
+  size: z.number()
 });
 
-export const insertMessageSchema = createInsertSchema(messages).omit({
-  id: true,
-  timestamp: true,
+// Canvas schemas
+export interface Canvas {
+  id: number;
+  userId: number | null;
+  sessionId: string;
+  name: string;
+  description: string | null;
+  thumbnailUrl: string | null;
+  width: number;
+  height: number;
+  isPublic: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertCanvas {
+  userId: number | null;
+  sessionId: string;
+  name: string;
+  description: string | null;
+  thumbnailUrl: string | null;
+  width: number;
+  height: number;
+  isPublic: boolean;
+}
+
+export const insertCanvasSchema = z.object({
+  userId: z.number().nullable(),
+  sessionId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  thumbnailUrl: z.string().nullable(),
+  width: z.number(),
+  height: z.number(),
+  isPublic: z.boolean()
 });
 
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
-export type Message = typeof messages.$inferSelect;
+export interface CanvasElement {
+  id: number;
+  canvasId: number;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  content: string;
+  style: Record<string, any>;
+  layer: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-// Chat session schema
-export const sessions = pgTable("sessions", {
-  id: serial("id").primaryKey(),
-  sessionId: text("session_id").notNull().unique(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  lastActive: timestamp("last_active").notNull().defaultNow(),
+export interface InsertCanvasElement {
+  canvasId: number;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  content: string;
+  style: Record<string, any>;
+  layer: number;
+}
+
+export const insertCanvasElementSchema = z.object({
+  canvasId: z.number(),
+  type: z.string(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  rotation: z.number(),
+  content: z.string(),
+  style: z.record(z.string(), z.any()),
+  layer: z.number()
 });
 
-export const insertSessionSchema = createInsertSchema(sessions).omit({
-  id: true,
-  createdAt: true,
-  lastActive: true,
+// Color palette schemas
+export interface ColorPalette {
+  id: number;
+  userId: number | null;
+  name: string;
+  description: string | null;
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  secondary: string;
+  secondaryLight: string;
+  secondaryDark: string;
+  accent: string;
+  accentLight: string;
+  accentDark: string;
+  background: string;
+  surface: string;
+  error: string;
+  warning: string;
+  success: string;
+  info: string;
+  text: string;
+  textSecondary: string;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertColorPalette {
+  userId: number | null;
+  name: string;
+  description: string | null;
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  secondary: string;
+  secondaryLight: string;
+  secondaryDark: string;
+  accent: string;
+  accentLight: string;
+  accentDark: string;
+  background: string;
+  surface: string;
+  error: string;
+  warning: string;
+  success: string;
+  info: string;
+  text: string;
+  textSecondary: string;
+  isDefault: boolean;
+}
+
+// Project Management schemas
+export interface Project {
+  id: number;
+  userId: number | null;
+  sessionId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  thumbnailUrl: string | null;
+  startDate: Date | null;
+  dueDate: Date | null;
+  completedDate: Date | null;
+  tags: string[];
+  isPublic: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertProject {
+  userId: number | null;
+  sessionId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  thumbnailUrl: string | null;
+  startDate: Date | null;
+  dueDate: Date | null;
+  completedDate: Date | null;
+  tags: string[];
+  isPublic: boolean;
+}
+
+export const insertProjectSchema = z.object({
+  userId: z.number().nullable(),
+  sessionId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: z.string(),
+  priority: z.string(),
+  thumbnailUrl: z.string().nullable(),
+  startDate: z.date().nullable(),
+  dueDate: z.date().nullable(),
+  completedDate: z.date().nullable(),
+  tags: z.array(z.string()),
+  isPublic: z.boolean()
 });
 
-export type InsertSession = z.infer<typeof insertSessionSchema>;
-export type Session = typeof sessions.$inferSelect;
+export interface Milestone {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  status: string;
+  dueDate: Date | null;
+  completedDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-// User schema (for future authentication)
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export interface InsertMilestone {
+  projectId: number;
+  name: string;
+  description: string | null;
+  status: string;
+  dueDate: Date | null;
+  completedDate: Date | null;
+}
+
+export const insertMilestoneSchema = z.object({
+  projectId: z.number(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: z.string(),
+  dueDate: z.date().nullable(),
+  completedDate: z.date().nullable()
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export interface Task {
+  id: number;
+  projectId: number;
+  milestoneId: number | null;
+  name: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  assignedTo: number | null;
+  startDate: Date | null;
+  dueDate: Date | null;
+  completedDate: Date | null;
+  estimatedHours: number | null;
+  actualHours: number | null;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertTask {
+  projectId: number;
+  milestoneId: number | null;
+  name: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  assignedTo: number | null;
+  startDate: Date | null;
+  dueDate: Date | null;
+  completedDate: Date | null;
+  estimatedHours: number | null;
+  actualHours: number | null;
+  tags: string[];
+}
+
+export const insertTaskSchema = z.object({
+  projectId: z.number(),
+  milestoneId: z.number().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: z.string(),
+  priority: z.string(),
+  assignedTo: z.number().nullable(),
+  startDate: z.date().nullable(),
+  dueDate: z.date().nullable(),
+  completedDate: z.date().nullable(),
+  estimatedHours: z.number().nullable(),
+  actualHours: z.number().nullable(),
+  tags: z.array(z.string())
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export interface ResearchInsight {
+  id: number;
+  projectId: number;
+  title: string;
+  content: string;
+  source: string | null;
+  confidence: number;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-// Bookmarks schema - for saving important conversations
-export const bookmarks = pgTable("bookmarks", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id"),
-  sessionId: text("session_id").notNull(),
-  title: text("title").notNull(),
-  description: text("description"),
-  snippet: text("snippet"), // Short preview of the conversation
-  tags: json("tags").$type<string[]>(),
-  isFavorite: boolean("is_favorite").default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  knowledgeGraphSnapshot: json("knowledge_graph_snapshot").$type<any>(), // Snapshot of knowledge graph at time of bookmark
+export interface InsertResearchInsight {
+  projectId: number;
+  title: string;
+  content: string;
+  source: string | null;
+  confidence: number;
+  tags: string[];
+}
+
+export const insertResearchInsightSchema = z.object({
+  projectId: z.number(),
+  title: z.string(),
+  content: z.string(),
+  source: z.string().nullable(),
+  confidence: z.number(),
+  tags: z.array(z.string())
 });
 
-export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export interface InsightTaskRelation {
+  id: number;
+  insightId: number;
+  taskId: number;
+  relationship: string;
+  createdAt: Date;
+}
+
+export interface InsertInsightTaskRelation {
+  insightId: number;
+  taskId: number;
+  relationship: string;
+}
+
+export const insertInsightTaskRelationSchema = z.object({
+  insightId: z.number(),
+  taskId: z.number(),
+  relationship: z.string()
 });
 
-export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
-export type Bookmark = typeof bookmarks.$inferSelect;
+export interface ProjectComment {
+  id: number;
+  projectId: number;
+  userId: number | null;
+  content: string;
+  createdAt: Date;
+}
 
-// File uploads schema - for storing uploaded files
-export const files = pgTable("files", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id"),
-  sessionId: text("session_id"),
-  filename: text("filename").notNull(),
-  originalName: text("original_name").notNull(),
-  mimeType: text("mime_type").notNull(),
-  size: integer("size").notNull(),
-  path: text("path").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  analysis: json("analysis").$type<{
-    summary?: string;
-    entities?: any[];
-    keywords?: string[];
-  }>(),
+export interface InsertProjectComment {
+  projectId: number;
+  userId: number | null;
+  content: string;
+}
+
+export const insertProjectCommentSchema = z.object({
+  projectId: z.number(),
+  userId: z.number().nullable(),
+  content: z.string()
 });
 
-export const insertFileSchema = createInsertSchema(files).omit({
-  id: true,
-  createdAt: true,
+export interface TaskComment {
+  id: number;
+  taskId: number;
+  userId: number | null;
+  content: string;
+  createdAt: Date;
+}
+
+export interface InsertTaskComment {
+  taskId: number;
+  userId: number | null;
+  content: string;
+}
+
+export const insertTaskCommentSchema = z.object({
+  taskId: z.number(),
+  userId: z.number().nullable(),
+  content: z.string()
 });
-
-export type InsertFile = z.infer<typeof insertFileSchema>;
-export type File = typeof files.$inferSelect;
-
-// Insights history schema - for tracking insights over time
-export const insights = pgTable("insights", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id"),
-  sessionId: text("session_id").notNull(),
-  type: text("type").notNull(), // pattern, cluster, connection, anomaly
-  description: text("description").notNull(),
-  relevance: integer("relevance").notNull(),
-  confidence: integer("confidence"),
-  nodeIds: json("node_ids").$type<string[]>(),
-  edgeIds: json("edge_ids").$type<string[]>(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  knowledgeGraphSnapshot: json("knowledge_graph_snapshot").$type<any>(), // Optional snapshot
-});
-
-export const insertInsightSchema = createInsertSchema(insights).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertInsight = z.infer<typeof insertInsightSchema>;
-export type Insight = typeof insights.$inferSelect;
-
-// User preferences schema - for storing UI and feature preferences
-export const preferences = pgTable("preferences", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  key: text("key").notNull(), // preference key (e.g., 'theme', 'language')
-  value: text("value").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertPreferenceSchema = createInsertSchema(preferences).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertPreference = z.infer<typeof insertPreferenceSchema>;
-export type Preference = typeof preferences.$inferSelect;
-
-// Canvas schema - for storing interactive whiteboard data
-export const canvases = pgTable("canvases", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id"),
-  sessionId: text("session_id").notNull(),
-  title: text("title").notNull(),
-  lastModified: timestamp("last_modified").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  thumbnail: text("thumbnail"),
-  isPublic: boolean("is_public").default(false),
-});
-
-export const insertCanvasSchema = createInsertSchema(canvases).omit({
-  id: true,
-  lastModified: true,
-  createdAt: true,
-});
-
-export type InsertCanvas = z.infer<typeof insertCanvasSchema>;
-export type Canvas = typeof canvases.$inferSelect;
-
-// Canvas elements schema - for storing objects on the canvas
-export const canvasElements = pgTable("canvas_elements", {
-  id: serial("id").primaryKey(),
-  canvasId: integer("canvas_id").notNull(),
-  type: text("type").notNull(), // text, shape, connection, node, image, insight
-  content: text("content"),
-  x: integer("x").notNull(),
-  y: integer("y").notNull(),
-  width: integer("width"),
-  height: integer("height"),
-  zIndex: integer("z_index").notNull().default(0),
-  style: json("style").$type<{
-    color?: string;
-    fontSize?: number;
-    fontFamily?: string;
-    backgroundColor?: string;
-    borderColor?: string;
-    borderWidth?: number;
-    opacity?: number;
-    rotation?: number;
-  }>(),
-  metadata: json("metadata").$type<{
-    sourceNodeId?: string;
-    sourceInsightId?: number;
-    linkedEntityIds?: string[];
-    aiGenerated?: boolean;
-    createdFromChat?: boolean;
-  }>(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertCanvasElement = z.infer<typeof insertCanvasElementSchema>;
-export type CanvasElement = typeof canvasElements.$inferSelect;
-
-// Project Management Module
-
-// Project Status Enum
-export const projectStatusEnum = pgEnum('project_status', ['not_started', 'in_progress', 'on_track', 'at_risk', 'off_track', 'completed', 'on_hold']);
-
-// Priority Enum
-export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high', 'critical']);
-
-// Projects table
-export const projects = pgTable('projects', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  description: text('description'),
-  status: projectStatusEnum('status').default('not_started').notNull(),
-  priority: priorityEnum('priority').default('medium').notNull(),
-  startDate: timestamp('start_date'),
-  dueDate: timestamp('due_date'),
-  completedDate: timestamp('completed_date'),
-  progress: integer('progress').default(0),
-  owner: text('owner').notNull(), // userId
-  metadata: json('metadata').$type<{ tags?: string[]; color?: string }>(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Milestones table
-export const milestones = pgTable('milestones', {
-  id: serial('id').primaryKey(),
-  projectId: integer('project_id').notNull(),
-  name: text('name').notNull(),
-  description: text('description'),
-  dueDate: timestamp('due_date'),
-  completedDate: timestamp('completed_date'),
-  status: projectStatusEnum('status').default('not_started').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Task Status Enum
-export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'in_review', 'done', 'blocked']);
-
-// Tasks table
-export const tasks = pgTable('tasks', {
-  id: serial('id').primaryKey(),
-  projectId: integer('project_id').notNull(),
-  milestoneId: integer('milestone_id'),
-  title: text('title').notNull(),
-  description: text('description'),
-  status: taskStatusEnum('status').default('todo').notNull(),
-  priority: priorityEnum('priority').default('medium').notNull(),
-  startDate: timestamp('start_date'),
-  dueDate: timestamp('due_date'),
-  completedDate: timestamp('completed_date'),
-  assignee: text('assignee'), // userId
-  estimatedHours: integer('estimated_hours'),
-  actualHours: integer('actual_hours'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Research Insights table
-export const researchInsights = pgTable('research_insights', {
-  id: serial('id').primaryKey(),
-  projectId: integer('project_id').notNull(),
-  title: text('title').notNull(),
-  content: text('content').notNull(),
-  source: text('source'),
-  confidence: integer('confidence').default(50),
-  tags: json('tags').$type<string[]>().default([]),
-  metadata: json('metadata'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Insight-Task Relationships table
-export const insightTaskRelations = pgTable('insight_task_relations', {
-  id: serial('id').primaryKey(),
-  insightId: integer('insight_id').notNull(),
-  taskId: integer('task_id').notNull(),
-  relevanceScore: integer('relevance_score').default(50),
-  notes: text('notes'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Project Comments
-export const projectComments = pgTable('project_comments', {
-  id: serial('id').primaryKey(),
-  projectId: integer('project_id').notNull(),
-  userId: text('user_id').notNull(),
-  content: text('content').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Task Comments
-export const taskComments = pgTable('task_comments', {
-  id: serial('id').primaryKey(),
-  taskId: integer('task_id').notNull(),
-  userId: text('user_id').notNull(),
-  content: text('content').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Insert schemas for Project Management
-export const insertProjectSchema = createInsertSchema(projects).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertMilestoneSchema = createInsertSchema(milestones).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertTaskSchema = createInsertSchema(tasks).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertResearchInsightSchema = createInsertSchema(researchInsights).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertInsightTaskRelationSchema = createInsertSchema(insightTaskRelations).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertProjectCommentSchema = createInsertSchema(projectComments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-// Types for Project Management
-export type Project = typeof projects.$inferSelect;
-export type InsertProject = z.infer<typeof insertProjectSchema>;
-
-export type Milestone = typeof milestones.$inferSelect;
-export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
-
-export type Task = typeof tasks.$inferSelect;
-export type InsertTask = z.infer<typeof insertTaskSchema>;
-
-export type ResearchInsight = typeof researchInsights.$inferSelect;
-export type InsertResearchInsight = z.infer<typeof insertResearchInsightSchema>;
-
-export type InsightTaskRelation = typeof insightTaskRelations.$inferSelect;
-export type InsertInsightTaskRelation = z.infer<typeof insertInsightTaskRelationSchema>;
-
-export type ProjectComment = typeof projectComments.$inferSelect;
-export type InsertProjectComment = z.infer<typeof insertProjectCommentSchema>;
-
-export type TaskComment = typeof taskComments.$inferSelect;
-export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
-
-// Color Palette management for Adaptive Color Palette Generator
-export const colorPalettes = pgTable('color_palettes', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  description: text('description'),
-  userId: text('user_id'),
-  primary: text('primary').notNull(),
-  primaryLight: text('primary_light').notNull(),
-  primaryDark: text('primary_dark').notNull(),
-  secondary: text('secondary').notNull(),
-  secondaryLight: text('secondary_light').notNull(),
-  secondaryDark: text('secondary_dark').notNull(),
-  accent: text('accent').notNull(),
-  background: text('background').notNull(),
-  surface: text('surface').notNull(),
-  text: text('text').notNull(),
-  textSecondary: text('text_secondary').notNull(),
-  success: text('success').notNull(),
-  warning: text('warning').notNull(),
-  error: text('error').notNull(),
-  sourceType: text('source_type').notNull(), // 'image', 'theme', 'custom'
-  sourceImage: text('source_image'), // URL or path to source image if applicable
-  isDefault: boolean('is_default').default(false),
-  metadata: json('metadata').$type<{
-    theme?: string;
-    tags?: string[];
-    harmony?: string;
-    colorSpace?: string;
-    accessibility?: {
-      wcagLevel?: string;
-      contrastRatio?: number;
-    };
-  }>(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-export const insertColorPaletteSchema = createInsertSchema(colorPalettes).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type ColorPalette = typeof colorPalettes.$inferSelect;
-export type InsertColorPalette = z.infer<typeof insertColorPaletteSchema>;

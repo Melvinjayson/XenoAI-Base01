@@ -38,29 +38,7 @@ import {
   mergeMindMaps,
   type MindMap
 } from "./mind-map-manager";
-import { 
-  InsertFile, 
-  InsertCanvas, 
-  insertCanvasSchema, 
-  InsertCanvasElement, 
-  insertCanvasElementSchema,
-  InsertColorPalette,
-  // Project Management schema imports
-  InsertProject,
-  insertProjectSchema,
-  InsertMilestone,
-  insertMilestoneSchema,
-  InsertTask,
-  insertTaskSchema,
-  InsertResearchInsight,
-  insertResearchInsightSchema,
-  InsertInsightTaskRelation,
-  insertInsightTaskRelationSchema,
-  InsertProjectComment,
-  insertProjectCommentSchema,
-  InsertTaskComment,
-  insertTaskCommentSchema
-} from "../shared/schema";
+import { SearchFilterOptions } from "../shared/schema";
 import { 
   createKnowledgeGraphFromSearch, 
   expandGraphNode, 

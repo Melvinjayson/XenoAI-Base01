@@ -21,22 +21,13 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Filter, X } from "lucide-react";
+import { Calendar as CalendarIcon, Filter, X, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-
-export interface SearchFilterOptions {
-  timeRange: string;
-  dateRange: {
-    from: Date | undefined;
-    to: Date | undefined;
-  };
-  sources: string[];
-  contentType: string[];
-  relevance: number;
-  location: string;
-}
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { SearchFilterOptions } from "@shared/schema";
 
 interface SearchFiltersProps {
   isOpen: boolean;
@@ -54,6 +45,15 @@ const DEFAULT_FILTERS: SearchFilterOptions = {
   contentType: [],
   relevance: 50,
   location: "anywhere",
+  language: [],
+  excludeTerms: [],
+  includeTerms: [],
+  fileType: [],
+  readingLevel: "any",
+  sortBy: "relevance",
+  minLength: undefined,
+  maxLength: undefined,
+  verifiedSourcesOnly: false,
 };
 
 const TIME_RANGES = [
@@ -91,6 +91,46 @@ const LOCATIONS = [
   { value: "latam", label: "Latin America" },
 ];
 
+const LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "zh", label: "Chinese" },
+  { value: "ja", label: "Japanese" },
+  { value: "ru", label: "Russian" },
+  { value: "ar", label: "Arabic" },
+  { value: "hi", label: "Hindi" },
+];
+
+const FILE_TYPES = [
+  { value: "pdf", label: "PDF" },
+  { value: "doc", label: "Word Documents" },
+  { value: "ppt", label: "Presentations" },
+  { value: "xls", label: "Spreadsheets" },
+  { value: "txt", label: "Text Files" },
+  { value: "html", label: "Web Pages" },
+  { value: "json", label: "JSON Files" },
+  { value: "csv", label: "CSV Data" },
+];
+
+const READING_LEVELS = [
+  { value: "any", label: "Any Level" },
+  { value: "basic", label: "Basic" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "advanced", label: "Advanced" },
+  { value: "technical", label: "Technical" },
+  { value: "academic", label: "Academic" },
+];
+
+const SORT_OPTIONS = [
+  { value: "relevance", label: "Relevance" },
+  { value: "date", label: "Date (Newest First)" },
+  { value: "date_oldest", label: "Date (Oldest First)" },
+  { value: "popularity", label: "Popularity" },
+  { value: "authority", label: "Authority" },
+];
+
 export function SearchFilters({ isOpen, onClose, onApplyFilters }: SearchFiltersProps) {
   const [filters, setFilters] = useState<SearchFilterOptions>(DEFAULT_FILTERS);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
@@ -102,8 +142,8 @@ export function SearchFilters({ isOpen, onClose, onApplyFilters }: SearchFilters
     }));
   };
 
-  const handleApplyFilters = () => {
-    // Count active filters
+  // Calculate active filter count
+  const countActiveFilters = (filters: SearchFilterOptions): number => {
     let count = 0;
     if (filters.timeRange !== "anytime") count++;
     if (filters.dateRange.from || filters.dateRange.to) count++;
@@ -111,7 +151,20 @@ export function SearchFilters({ isOpen, onClose, onApplyFilters }: SearchFilters
     if (filters.contentType.length > 0) count++;
     if (filters.relevance !== 50) count++;
     if (filters.location !== "anywhere") count++;
+    if (filters.language && filters.language.length > 0) count++;
+    if (filters.excludeTerms && filters.excludeTerms.length > 0) count++;
+    if (filters.includeTerms && filters.includeTerms.length > 0) count++;
+    if (filters.fileType && filters.fileType.length > 0) count++;
+    if (filters.readingLevel && filters.readingLevel !== "any") count++;
+    if (filters.sortBy && filters.sortBy !== "relevance") count++;
+    if (filters.minLength !== undefined || filters.maxLength !== undefined) count++;
+    if (filters.verifiedSourcesOnly) count++;
     
+    return count;
+  };
+
+  const handleApplyFilters = () => {
+    const count = countActiveFilters(filters);
     setActiveFiltersCount(count);
     onApplyFilters(filters);
     onClose();
@@ -123,30 +176,44 @@ export function SearchFilters({ isOpen, onClose, onApplyFilters }: SearchFilters
     onApplyFilters(DEFAULT_FILTERS);
   };
 
-  // Toggle source selection
-  const toggleSource = (source: string) => {
+  // Generic array toggle function
+  const toggleArrayItem = <T extends keyof SearchFilterOptions>(
+    key: T, 
+    value: string
+  ) => {
     setFilters(prev => {
-      const newSources = prev.sources.includes(source)
-        ? prev.sources.filter(s => s !== source)
-        : [...prev.sources, source];
+      const array = prev[key] as string[];
+      if (!Array.isArray(array)) return prev;
+      
+      const newArray = array.includes(value)
+        ? array.filter(item => item !== value)
+        : [...array, value];
       
       return {
         ...prev,
-        sources: newSources,
+        [key]: newArray,
       };
     });
   };
 
-  // Toggle content type selection
-  const toggleContentType = (type: string) => {
+  // Helper methods for specific filter types
+  const toggleSource = (source: string) => toggleArrayItem('sources', source);
+  const toggleContentType = (type: string) => toggleArrayItem('contentType', type);
+  const toggleLanguage = (lang: string) => toggleArrayItem('language', lang);
+  const toggleFileType = (type: string) => toggleArrayItem('fileType', type);
+  
+  // Helper for adding/removing terms
+  const addTerm = (termType: 'includeTerms' | 'excludeTerms', term: string) => {
+    if (!term.trim()) return;
+    toggleArrayItem(termType, term.trim());
+  };
+  
+  const removeTerm = (termType: 'includeTerms' | 'excludeTerms', term: string) => {
     setFilters(prev => {
-      const newTypes = prev.contentType.includes(type)
-        ? prev.contentType.filter(t => t !== type)
-        : [...prev.contentType, type];
-      
+      const terms = prev[termType] as string[];
       return {
         ...prev,
-        contentType: newTypes,
+        [termType]: terms.filter(t => t !== term)
       };
     });
   };
@@ -265,6 +332,17 @@ export function SearchFilters({ isOpen, onClose, onApplyFilters }: SearchFilters
                       </label>
                     </div>
                   ))}
+                  
+                  <div className="pt-2 flex items-center">
+                    <Switch
+                      id="verified-sources"
+                      checked={filters.verifiedSourcesOnly}
+                      onCheckedChange={(checked) => updateFilters({ verifiedSourcesOnly: checked })}
+                    />
+                    <label htmlFor="verified-sources" className="ml-2 text-sm cursor-pointer">
+                      Verified sources only
+                    </label>
+                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -293,6 +371,160 @@ export function SearchFilters({ isOpen, onClose, onApplyFilters }: SearchFilters
               </AccordionContent>
             </AccordionItem>
 
+            {/* Keywords Filter */}
+            <AccordionItem value="keywords">
+              <AccordionTrigger>Keywords</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3">
+                  {/* Include terms */}
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Must include these terms:</label>
+                    
+                    {/* Display added terms */}
+                    {filters.includeTerms && filters.includeTerms.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {filters.includeTerms.map(term => (
+                          <Badge variant="secondary" key={term} className="p-1 gap-1">
+                            {term}
+                            <X 
+                              size={14} 
+                              className="cursor-pointer ml-1" 
+                              onClick={() => removeTerm('includeTerms', term)}
+                            />
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Add term input */}
+                    <div className="flex gap-2">
+                      <Input 
+                        id="include-term-input"
+                        placeholder="Add term"
+                        className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            addTerm('includeTerms', e.currentTarget.value);
+                            e.currentTarget.value = '';
+                          }
+                        }}
+                      />
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => {
+                          const input = document.getElementById('include-term-input') as HTMLInputElement;
+                          if (input) {
+                            addTerm('includeTerms', input.value);
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        <Plus size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Exclude terms */}
+                  <div className="pt-3">
+                    <label className="text-sm font-medium mb-1 block">Exclude these terms:</label>
+                    
+                    {/* Display excluded terms */}
+                    {filters.excludeTerms && filters.excludeTerms.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {filters.excludeTerms.map(term => (
+                          <Badge variant="outline" key={term} className="p-1 gap-1 text-destructive border-destructive">
+                            {term}
+                            <X 
+                              size={14} 
+                              className="cursor-pointer ml-1" 
+                              onClick={() => removeTerm('excludeTerms', term)}
+                            />
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Add exclusion term input */}
+                    <div className="flex gap-2">
+                      <Input 
+                        id="exclude-term-input"
+                        placeholder="Exclude term"
+                        className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            addTerm('excludeTerms', e.currentTarget.value);
+                            e.currentTarget.value = '';
+                          }
+                        }}
+                      />
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => {
+                          const input = document.getElementById('exclude-term-input') as HTMLInputElement;
+                          if (input) {
+                            addTerm('excludeTerms', input.value);
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        <Minus size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Language Filter */}
+            <AccordionItem value="language">
+              <AccordionTrigger>Language</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-2">
+                  {LANGUAGES.map(lang => (
+                    <div key={lang.value} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`lang-${lang.value}`}
+                        checked={filters.language?.includes(lang.value)}
+                        onCheckedChange={() => toggleLanguage(lang.value)}
+                      />
+                      <label 
+                        htmlFor={`lang-${lang.value}`}
+                        className="text-sm cursor-pointer"
+                      >
+                        {lang.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* File Type Filter */}
+            <AccordionItem value="filetype">
+              <AccordionTrigger>File Type</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-2">
+                  {FILE_TYPES.map(type => (
+                    <div key={type.value} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`filetype-${type.value}`}
+                        checked={filters.fileType?.includes(type.value)}
+                        onCheckedChange={() => toggleFileType(type.value)}
+                      />
+                      <label 
+                        htmlFor={`filetype-${type.value}`}
+                        className="text-sm cursor-pointer"
+                      >
+                        {type.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             {/* Relevance Filter */}
             <AccordionItem value="relevance">
               <AccordionTrigger>Relevance</AccordionTrigger>
@@ -310,6 +542,87 @@ export function SearchFilters({ isOpen, onClose, onApplyFilters }: SearchFilters
                       {filters.relevance}%
                     </span>
                     <span>Exact matches</span>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Advanced Options */}
+            <AccordionItem value="advanced">
+              <AccordionTrigger>Advanced Options</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4">
+                  {/* Reading Level */}
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Reading Level</label>
+                    <Select 
+                      value={filters.readingLevel} 
+                      onValueChange={(value) => updateFilters({ readingLevel: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select reading level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {READING_LEVELS.map(level => (
+                          <SelectItem key={level.value} value={level.value}>
+                            {level.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Content Length */}
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Content Length (words)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Minimum</label>
+                        <Input
+                          type="number"
+                          placeholder="Min words"
+                          value={filters.minLength !== undefined ? String(filters.minLength) : ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : parseInt(e.target.value);
+                            updateFilters({ minLength: value });
+                          }}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Maximum</label>
+                        <Input
+                          type="number"
+                          placeholder="Max words"
+                          value={filters.maxLength !== undefined ? String(filters.maxLength) : ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : parseInt(e.target.value);
+                            updateFilters({ maxLength: value });
+                          }}
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Sort Order */}
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Sort Results By</label>
+                    <Select 
+                      value={filters.sortBy} 
+                      onValueChange={(value) => updateFilters({ sortBy: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select sorting method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SORT_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </AccordionContent>

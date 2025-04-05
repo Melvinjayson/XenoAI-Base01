@@ -3,15 +3,142 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import { SearchResult, SearchSource, AssetData } from "./types";
 
+// Helper function to parse a search query with filter parameters
+function parseSearchQuery(query: string): { baseQuery: string; filterParams: string[] } {
+  // Check if we have a query with filter parameters in parentheses
+  const filterMatch = query.match(/^(.+?)\s*\((.+?)\)$/);
+  
+  if (!filterMatch) {
+    return { baseQuery: query, filterParams: [] };
+  }
+  
+  const baseQuery = filterMatch[1].trim();
+  const filterString = filterMatch[2].trim();
+  
+  // Split filter string by semicolons to get individual parameters
+  const params = filterString.split(';').map(p => p.trim());
+  
+  return {
+    baseQuery,
+    filterParams: params
+  };
+}
+
 // Initialize OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Function to fetch search results from DuckDuckGo
+// Function to fetch search results from DuckDuckGo with enhanced filter support
 async function searchWeb(query: string): Promise<{ title: string; link: string; snippet: string }[]> {
   try {
-    console.log(`Searching DuckDuckGo for: ${query}`);
-    // Use DuckDuckGo as our search engine through HTML scraping
-    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    // Parse the query to extract search filters
+    const queryInfo = parseSearchQuery(query);
+    
+    // Build search URL with appropriate parameters
+    let modifiedQuery = queryInfo.baseQuery;
+    let searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(modifiedQuery)}`;
+    
+    // Add filter parameters to the search URL if available
+    if (queryInfo.filterParams.length > 0) {
+      // Apply specific duckduckgo search parameters based on our filters
+      const ddgParams: string[] = [];
+      
+      // Time-based filters
+      if (queryInfo.filterParams.find((p: string) => p.includes('time period: in the last 24 hours'))) {
+        ddgParams.push('df=d');  // Past day
+      } else if (queryInfo.filterParams.find((p: string) => p.includes('time period: in the last week'))) {
+        ddgParams.push('df=w');  // Past week
+      } else if (queryInfo.filterParams.find((p: string) => p.includes('time period: in the last month'))) {
+        ddgParams.push('df=m');  // Past month
+      } else if (queryInfo.filterParams.find((p: string) => p.includes('time period: in the last year'))) {
+        ddgParams.push('df=y');  // Past year
+      }
+      
+      // File type filters
+      const fileTypeParam = queryInfo.filterParams.find((p: string) => p.includes('file types:'));
+      if (fileTypeParam) {
+        const fileTypeMatch = fileTypeParam.match(/file types: ([^;)]+)/);
+        if (fileTypeMatch) {
+          const fileTypes = fileTypeMatch[1].split(',').map((t: string) => t.trim());
+          fileTypes.forEach((type: string) => {
+            ddgParams.push(`filetype:${type}`);
+          });
+        }
+      }
+      
+      // Site/source filters
+      const sourceParam = queryInfo.filterParams.find((p: string) => p.includes('sources:'));
+      if (sourceParam) {
+        const sourceMatch = sourceParam.match(/sources: ([^;)]+)/);
+        if (sourceMatch) {
+          const sources = sourceMatch[1].split(',').map((s: string) => s.trim());
+          sources.forEach((source: string) => {
+            if (source === 'academic') {
+              ddgParams.push('site:.edu');
+            } else if (source === 'news') {
+              ddgParams.push('site:news');
+            }
+          });
+        }
+      }
+      
+      // Language filters
+      const langParam = queryInfo.filterParams.find((p: string) => p.includes('languages:'));
+      if (langParam) {
+        const langMatch = langParam.match(/languages: ([^;)]+)/);
+        if (langMatch) {
+          const languages = langMatch[1].split(',').map((l: string) => l.trim());
+          // Map common language codes to DuckDuckGo language parameters
+          const langCode = languages[0]; // Use first language as primary
+          if (langCode) {
+            if (langCode === 'en') ddgParams.push('kl=us-en');
+            if (langCode === 'es') ddgParams.push('kl=es-es');
+            if (langCode === 'fr') ddgParams.push('kl=fr-fr');
+            if (langCode === 'de') ddgParams.push('kl=de-de');
+            if (langCode === 'zh') ddgParams.push('kl=zh-cn');
+            if (langCode === 'ja') ddgParams.push('kl=ja-jp');
+            if (langCode === 'ru') ddgParams.push('kl=ru-ru');
+            if (langCode === 'ar') ddgParams.push('kl=ar-sa');
+            if (langCode === 'hi') ddgParams.push('kl=in-en');
+          }
+        }
+      }
+      
+      // Excluded terms
+      const excludeParam = queryInfo.filterParams.find((p: string) => p.includes('exclude:'));
+      if (excludeParam) {
+        const excludeMatch = excludeParam.match(/exclude: ([^;)]+)/);
+        if (excludeMatch) {
+          const excludeTerms = excludeMatch[1].split(',').map((t: string) => t.trim());
+          // Add exclude terms to the query
+          excludeTerms.forEach((term: string) => {
+            modifiedQuery = `${modifiedQuery} -${term}`;
+          });
+        }
+      }
+      
+      // Included terms
+      const includeParam = queryInfo.filterParams.find((p: string) => p.includes('must include:'));
+      if (includeParam) {
+        const includeMatch = includeParam.match(/must include: ([^;)]+)/);
+        if (includeMatch) {
+          const includeTerms = includeMatch[1].split(',').map((t: string) => t.trim());
+          // Add include terms to the query
+          includeTerms.forEach((term: string) => {
+            modifiedQuery = `${modifiedQuery} +${term}`;
+          });
+        }
+      }
+      
+      // If we have modified parameters, rebuild the search URL
+      if (ddgParams.length > 0 || modifiedQuery !== queryInfo.baseQuery) {
+        searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(modifiedQuery)}`;
+        if (ddgParams.length > 0) {
+          searchUrl += `&${ddgParams.join('&')}`;
+        }
+      }
+    }
+    
+    console.log(`Searching DuckDuckGo with enhanced filters: ${searchUrl}`);
     const response = await axios.get(searchUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'

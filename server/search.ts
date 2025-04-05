@@ -9,18 +9,8 @@ const searchCache: Cache<SearchResult> = new Map();
 // Default expiration time for cached results (30 minutes)
 const CACHE_EXPIRY_MS = 30 * 60 * 1000;
 
-// Interface for search filter options
-interface SearchFilterOptions {
-  timeRange?: string;
-  dateRange?: {
-    from?: Date;
-    to?: Date;
-  };
-  sources?: string[];
-  contentType?: string[];
-  relevance?: number;
-  location?: string;
-}
+// Import search filter options from shared schema
+import { SearchFilterOptions } from '@shared/schema';
 
 // Function to perform web search using LangChain enhanced search with filters
 export async function webSearch(query: string, filters?: SearchFilterOptions): Promise<SearchResult> {
@@ -38,6 +28,9 @@ export async function webSearch(query: string, filters?: SearchFilterOptions): P
       return cachedResult.data;
     }
     
+    // Clear query parameters for better prompt formatting
+    const queryParams: string[] = [];
+    
     // Enhance query with filters
     if (filters.timeRange && filters.timeRange !== 'anytime') {
       const timeRangeMap: Record<string, string> = {
@@ -48,34 +41,83 @@ export async function webSearch(query: string, filters?: SearchFilterOptions): P
       };
       
       if (timeRangeMap[filters.timeRange]) {
-        enhancedQuery += ` ${timeRangeMap[filters.timeRange]}`;
+        queryParams.push(`time period: ${timeRangeMap[filters.timeRange]}`);
       }
     }
     
     // Add date range if specified
     if (filters.dateRange && (filters.dateRange.from || filters.dateRange.to)) {
       if (filters.dateRange.from && filters.dateRange.to) {
-        enhancedQuery += ` between ${filters.dateRange.from.toLocaleDateString()} and ${filters.dateRange.to.toLocaleDateString()}`;
+        queryParams.push(`date range: between ${filters.dateRange.from.toLocaleDateString()} and ${filters.dateRange.to.toLocaleDateString()}`);
       } else if (filters.dateRange.from) {
-        enhancedQuery += ` after ${filters.dateRange.from.toLocaleDateString()}`;
+        queryParams.push(`published after: ${filters.dateRange.from.toLocaleDateString()}`);
       } else if (filters.dateRange.to) {
-        enhancedQuery += ` before ${filters.dateRange.to.toLocaleDateString()}`;
+        queryParams.push(`published before: ${filters.dateRange.to.toLocaleDateString()}`);
       }
     }
     
     // Add content type filters
     if (filters.contentType && filters.contentType.length > 0) {
-      enhancedQuery += ` showing only ${filters.contentType.join(', ')}`;
+      queryParams.push(`content types: ${filters.contentType.join(', ')}`);
     }
     
     // Add source filters
     if (filters.sources && filters.sources.length > 0) {
-      enhancedQuery += ` from ${filters.sources.join(', ')} sources`;
+      queryParams.push(`sources: ${filters.sources.join(', ')}`);
     }
     
     // Add location filter
     if (filters.location && filters.location !== 'anywhere') {
-      enhancedQuery += ` in ${filters.location}`;
+      queryParams.push(`location: ${filters.location}`);
+    }
+    
+    // Add language filter
+    if (filters.language && filters.language.length > 0) {
+      queryParams.push(`languages: ${filters.language.join(', ')}`);
+    }
+    
+    // Add excluded terms
+    if (filters.excludeTerms && filters.excludeTerms.length > 0) {
+      queryParams.push(`exclude: ${filters.excludeTerms.join(', ')}`);
+    }
+    
+    // Add included terms
+    if (filters.includeTerms && filters.includeTerms.length > 0) {
+      queryParams.push(`must include: ${filters.includeTerms.join(', ')}`);
+    }
+    
+    // Add file type filter
+    if (filters.fileType && filters.fileType.length > 0) {
+      queryParams.push(`file types: ${filters.fileType.join(', ')}`);
+    }
+    
+    // Add reading level filter
+    if (filters.readingLevel) {
+      queryParams.push(`reading level: ${filters.readingLevel}`);
+    }
+    
+    // Add sort order
+    if (filters.sortBy) {
+      queryParams.push(`sort by: ${filters.sortBy}`);
+    }
+    
+    // Add length constraints
+    if (filters.minLength !== undefined || filters.maxLength !== undefined) {
+      let lengthStr = 'length:';
+      if (filters.minLength !== undefined) lengthStr += ` minimum ${filters.minLength} words`;
+      if (filters.minLength !== undefined && filters.maxLength !== undefined) lengthStr += ' and';
+      if (filters.maxLength !== undefined) lengthStr += ` maximum ${filters.maxLength} words`;
+      queryParams.push(lengthStr);
+    }
+    
+    // Add verified sources only flag
+    if (filters.verifiedSourcesOnly) {
+      queryParams.push('verified sources only');
+    }
+    
+    // Compose enhanced query with all parameters
+    if (queryParams.length > 0) {
+      enhancedQuery = `${query} (${queryParams.join('; ')})`;
     }
     
     console.log('Enhanced query with filters:', enhancedQuery);
@@ -130,10 +172,16 @@ async function generateSearchResultWithOpenAI(query: string): Promise<SearchResu
     
     const currentDate = new Date().toISOString().split('T')[0];
     
+    // Parse the query and extract any filter parameters
+    const filterParams = extractFilterParams(query);
+    const baseQuery = filterParams.baseQuery || query;
+    
     const prompt = `
-    You are a web search assistant that provides rich, interactive search results about "${query}".
+    You are a web search assistant that provides rich, interactive search results about "${baseQuery}".
     
     Today's date is ${currentDate}.
+    
+    ${filterParams.filterPrompt ? `IMPORTANT SEARCH PARAMETERS:\n${filterParams.filterPrompt}\n` : ''}
     
     Please generate a comprehensive answer with the following:
     1. A detailed response that addresses the query directly with proper markdown formatting for headings, lists, etc.
@@ -276,6 +324,34 @@ export async function getSuggestions(query: string): Promise<string[]> {
     console.error('Error getting suggestions:', error);
     return getDefaultSuggestions(query);
   }
+}
+
+// Helper function to extract filter parameters from an enhanced query string
+function extractFilterParams(query: string): { baseQuery: string; filterPrompt: string } {
+  // Check if we have a query with filter parameters in parentheses
+  const filterMatch = query.match(/^(.+?)\s*\((.+?)\)$/);
+  
+  if (!filterMatch) {
+    return { baseQuery: query, filterPrompt: '' };
+  }
+  
+  const baseQuery = filterMatch[1].trim();
+  const filterString = filterMatch[2].trim();
+  
+  // Format the filter parameters as a prompt
+  const filterPromptLines: string[] = [];
+  
+  // Split filter string by semicolons to get individual parameters
+  const params = filterString.split(';').map(p => p.trim());
+  
+  params.forEach(param => {
+    filterPromptLines.push(`- ${param}`);
+  });
+  
+  return {
+    baseQuery,
+    filterPrompt: filterPromptLines.join('\n')
+  };
 }
 
 // Helper function for default suggestions based on query context
