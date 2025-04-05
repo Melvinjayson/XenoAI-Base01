@@ -1,7 +1,8 @@
 import { Message } from "@/types";
 import { 
   ExternalLink, Mic, MessageSquare, Network, ThumbsUp, ThumbsDown, 
-  Flag, ArrowRight, MoreHorizontal, CheckCircle, Sparkles, BrainCircuit, Brain
+  Flag, ArrowRight, MoreHorizontal, CheckCircle, Sparkles, BrainCircuit, Brain,
+  AlertCircle, Info
 } from "lucide-react";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { Button } from "@/components/ui/button";
@@ -115,6 +116,30 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           </div>
           
           <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full dark:text-slate-100 relative">
+            {message.fallback && (
+              <div className="mb-2 flex items-center gap-1">
+                <Badge variant="outline" className="text-xs py-0 px-1 border-amber-500 text-amber-600 gap-1 flex items-center">
+                  <AlertCircle className="w-3 h-3" />
+                  Limited Mode
+                </Badge>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+                        <Info className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">
+                        Xeno AI is currently using limited capabilities due to API restrictions. 
+                        Some features like web search and detailed responses may be unavailable.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
+            
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>

@@ -4,6 +4,7 @@ import { webSearch } from './search';
 import { conversationalResponse } from './agent';
 import { memoryManager, MemoryOptions } from './memory-manager';
 import { selectModel, createOpenAIClient, enhanceVoiceResponse, ModelConfig } from './model-selector';
+import { apiQuotaManager } from './api-quota-manager';
 
 // System message for the OpenAI API
 const systemMessage: ChatMessage = {
@@ -149,6 +150,48 @@ export function prepareGreeting(userName?: string, lastInteraction?: Date): stri
 }
 
 // Function to handle chat with OpenAI and LangChain
+// Function to generate a fallback response when external APIs are unavailable
+function generateFallbackResponse(userMessage: string, history: ChatMessage[], isVoiceResponse: boolean = false): ChatResponse {
+  console.log('Generating fallback response for:', userMessage);
+  
+  // Simple response patterns based on user input
+  const greetingPattern = /^(hello|hi|hey|greetings|howdy)/i;
+  const helpPattern = /^(help|assist|support|guide)/i;
+  const weatherPattern = /(weather|temperature|forecast)/i;
+  const timePattern = /(time|date|day|today)/i;
+  const thanksPattern = /(thank|thanks|appreciate)/i;
+  const aboutPattern = /(about|who are you|what are you)/i;
+  
+  let response = "";
+  
+  if (greetingPattern.test(userMessage)) {
+    response = "Hello there! I'm Xeno AI. I'm currently experiencing connectivity issues with some of my services, but I'm here to help as best I can.";
+  } else if (helpPattern.test(userMessage)) {
+    response = "I'm here to help you with information and assistance. However, I'm currently running in a limited mode due to API quota limitations. You can still use features like project management and other local functionalities.";
+  } else if (weatherPattern.test(userMessage)) {
+    response = "I'm sorry, I'm unable to provide weather information at the moment due to API limitations. Please try again later when my external services are available.";
+  } else if (timePattern.test(userMessage)) {
+    const now = new Date();
+    response = `The current time is ${now.toLocaleTimeString()} on ${now.toLocaleDateString()}.`;
+  } else if (thanksPattern.test(userMessage)) {
+    response = "You're welcome! I'm glad I could help, even with my limited services at the moment.";
+  } else if (aboutPattern.test(userMessage)) {
+    response = "I'm Xeno AI, your personal AI assistant designed to help with research, knowledge management, and various tasks. I'm currently running with limited capabilities due to external API quota restrictions.";
+  } else {
+    response = "I apologize, but I'm currently experiencing limitations with my external API services due to quota restrictions. You can still use local features like project management. For complex queries, please try again later when my services are fully operational.";
+  }
+  
+  // Enhance the response if it's for voice output
+  if (isVoiceResponse) {
+    response = enhanceVoiceResponse(response);
+  }
+  
+  return {
+    message: response,
+    fallback: true
+  };
+}
+
 export async function chat(
   userMessage: string, 
   history: ChatMessage[], 
@@ -157,6 +200,13 @@ export async function chat(
   isVoiceResponse: boolean = false
 ): Promise<ChatResponse> {
   try {
+    // Check if we're hitting API quota limits
+    const apiLimitStatus = apiQuotaManager.checkRateLimit('openai');
+    if (apiLimitStatus.isLimited) {
+      console.log('OpenAI API quota exceeded, using fallback response');
+      return generateFallbackResponse(userMessage, history, isVoiceResponse);
+    }
+    
     // For informational queries, try to get enhanced search results first
     if (isInformationalQuery(userMessage)) {
       try {
@@ -322,8 +372,11 @@ export async function chat(
     };
   } catch (error) {
     console.error('OpenAI API error:', error);
-    return {
-      message: 'I apologize, but I encountered an issue while processing your request. Please try again later.'
-    };
+    
+    // Record the API error in the quota manager
+    apiQuotaManager.recordApiUsage('openai');
+    
+    // Use our fallback response mechanism for errors as well
+    return generateFallbackResponse(userMessage, history, isVoiceResponse);
   }
 }

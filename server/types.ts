@@ -48,6 +48,7 @@ export interface ChatResponse {
   }[];
   assets?: AssetData[];
   relatedQueries?: string[];
+  fallback?: boolean; // Indicates if this is a fallback response when API quota is exceeded
 }
 
 // Voice synthesis types

@@ -134,6 +134,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         throw new Error("Invalid response format from API");
       }
       
+      // Check if this is a fallback response due to API quota limits
+      if (data.fallback) {
+        console.log('Received fallback response due to API limitations');
+        
+        // Show a toast notification about API limits only once per session
+        if (!sessionStorage.getItem('api_limit_notified')) {
+          toast({
+            title: "API Quota Limited",
+            description: "Some AI features are currently limited. You can still use local features like project management.",
+            variant: "destructive",
+            duration: 7000,
+          });
+          sessionStorage.setItem('api_limit_notified', 'true');
+        }
+      }
+      
       // Store search results if they exist for knowledge graph usage
       if (data.sources && data.sources.length > 0) {
         setLastSearchResult({
@@ -152,6 +168,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         sources: data.sources || [],
         assets: data.assets || [],
         relatedQueries: data.relatedQueries || [],
+        fallback: data.fallback || false, // Track if this is a fallback message
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
