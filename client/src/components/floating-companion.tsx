@@ -38,6 +38,37 @@ export function FloatingCompanion({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [animationState, setAnimationState] = useState<'idle' | 'thinking' | 'speaking'>('idle');
+  const [location] = useLocation();
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Check if we should hide the companion
+  const isHiddenPage = location === '/' || location.includes('splash');
+  if (isHiddenPage) return null;
+
+  // Drag handlers
+  const handleDragStart = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDragPosition({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  };
+
+  const handleDrag = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    
+    const x = e.clientX - dragPosition.x;
+    const y = e.clientY - dragPosition.y;
+    
+    e.currentTarget.style.left = `${x}px`;
+    e.currentTarget.style.top = `${y}px`;
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
   
   const toggleExpanded = () => {
     if (isMinimized) {
@@ -76,11 +107,18 @@ export function FloatingCompanion({
   };
   
   return (
-    <div className={cn(
-      "fixed z-50 flex flex-col items-end", 
-      positionClasses[position],
-      className
-    )}>
+    <div 
+      className={cn(
+        "fixed z-50 flex flex-col items-end cursor-move", 
+        !isDragging && positionClasses[position],
+        className
+      )}
+      onMouseDown={handleDragStart}
+      onMouseMove={handleDrag}
+      onMouseUp={handleDragEnd}
+      onMouseLeave={handleDragEnd}
+      style={isDragging ? { position: 'fixed' } : undefined}
+    >
       {/* Companion options menu */}
       {isExpanded && !isMinimized && (
         <div className="mb-2 bg-white dark:bg-gray-900 rounded-lg shadow-lg p-2 animate-in slide-in-from-bottom-5 duration-200">
