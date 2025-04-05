@@ -163,10 +163,37 @@ export function FloatingVoiceWidget() {
                 const textToSpeak = latestMessage ? latestMessage.textContent || '' : 'Message received';
                 
                 const utterance = new SpeechSynthesisUtterance(textToSpeak);
-                // Set language if available in data
+                
+                // Set language if available in data or from language context
                 if (data.language) {
                   utterance.lang = data.language;
+                } else if (language) {
+                  // Map our language code to a browser-compatible one
+                  const langMap: Record<string, string> = {
+                    'en': 'en-US',
+                    'fr': 'fr-FR',
+                    'es': 'es-ES',
+                    'de': 'de-DE',
+                    'it': 'it-IT',
+                    'pt': 'pt-PT',
+                    'ja': 'ja-JP',
+                    'ko': 'ko-KR',
+                    'zh': 'zh-CN',
+                    'ar': 'ar-SA',
+                    'ru': 'ru-RU'
+                  };
+                  utterance.lang = langMap[language] || 'en-US';
                 }
+                
+                // Set up event handlers
+                utterance.onend = () => {
+                  console.log('Browser TTS playback completed');
+                };
+                
+                utterance.onerror = (e) => {
+                  console.error('Browser TTS error:', e);
+                };
+                
                 window.speechSynthesis.speak(utterance);
               } catch (ttsError) {
                 console.error('Text-to-speech error:', ttsError);
@@ -183,6 +210,37 @@ export function FloatingVoiceWidget() {
             const textToSpeak = latestMessage ? latestMessage.textContent || '' : 'Message received';
             
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            // Set language if available in data or from language context
+            if (data.language) {
+              utterance.lang = data.language;
+            } else if (language) {
+              // Map our language code to a browser-compatible one
+              const langMap: Record<string, string> = {
+                'en': 'en-US',
+                'fr': 'fr-FR',
+                'es': 'es-ES',
+                'de': 'de-DE',
+                'it': 'it-IT',
+                'pt': 'pt-PT',
+                'ja': 'ja-JP',
+                'ko': 'ko-KR',
+                'zh': 'zh-CN',
+                'ar': 'ar-SA',
+                'ru': 'ru-RU'
+              };
+              utterance.lang = langMap[language] || 'en-US';
+            }
+            
+            // Set up event handlers
+            utterance.onend = () => {
+              console.log('Browser TTS playback completed');
+            };
+            
+            utterance.onerror = (e) => {
+              console.error('Browser TTS error:', e);
+            };
+            
             window.speechSynthesis.speak(utterance);
           } catch (ttsError) {
             console.error('Text-to-speech error:', ttsError);
@@ -338,6 +396,8 @@ export function FloatingVoiceWidget() {
                 const textToSpeak = latestMessage.textContent || '';
                 if (textToSpeak) {
                   const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                  
+                  // Set language based on current language context
                   if (language) {
                     // Map our language code to a browser-compatible one
                     const langMap: Record<string, string> = {
@@ -350,9 +410,21 @@ export function FloatingVoiceWidget() {
                       'ja': 'ja-JP',
                       'ko': 'ko-KR',
                       'zh': 'zh-CN',
+                      'ar': 'ar-SA',
+                      'ru': 'ru-RU'
                     };
                     utterance.lang = langMap[language] || 'en-US';
                   }
+                  
+                  // Set up event handlers
+                  utterance.onend = () => {
+                    console.log('WebSocket fallback TTS completed');
+                  };
+                  
+                  utterance.onerror = (e) => {
+                    console.error('WebSocket fallback TTS error:', e);
+                  };
+                  
                   window.speechSynthesis.speak(utterance);
                 }
               }
@@ -413,6 +485,35 @@ export function FloatingVoiceWidget() {
         try {
           const fallbackMessage = "I'm sorry, I couldn't process your request right now. Please try again later.";
           const utterance = new SpeechSynthesisUtterance(fallbackMessage);
+          
+          // Set language based on current language context
+          if (language) {
+            // Map our language code to a browser-compatible one
+            const langMap: Record<string, string> = {
+              'en': 'en-US',
+              'fr': 'fr-FR',
+              'es': 'es-ES',
+              'de': 'de-DE',
+              'it': 'it-IT',
+              'pt': 'pt-PT',
+              'ja': 'ja-JP',
+              'ko': 'ko-KR',
+              'zh': 'zh-CN',
+              'ar': 'ar-SA',
+              'ru': 'ru-RU'
+            };
+            utterance.lang = langMap[language] || 'en-US';
+          }
+          
+          // Set up event handlers
+          utterance.onend = () => {
+            console.log('Error fallback TTS completed');
+          };
+          
+          utterance.onerror = (e) => {
+            console.error('Error fallback TTS error:', e);
+          };
+          
           window.speechSynthesis.speak(utterance);
         } catch (ttsError) {
           console.error('Fallback text-to-speech error:', ttsError);

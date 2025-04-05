@@ -192,6 +192,12 @@ function generateFallbackResponse(userMessage: string, history: ChatMessage[], i
   };
 }
 
+import { 
+  isQuerySuitableForLocalProcessing, 
+  isConversationContextComplex, 
+  processWithLocalLLM 
+} from './local-llm';
+
 export async function chat(
   userMessage: string, 
   history: ChatMessage[], 
@@ -200,7 +206,45 @@ export async function chat(
   isVoiceResponse: boolean = false
 ): Promise<ChatResponse> {
   try {
-    // Check if we're hitting API quota limits
+    // First determine if we should use local LLM or commercial API
+    const queryIsSuitable = isQuerySuitableForLocalProcessing(userMessage);
+    const conversationIsComplex = isConversationContextComplex(history);
+    const useLocalLLM = !forceAdvancedModel && queryIsSuitable && !conversationIsComplex;
+    
+    console.log(
+      `Processing chat request: ${userMessage.substring(0, 30)}... ` +
+      `Query suitability: ${queryIsSuitable ? 'Simple' : 'Complex'}, ` +
+      `Conversation: ${conversationIsComplex ? 'Complex' : 'Simple'}, ` +
+      `Using: ${useLocalLLM ? 'Local LLM' : 'OpenAI API'}`
+    );
+    
+    // Try local LLM first for suitable queries
+    if (useLocalLLM) {
+      try {
+        console.log('Using local LLM for processing');
+        const localResponse = await processWithLocalLLM(userMessage, history);
+        
+        // Record the usage
+        apiQuotaManager.recordApiUsage('local-llm', 1);
+        
+        // Enhance for voice if needed
+        let message = localResponse.message;
+        if (isVoiceResponse) {
+          message = enhanceVoiceResponse(message);
+        }
+        
+        return {
+          message,
+          isLocal: true
+        };
+      } catch (localError) {
+        console.error('Error with local LLM:', localError);
+        console.log('Falling back to OpenAI API');
+        // Continue to OpenAI processing
+      }
+    }
+    
+    // Check if we're hitting API quota limits for OpenAI
     const apiLimitStatus = apiQuotaManager.checkRateLimit('openai');
     if (apiLimitStatus.isLimited) {
       console.log('OpenAI API quota exceeded, using fallback response');

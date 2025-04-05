@@ -1,4 +1,4 @@
-type ApiService = 'elevenlabs' | 'openai' | 'perplexity';
+type ApiService = 'elevenlabs' | 'openai' | 'perplexity' | 'local-llm';
 
 interface QuotaUsage {
   requestsToday: number;
@@ -31,6 +31,7 @@ export class ApiQuotaManager {
     this.initializeService('elevenlabs', 10000, 50); // 10,000 daily quota, 50 requests per hour
     this.initializeService('openai', 100000, 200); // 100,000 daily quota, 200 requests per hour
     this.initializeService('perplexity', 50000, 100); // 50,000 daily quota, 100 requests per hour
+    this.initializeService('local-llm', 1000000, 10000); // Very high limits for local LLM since it doesn't have API restrictions
   }
 
   public static getInstance(): ApiQuotaManager {

@@ -53,14 +53,68 @@ export function useTextToSpeech() {
       console.log('Synthesizing speech with voice:', voiceId, 'language:', language);
       
       // Request speech synthesis from server
-      const data = await apiRequest('/api/synthesize', 'POST', {
+      const data = await apiRequest('POST', '/api/synthesize', {
         text,
         voiceId,
         language,
       });
       
-      if (!data || !data.audioUrl) {
+      // Check if we got a fallback response with empty audioUrl
+      if (data && data.fallback === true && !data.audioUrl) {
+        console.log('Using browser speech synthesis as fallback');
+        // Use browser's built-in speech synthesis
+        if ('speechSynthesis' in window) {
+          try {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = language || 'en';
+            
+            // Adjust voice settings if available
+            try {
+              const voices = window.speechSynthesis.getVoices();
+              if (voices.length > 0) {
+                // Try to find a voice for the specified language
+                const voiceMatches = voices.filter(v => v.lang.startsWith(language.split('-')[0]));
+                if (voiceMatches.length > 0) {
+                  utterance.voice = voiceMatches[0];
+                }
+              }
+            } catch (voiceError) {
+              console.warn('Could not set voice:', voiceError);
+            }
+            
+            // Set up event handlers
+            utterance.onend = () => {
+              setIsSpeaking(false);
+              setCurrentText(null);
+              setCurrentVisualCommands(null);
+            };
+            
+            utterance.onerror = (e) => {
+              console.error('Browser speech synthesis error:', e);
+              setIsSpeaking(false);
+              setCurrentText(null);
+              setCurrentVisualCommands(null);
+              setError('Browser speech synthesis failed.');
+            };
+            
+            window.speechSynthesis.speak(utterance);
+            return; // Exit early since we're using browser TTS
+          } catch (ttsError) {
+            console.error('Browser speech synthesis error:', ttsError);
+            throw new Error('Browser speech synthesis failed: ' + (ttsError instanceof Error ? ttsError.message : String(ttsError)));
+          }
+        } else {
+          throw new Error('Speech synthesis not supported in this browser');
+        }
+      }
+      
+      if (!data || (!data.audioUrl && !data.fallback)) {
         throw new Error('Invalid response from speech synthesis server');
+      }
+      
+      // Only proceed with audio element if we have a valid audio URL
+      if (!data.audioUrl) {
+        return; // Nothing more to do without a URL
       }
       
       // Create and set up audio element

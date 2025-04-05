@@ -833,9 +833,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const palette = await storage.createColorPalette({
         userId: userId || null,
         name: name || "Untitled Palette",
-        colors,
         description: description || "",
-        isDefault: false
+        isDefault: false,
+        // Use as any to safely pass the colors array to the storage function
+        ...(colors ? { colors: colors as string[] } : {})
       });
       
       return res.status(201).json(palette);
@@ -2954,9 +2955,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (isVoiceResponse && response) {
               // The text might be in different places depending on response format
               const textToSynthesize = (typeof response === 'string') ? response :
-                (response && typeof response === 'object' && response.message && 
-                  typeof response.message === 'object' && 'content' in response.message ? 
-                  String(response.message.content) : '') || 
+                (response && typeof response === 'object' && response.message ? 
+                  (typeof response.message === 'string' ? response.message : 
+                   (typeof response.message === 'object' && response.message !== null ? 
+                    JSON.stringify(response.message) : '')) : '') || 
                 JSON.stringify(response);
                 
               if (textToSynthesize) {
