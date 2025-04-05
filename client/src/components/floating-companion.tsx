@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCompanion } from '@/context/companion-context';
-import { useLocation } from "wouter"; // Added import
+import { useLocation } from "wouter";
 
 interface FloatingCompanionProps {
   className?: string;
@@ -110,15 +110,20 @@ export function FloatingCompanion({
   return (
     <div 
       className={cn(
-        "fixed z-50 flex flex-col items-end cursor-move", 
-        !isDragging && positionClasses[position],
+        "fixed z-50 flex flex-col items-end cursor-move",
         className
       )}
       onMouseDown={handleDragStart}
       onMouseMove={handleDrag}
       onMouseUp={handleDragEnd}
       onMouseLeave={handleDragEnd}
-      style={isDragging ? { position: 'fixed' } : undefined}
+      style={{
+        position: 'fixed',
+        left: isDragging ? `${dragPosition.x}px` : positionClasses[position].includes('left') ? '16px' : 'auto',
+        right: isDragging ? 'auto' : positionClasses[position].includes('right') ? '16px' : 'auto',
+        top: isDragging ? `${dragPosition.y}px` : positionClasses[position].includes('top') ? '16px' : 'auto',
+        bottom: isDragging ? 'auto' : positionClasses[position].includes('bottom') ? '16px' : 'auto'
+      }}
     >
       {/* Companion options menu */}
       {isExpanded && !isMinimized && (
