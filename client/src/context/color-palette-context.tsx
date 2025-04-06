@@ -34,8 +34,9 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await apiRequest('GET', '/api/color-palettes');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response?.ok) {
+        console.warn('Failed to load palettes, using default');
+        return [];
       }
       const data = await response.json();
       setPalettes(data);
