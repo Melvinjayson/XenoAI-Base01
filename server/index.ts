@@ -15,9 +15,13 @@ import { getAvailableModels } from './model-selector';
 // Create Express application
 const app = express();
 
+// Import validation middleware
+import { validateRequest } from './middleware/requestValidation';
+
 // Middleware
 app.use(express.json({ limit: '50mb' })); // For parsing application/json with large payload support
 app.use(express.urlencoded({ extended: true })); // For parsing application/x-www-form-urlencoded
+app.use(validateRequest); // Add request validation
 
 // CORS headers for development
 app.use((req, res, next) => {
