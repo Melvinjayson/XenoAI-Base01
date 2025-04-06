@@ -65,8 +65,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Set up API routes
-setupRoutes(app);
+// Set up API routes and WebSocket server
+const webSocketServer = setupRoutes(app, httpServer);
+console.log(`WebSocket server available: ${!!webSocketServer}`);
 
 // Start the server
 const PORT = process.env.PORT || 5000;

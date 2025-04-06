@@ -110,8 +110,8 @@ export async function processMessage(
         model: selectedModel.id,
         tokens: {
           prompt: estimatedTokens,
-          completion: estimatedTokenCount(localResponse),
-          total: estimatedTokens + estimatedTokenCount(localResponse)
+          completion: estimateTokenCount(localResponse),
+          total: estimatedTokens + estimateTokenCount(localResponse)
         },
         timing: {
           start: Date.now() - 500, // Approximate timing
@@ -120,17 +120,30 @@ export async function processMessage(
         }
       };
     } else if (selectedModel.provider === 'openai') {
-      // Route to OpenAI
-      const processingOptions: ProcessOptions = {
-        systemPrompt,
-        temperature: options.temperature ?? selectedModel.temperature,
-        maxTokens: options.maxTokens ?? selectedModel.maxTokens,
-        topP: options.topP,
-        frequencyPenalty: options.frequencyPenalty,
-        presencePenalty: options.presencePenalty
-      };
-      
-      response = await processWithOpenAI(message, history, selectedModel.id, processingOptions);
+      try {
+        // Route to OpenAI
+        const processingOptions: ProcessOptions = {
+          systemPrompt,
+          temperature: options.temperature ?? selectedModel.temperature,
+          maxTokens: options.maxTokens ?? selectedModel.maxTokens,
+          topP: options.topP,
+          frequencyPenalty: options.frequencyPenalty,
+          presencePenalty: options.presencePenalty
+        };
+        
+        response = await processWithOpenAI(message, history, selectedModel.id, processingOptions);
+      } catch (openaiError: any) {
+        console.error('OpenAI error, falling back to local model:', openaiError.message || openaiError);
+        
+        // Track API quota usage for failures
+        if (openaiError?.code === 'insufficient_quota' || openaiError?.status === 429) {
+          apiQuotaManager.trackFailure(ApiService.OPENAI, true);
+        }
+        
+        // Always fall back to local model on OpenAI errors
+        console.log('Falling back to local model due to OpenAI error');
+        return await fallbackToLocalModel(message, history, options);
+      }
     } else {
       // Unsupported provider
       throw new Error(`Provider ${selectedModel.provider} not supported yet`);
@@ -140,14 +153,31 @@ export async function processMessage(
   } catch (error) {
     console.error('Error in model router:', error);
     
-    // Try to fall back to local model if available and not already using it
-    if (!useLocalModel && apiQuotaManager.getRemainingQuota(ApiService.OPENAI) <= 0) {
-      console.log('Falling back to local model due to quota restrictions');
-      return await fallbackToLocalModel(message, history, options);
+    // Always try to fall back to local model if available and not already using it
+    if (!useLocalModel) {
+      console.log('Falling back to local model due to error');
+      try {
+        return await fallbackToLocalModel(message, history, options);
+      } catch (fallbackError) {
+        console.error('Error in local model fallback:', fallbackError);
+      }
     }
     
-    // Re-throw the error if no fallback available
-    throw error;
+    // If we got here, both primary and fallback models failed
+    return {
+      message: "I'm having trouble processing your request right now. Please try a simpler question.",
+      model: 'error-fallback',
+      tokens: {
+        prompt: estimatedTokens,
+        completion: 0,
+        total: estimatedTokens
+      },
+      timing: {
+        start: Date.now() - 100,
+        end: Date.now(),
+        total: 100
+      }
+    };
   }
 }
 

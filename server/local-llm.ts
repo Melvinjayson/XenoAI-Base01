@@ -166,11 +166,18 @@ async function simulateLocalModelInference(context: string): Promise<string> {
       'hi': 'Hi there! How can I help you?',
       'how are you': "I'm functioning well, thank you for asking. How can I assist you?",
       'what time': "I don't have access to the current time. I'm a local language model running offline.",
-      'your name': "I'm a local language model assistant running on your device.",
+      'your name': "I'm Xeno AI, a helpful AI assistant running on your device.",
+      'who are you': "I'm Xeno AI, an intelligent assistant designed to help with a variety of tasks from answering questions to helping with research.",
       'thank': "You're welcome! Is there anything else I can help with?",
-      'help': "I'm here to help! You can ask me questions, and I'll do my best to provide useful information or assistance.",
+      'help': "I'm here to help! You can ask me questions about various topics, and I'll do my best to provide useful information or assistance.",
       'bye': "Goodbye! Feel free to return if you have more questions.",
-      'default': "I'm processing your request locally. For more complex questions, we might need to use an online model."
+      'what can you do': "I can help answer questions, search for information, create knowledge graphs, generate insights, and assist with various research tasks. What would you like help with today?",
+      'weather': "I don't have access to real-time weather data. You would need to connect to an online service for current weather information.",
+      'news': "I don't have access to current news. For the latest updates, you would need to connect to an online service.",
+      'search': "I can help you search for information when connected to online services. What topic are you interested in?",
+      'knowledge graph': "I can create knowledge graphs to visualize relationships between concepts and entities. Would you like me to create one on a specific topic?",
+      'research': "I can assist with research by providing information, organizing ideas, and generating insights. What are you researching?",
+      'default': "I understand you're asking about this topic. While I'm currently running in local mode with limited capabilities, I can still try to help with basic questions. Feel free to ask something specific, and I'll do my best to assist!"
     };
     
     // Find a response based on keyword matching

@@ -6,10 +6,12 @@
  */
 
 import { Request, Response, Express } from 'express';
+import { Server as HTTPServer } from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 import { processMessage } from './model-router';
 import { getAvailableModels } from './model-selector';
 import { apiQuotaManager } from './api-quota-manager';
-import { ChatMessage, ApiService, ActionType } from './types';
+import { ChatMessage, ActionType } from './types';
 import { storage } from './storage';
 import { insertColorPaletteSchema } from '@shared/schema';
 import { 
@@ -21,12 +23,16 @@ import {
 } from './context-integration';
 import { memoryManager } from './memory-manager';
 import { enhancedMemoryManager } from './enhanced-memory-manager';
+import { isLocalLLMAvailable } from './local-llm';
+
+// Define API Service type for quota manager
+type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
 
 /**
- * Set up all routes for the application
+ * Set up all API routes for the application
  * @param app Express application
  */
-export function setupRoutes(app: Express): void {
+function setupApiRoutes(app: Express): void {
   // API root endpoint
   app.get('/api', (req: Request, res: Response) => {
     res.status(200).json({ message: 'API server is running' });
@@ -456,4 +462,114 @@ export function setupRoutes(app: Express): void {
   app.use('/api/*', (req: Request, res: Response) => {
     res.status(404).json({ error: 'API endpoint not found' });
   });
+}
+
+/**
+ * Set up all routes and WebSocket server for the application
+ * @param app Express application
+ * @param httpServer HTTP server instance
+ * @returns WebSocketServer instance
+ */
+export function setupRoutes(app: Express, httpServer?: HTTPServer): WebSocketServer | undefined {
+  // Set up all API routes
+  setupApiRoutes(app);
+  
+  // Initialize WebSocket server if HTTP server is provided
+  let wss: WebSocketServer | undefined;
+  
+  if (httpServer) {
+    // Create WebSocket server on /ws path
+    wss = new WebSocketServer({ 
+      server: httpServer,
+      path: '/ws' 
+    });
+
+    // Handle WebSocket connections
+    wss.on('connection', function connection(ws: WebSocket) {
+      console.log('WebSocket client connected');
+
+      // Handle messages from client
+      ws.on('message', function incoming(message) {
+        console.log('Received message:', message.toString());
+        
+        try {
+          // Parse the message
+          const data = JSON.parse(message.toString());
+          
+          // Handle different message types
+          switch (data.type) {
+            case 'ping':
+              // Respond with pong to keep connection alive
+              ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+              break;
+              
+            case 'event':
+              // Handle client events 
+              console.log('Client event:', data.event);
+              
+              // Echo back the event with acknowledgment
+              ws.send(JSON.stringify({ 
+                type: 'eventAck', 
+                eventId: data.eventId,
+                timestamp: Date.now() 
+              }));
+              break;
+              
+            case 'chat':
+              // Handle chat message 
+              console.log('Chat message:', data.message);
+              
+              // Acknowledge receipt of message
+              ws.send(JSON.stringify({ 
+                type: 'chatAck', 
+                messageId: data.messageId,
+                timestamp: Date.now() 
+              }));
+              break;
+              
+            default:
+              // Handle unknown message types
+              console.log('Unknown message type:', data.type);
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                error: 'Unknown message type',
+                originalType: data.type,
+                timestamp: Date.now() 
+              }));
+          }
+        } catch (err) {
+          console.error('Error processing WebSocket message:', err);
+          // Send error response
+          ws.send(JSON.stringify({ 
+            type: 'error', 
+            error: String(err),
+            timestamp: Date.now() 
+          }));
+        }
+      });
+
+      // Handle connection close
+      ws.on('close', () => {
+        console.log('WebSocket client disconnected');
+      });
+
+      // Handle errors
+      ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+      });
+
+      // Send welcome message
+      ws.send(JSON.stringify({ 
+        type: 'welcome', 
+        message: 'Connected to Xeno AI WebSocket server',
+        timestamp: Date.now() 
+      }));
+    });
+
+    // Log WebSocket server status
+    console.log('WebSocket server initialized on path: /ws');
+  }
+
+  // Return the WebSocket server instance
+  return wss;
 }

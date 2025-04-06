@@ -1,0 +1,1 @@
+var WebSocket = require("ws"); var ws = new WebSocket("ws://localhost:5000/ws"); ws.on("open", function() { console.log("Connected"); ws.send(JSON.stringify({type: "ping"})); }); ws.on("message", function(data) { console.log("Received:", data.toString()); ws.close(); }); ws.on("error", function(err) { console.error("Error:", err); });

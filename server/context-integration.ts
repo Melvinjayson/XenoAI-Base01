@@ -157,6 +157,7 @@ export async function enhancedContextDetection(
     intent: analysis.intent,
     userGoal: analysis.userGoal,
     keywords: analysis.keywords,
+    topics: analysis.topics, // Include topics from analysis
     recentMessages,
     relatedTopics: analysis.relatedTopics,
     metadata: {
@@ -185,7 +186,30 @@ export async function processWithEnhancedContext(
   options: any = {}
 ): Promise<ProcessorResponse> {
   // First, detect context
-  const context = await enhancedContextDetection(message, history, sessionId);
+  let context;
+  try {
+    context = await enhancedContextDetection(message, history, sessionId);
+  } catch (error) {
+    console.error('Error in context detection:', error);
+    // Create a fallback context
+    context = {
+      topic: '',
+      entities: [],
+      sentiment: { score: 0, label: 'neutral' },
+      intent: 'unknown',
+      keywords: [],
+      topics: [],
+      recentMessages: history.slice(-5),
+      relatedTopics: [],
+      metadata: {
+        messageLength: message.length,
+        historyLength: history.length,
+        timestamp: new Date().toISOString()
+      },
+      sessionId: sessionId,
+      hasEnhancedMemory: false
+    };
+  }
   
   // Get enhanced memory context
   const memoryContext = await enhancedMemoryManager.getEnhancedContext(
