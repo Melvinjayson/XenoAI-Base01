@@ -227,12 +227,32 @@ function extractKeywords(message: string): string[] {
  * @param message Text to analyze
  * @returns Sentiment analysis results
  */
-function analyzeSentiment(message: string): { score: number; label: 'positive' | 'negative' | 'neutral' } {
+function analyzeSentiment(message: string): { score: number; label: 'positive' | 'negative' | 'neutral'; emotions: string[]; intensity: number } {
   // Tokenize the message
   const tokens = tokenizer.tokenize(message) || [];
   
   // Calculate sentiment score
   const score = sentimentAnalyzer.getSentiment(tokens);
+  
+  // Detect emotions
+  const emotionKeywords = {
+    joy: ['happy', 'excited', 'delighted', 'glad'],
+    sadness: ['sad', 'upset', 'disappointed', 'unhappy'],
+    anger: ['angry', 'frustrated', 'annoyed', 'mad'],
+    fear: ['afraid', 'worried', 'scared', 'anxious'],
+    surprise: ['surprised', 'amazed', 'astonished', 'shocked']
+  };
+
+  const detectedEmotions = [];
+  const messageLower = message.toLowerCase();
+  for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+    if (keywords.some(keyword => messageLower.includes(keyword))) {
+      detectedEmotions.push(emotion);
+    }
+  }
+
+  // Calculate emotional intensity
+  const intensity = Math.abs(score) * (detectedEmotions.length > 0 ? 1.5 : 1);
   
   // Map score to label
   let label: 'positive' | 'negative' | 'neutral' = 'neutral';
@@ -242,7 +262,7 @@ function analyzeSentiment(message: string): { score: number; label: 'positive' |
     label = 'negative';
   }
   
-  return { score, label };
+  return { score, label, emotions: detectedEmotions, intensity };
 }
 
 /**
