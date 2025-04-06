@@ -176,7 +176,8 @@ export function estimateComplexity(message: string, history: any[] = []): number
  * @param text Text to estimate
  * @returns Estimated token count
  */
-export function estimateTokenCount(text: string): number {
+export function estimateTokenCount(text?: string | null): number {
+  if (!text) return 0;
   // Simple approximation: 1 token ≈ 4 characters
   return Math.ceil(text.length / 4);
 }

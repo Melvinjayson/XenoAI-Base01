@@ -83,25 +83,45 @@ const PORT = process.env.PORT || 5000;
     
     // Initialize enhanced memory manager
     console.log('Initializing enhanced memory system...');
-    // Preload a default session memory
-    const defaultSessionId = 'default-session';
-    // Initialize with a system message
-    const systemMessage: ChatMessage = {
-      role: 'system',
-      content: 'Memory system initialized with default session.',
-      timestamp: new Date().toISOString()
-    };
     
-    await enhancedMemoryManager.processMessage(
-      systemMessage,
-      defaultSessionId,
-      [], // No entities for system message
-      ['system', 'initialization'] // Basic topics
-    );
-    console.log('Enhanced memory system initialized.');
+    // Skip full memory initialization in development to speed up startup
+    const skipMemoryInit = process.env.NODE_ENV !== 'production';
+    
+    if (skipMemoryInit) {
+      console.log('Skipping full memory initialization in development mode.');
+      enhancedMemoryManager.initializeDefault();
+      console.log('Memory system initialized with defaults.');
+    } else {
+      // Preload a default session memory
+      const defaultSessionId = 'default-session';
+      // Initialize with a system message
+      const systemMessage: ChatMessage = {
+        role: 'system',
+        content: 'Memory system initialized with default session.',
+        timestamp: new Date().toISOString()
+      };
+      
+      await enhancedMemoryManager.processMessage(
+        systemMessage,
+        defaultSessionId,
+        [], // No entities for system message
+        ['system', 'initialization'] // Basic topics
+      );
+      console.log('Enhanced memory system initialized completely.');
+    }
     
     // Initialize local model
-    await initializeLocalLLM();
+    console.log('Initializing local language model...');
+    const localLLMInitialized = await initializeLocalLLM();
+    console.log(`Local language model initialized: ${localLLMInitialized}`);
+    
+    if (!localLLMInitialized) {
+      // Try once more with a delay
+      console.log('Retrying local model initialization...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const retrySuccess = await initializeLocalLLM();
+      console.log(`Local model initialization retry: ${retrySuccess ? 'successful' : 'failed'}`);
+    }
     
     // Log available models
     const models = getAvailableModels();

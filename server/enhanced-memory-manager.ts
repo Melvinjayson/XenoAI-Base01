@@ -93,6 +93,50 @@ export class EnhancedMemoryManager {
     this.memoryDecayRates.set('emotional', 0.15);
   }
   
+  /**
+   * Initialize memory system with defaults
+   * This lighter-weight initialization can be used to speed up system startup
+   * in development environments
+   */
+  public initializeDefault(): void {
+    // Create default session
+    const defaultSessionId = 'default-session';
+    
+    // Set up empty memory structures for the default session
+    if (!this.episodicMemory.has(defaultSessionId)) {
+      this.episodicMemory.set(defaultSessionId, []);
+    }
+    
+    if (!this.conceptualMemory.has(defaultSessionId)) {
+      this.conceptualMemory.set(defaultSessionId, {
+        concepts: new Map<string, {
+          relatedConcepts: string[];
+          definition: string;
+          examples: string[];
+          lastDiscussed: Date;
+          frequency: number;
+        }>()
+      });
+    }
+    
+    // Set up default user profile
+    if (!this.userProfiles.has(defaultSessionId)) {
+      const userProfile: UserProfileMemory = {
+        preferences: new Map<string, string>(),
+        interests: [] as string[],
+        knowledgeLevel: new Map<string, 'beginner' | 'intermediate' | 'advanced'>(),
+        communicationStyle: 'neutral',
+        interactionPatterns: {
+          questionFrequency: 0.5,
+          responseLength: 'mixed',
+          topicChanges: 0.3,
+          followUpRate: 0.4
+        }
+      };
+      this.userProfiles.set(defaultSessionId, userProfile);
+    }
+  }
+  
   public static getInstance(): EnhancedMemoryManager {
     if (!EnhancedMemoryManager.instance) {
       EnhancedMemoryManager.instance = new EnhancedMemoryManager();

@@ -13,7 +13,7 @@ import {
   ProcessOptions
 } from './types';
 import { processWithOpenAI } from './openai';
-import { processWithLocalLLM } from './local-llm';
+import { processWithLocalLLM, isLocalLLMAvailable, initializeLocalLLM } from './local-llm';
 import {
   selectModel,
   shouldUseAdvancedModel,
@@ -121,6 +121,14 @@ export async function processMessage(
       };
     } else if (selectedModel.provider === 'openai') {
       try {
+        // Check API quota before attempting to call OpenAI
+        const quotaCheck = apiQuotaManager.checkRateLimit(ApiService.OPENAI);
+        if (quotaCheck) {
+          console.log(`OpenAI API quota exceeded: ${quotaCheck}`);
+          console.log('Preemptively falling back to local model due to quota limits');
+          return await fallbackToLocalModel(message, history, options);
+        }
+        
         // Route to OpenAI
         const processingOptions: ProcessOptions = {
           systemPrompt,
@@ -131,13 +139,23 @@ export async function processMessage(
           presencePenalty: options.presencePenalty
         };
         
+        // Try to initialize local LLM in advance as a fallback
+        initializeLocalLLM().catch(err => console.warn('Preemptive local LLM init failed:', err));
+        
         response = await processWithOpenAI(message, history, selectedModel.id, processingOptions);
       } catch (openaiError: any) {
         console.error('OpenAI error, falling back to local model:', openaiError.message || openaiError);
         
         // Track API quota usage for failures
-        if (openaiError?.code === 'insufficient_quota' || openaiError?.status === 429) {
+        if (openaiError?.code === 'insufficient_quota' || 
+            openaiError?.status === 429 || 
+            openaiError?.message?.includes('quota') ||
+            openaiError?.message?.includes('rate limit')) {
+          console.log('Rate limit reached for openai');
           apiQuotaManager.trackFailure(ApiService.OPENAI, true);
+        } else {
+          // Other type of error
+          apiQuotaManager.trackFailure(ApiService.OPENAI, false);
         }
         
         // Always fall back to local model on OpenAI errors
@@ -194,6 +212,15 @@ async function fallbackToLocalModel(
   options: ChatOptions
 ): Promise<ProcessorResponse> {
   try {
+    // Check if local LLM is available
+    if (!isLocalLLMAvailable()) {
+      // Try to initialize it
+      const initialized = await initializeLocalLLM();
+      if (!initialized) {
+        throw new Error('Local language model initialization failed. Cannot use fallback model.');
+      }
+    }
+    
     const systemPrompt = options.systemPrompt || DEFAULT_PROMPTS.local;
     const localResponse = await processWithLocalLLM(
       message, 
@@ -205,9 +232,9 @@ async function fallbackToLocalModel(
       message: localResponse,
       model: 'local-basic',
       tokens: {
-        prompt: estimateTokenCount(message),
-        completion: estimateTokenCount(localResponse),
-        total: estimateTokenCount(message) + estimateTokenCount(localResponse)
+        prompt: estimateTokenCount(message) || 10,
+        completion: estimateTokenCount(localResponse) || 20,
+        total: (estimateTokenCount(message) || 10) + (estimateTokenCount(localResponse) || 20)
       },
       timing: {
         start: Date.now() - 300, // Approximate timing
@@ -217,7 +244,22 @@ async function fallbackToLocalModel(
     };
   } catch (error) {
     console.error('Error in local model fallback:', error);
-    throw new Error('All AI services are currently unavailable. Please try again later.');
+    
+    // Return a basic fallback response instead of throwing an error
+    return {
+      message: "I'm sorry, all AI services are currently unavailable. Please try again later. The system will continue to work with limited functionality.",
+      model: 'local-basic-emergency',
+      tokens: {
+        prompt: message.length / 4 || 10,
+        completion: 30,
+        total: message.length / 4 + 30
+      },
+      timing: {
+        start: Date.now() - 100,
+        end: Date.now(),
+        total: 100
+      }
+    };
   }
 }
 
