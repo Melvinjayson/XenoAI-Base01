@@ -3,9 +3,25 @@
  * 
  * This module provides support for running local language models,
  * allowing the AI to function offline or with reduced API usage.
+ * It also integrates web browsing capabilities for access to up-to-date information.
  */
 
 import { LocalModelStatus, ChatMessage, Entity } from './types';
+import { enhancedSearch, conversationalResponse } from './web-search';
+
+// Configuration for web browsing integration
+const WEB_SEARCH_CONFIG = {
+  // Maximum age of cached search results in milliseconds (5 minutes)
+  maxCacheAge: 5 * 60 * 1000,
+  // Minimum confidence threshold to trigger web search (0-1)
+  searchConfidenceThreshold: 0.7,
+  // Maximum number of web search results to include
+  maxSearchResults: 3,
+  // Terms that indicate current/recent information is needed
+  currentInfoTerms: ['latest', 'recent', 'current', 'today', 'news', 'update', 'newest', 'trend', 'this week', 'this month', 'this year', 'covid'],
+  // Online information terms
+  onlineInfoTerms: ['website', 'online', 'internet', 'search', 'web', 'find', 'link', 'url', 'browse', 'browser', 'internet', 'net', 'www'],
+};
 
 // Current status of the local model
 let modelStatus: LocalModelStatus = {
@@ -28,6 +44,17 @@ interface LocalContext {
   }[];
   userPreferences: Record<string, any>;
   sessionData: Map<string, any>;
+  // Web search integration
+  webSearchResults?: {
+    query: string;
+    results: {
+      title: string;
+      link: string;
+      snippet: string;
+      content?: string;
+    }[];
+    timestamp: number;
+  };
 }
 
 // Initialize local context store
@@ -193,10 +220,40 @@ export async function processWithLocalLLM(
       sessionContext.topics = sessionContext.topics.slice(-10);
     }
     
-    // Format conversation context
+    // Check if this query needs web browsing
+    const { shouldSearch, searchQuery, confidence } = await shouldUseWebSearch(message, sessionContext);
+    
+    // If web search is needed and we don't have recent cached results, perform search
+    if (shouldSearch) {
+      console.log(`Web search triggered for query: "${searchQuery}" (confidence: ${confidence.toFixed(2)})`);
+      
+      try {
+        // Perform the search
+        const searchResult = await enhancedSearch(searchQuery);
+        
+        // Store search results in session context
+        sessionContext.webSearchResults = {
+          query: searchQuery,
+          results: searchResult.results.map(result => ({
+            title: result.title,
+            link: result.link,
+            snippet: result.snippet,
+            content: result.content || ''
+          })),
+          timestamp: Date.now()
+        };
+        
+        console.log(`Web search completed with ${sessionContext.webSearchResults.results.length} results`);
+      } catch (error) {
+        console.error('Error performing web search:', error);
+        // Don't fail the entire request if search fails
+      }
+    }
+    
+    // Format conversation context (will now include web search results if available)
     const context = formatConversationContext(systemPrompt, history, message, sessionContext);
     
-    // Generate response (simulated)
+    // Generate response (simulated) - will now incorporate web search results if available
     const response = await simulateLocalModelInference(context, message, sessionContext);
     
     // Store this interaction in context
@@ -216,6 +273,134 @@ export async function processWithLocalLLM(
     console.error('Error processing with local LLM:', error.message);
     throw error;
   }
+}
+
+/**
+ * Detect if a query needs web browsing for accurate information
+ * @param query User query/message
+ * @param sessionContext Session context data
+ * @returns Whether web search would be beneficial and the detected search query
+ */
+async function shouldUseWebSearch(
+  query: string,
+  sessionContext: LocalContext
+): Promise<{ shouldSearch: boolean; searchQuery: string; confidence: number }> {
+  const queryLower = query.toLowerCase().trim();
+  let shouldSearch = false;
+  let searchQuery = query.trim();
+  let confidence = 0;
+  
+  // Check if the query has explicit web search intent
+  const hasExplicitSearchIntent = 
+    queryLower.startsWith('search for') || 
+    queryLower.startsWith('find information about') ||
+    queryLower.startsWith('look up') ||
+    queryLower.startsWith('google') ||
+    queryLower.includes('can you search for') ||
+    queryLower.includes('can you find information about') ||
+    queryLower.includes('search the web for');
+  
+  if (hasExplicitSearchIntent) {
+    // Extract the actual search query from the request
+    const searchTerms = [
+      'search for',
+      'find information about',
+      'look up',
+      'google',
+      'can you search for',
+      'can you find information about',
+      'search the web for'
+    ];
+    
+    for (const term of searchTerms) {
+      if (queryLower.includes(term)) {
+        searchQuery = query.substring(queryLower.indexOf(term) + term.length).trim();
+        // Remove any question marks, periods at the end
+        searchQuery = searchQuery.replace(/[?.,;!]$/, '').trim();
+        break;
+      }
+    }
+    
+    shouldSearch = true;
+    confidence = 0.95; // Very high confidence for explicit search requests
+  } 
+  // Check if query needs current information
+  else {
+    // Check for terms suggesting current/recent information is needed
+    const hasCurrencyTerms = WEB_SEARCH_CONFIG.currentInfoTerms.some(term => 
+      queryLower.includes(term)
+    );
+    
+    // Check for online-related terms
+    const hasOnlineTerms = WEB_SEARCH_CONFIG.onlineInfoTerms.some(term => 
+      queryLower.includes(term)
+    );
+    
+    // Check if it's a question (starts with what, how, why, when, who, where, is, are, can, could, etc.)
+    const isQuestion = /^(what|how|why|when|who|where|is|are|can|could|would|should|will|has|have|do|does|did|was|were|am)[^a-z]/.test(queryLower);
+    
+    // Calculate confidence score
+    let searchConfidence = 0;
+    if (hasCurrencyTerms) searchConfidence += 0.4;
+    if (hasOnlineTerms) searchConfidence += 0.3;
+    if (isQuestion) searchConfidence += 0.2;
+    
+    // Check if the question is about recent events, news, or technology
+    const isAboutRecentEvents = 
+      queryLower.includes('news') || 
+      queryLower.includes('recent event') || 
+      queryLower.includes('latest development') ||
+      queryLower.includes('what happened') ||
+      queryLower.includes('current state of');
+    
+    if (isAboutRecentEvents) searchConfidence += 0.3;
+    
+    // Limit max confidence to 0.9 for implicit searches
+    confidence = Math.min(0.9, searchConfidence);
+    shouldSearch = confidence >= WEB_SEARCH_CONFIG.searchConfidenceThreshold;
+  }
+  
+  // If web search is needed, but search query is too short or vague, use the full query
+  if (shouldSearch && searchQuery.split(' ').length < 2) {
+    searchQuery = query.trim();
+  }
+  
+  // Extra check for basic conversational queries that don't need web search
+  const basicConversationalQueries = [
+    'how are you',
+    'what is your name',
+    'who are you',
+    'what can you do',
+    'help me',
+    'tell me about yourself',
+    'what are your capabilities',
+    'hello',
+    'hi there',
+    'good morning',
+    'good afternoon',
+    'good evening',
+    'thanks',
+    'thank you'
+  ];
+  
+  if (basicConversationalQueries.some(basicQuery => 
+    queryLower.includes(basicQuery) && queryLower.split(' ').length < 7
+  )) {
+    shouldSearch = false;
+    confidence = 0;
+  }
+  
+  // Check for cached results that are still fresh
+  if (shouldSearch && 
+      sessionContext.webSearchResults && 
+      sessionContext.webSearchResults.query.toLowerCase() === searchQuery.toLowerCase() &&
+      Date.now() - sessionContext.webSearchResults.timestamp < WEB_SEARCH_CONFIG.maxCacheAge) {
+    console.log('Using cached web search results for query:', searchQuery);
+    // We won't search again since we have fresh results
+    shouldSearch = false;
+  }
+  
+  return { shouldSearch, searchQuery, confidence };
 }
 
 /**
@@ -286,6 +471,23 @@ function formatConversationContext(
       // Remove trailing comma and space
       enhancedSystemPrompt = enhancedSystemPrompt.slice(0, -2);
     }
+  }
+  
+  // Add web search results if available
+  if (sessionContext.webSearchResults) {
+    // Calculate how recent the results are
+    const ageInMinutes = Math.floor(
+      (Date.now() - sessionContext.webSearchResults.timestamp) / (60 * 1000)
+    );
+    
+    enhancedSystemPrompt += `\n\nWeb search results for query "${sessionContext.webSearchResults.query}" (${ageInMinutes} minutes ago):`;
+    
+    // Add each search result
+    sessionContext.webSearchResults.results.forEach((result, index) => {
+      enhancedSystemPrompt += `\n\nResult ${index + 1}: ${result.title}\nSource: ${result.link}\n${result.content || result.snippet}`;
+    });
+    
+    enhancedSystemPrompt += "\n\nWhen using this web information in your response, remember to cite sources appropriately.";
   }
   
   // Start with system prompt
@@ -367,6 +569,9 @@ async function simulateLocalModelInference(
     } 
     // Question/information intent
     else if (messageIntent === 'question') {
+      // Check if we have web search results
+      const hasWebResults = !!sessionContext.webSearchResults;
+      
       // Check if we have context related to the question
       const relatedTopics = topics.filter(topic => 
         lastMessage.toLowerCase().includes(topic.toLowerCase())
@@ -376,7 +581,29 @@ async function simulateLocalModelInference(
         lastMessage.toLowerCase().includes(entity)
       );
       
-      if (relatedTopics.length > 0 || relatedEntities.length > 0) {
+      if (hasWebResults) {
+        // Use web search results to provide a more informed response
+        const results = sessionContext.webSearchResults!.results;
+        const query = sessionContext.webSearchResults!.query;
+        
+        // Create a response that incorporates web search data
+        response = `Based on the web search results for "${query}", I can provide you with some information:`;
+        
+        // Add brief summary of each result
+        results.forEach((result, index) => {
+          const snippet = result.content || result.snippet;
+          response += `\n\n${index + 1}. According to ${result.title}, ${snippet.substring(0, 150)}${snippet.length > 150 ? '...' : ''}`;
+        });
+        
+        // Add a conclusion and source attribution
+        response += `\n\nThis information comes from the web search results. Would you like me to elaborate on any specific aspect of these findings?`;
+        
+        // Add citation note
+        if (results.length > 0) {
+          response += `\n\nSources: ${results.map((r, i) => `[${i+1}] ${r.title}`).join(', ')}`;
+        }
+      }
+      else if (relatedTopics.length > 0 || relatedEntities.length > 0) {
         response = `Based on our previous conversation about ${relatedTopics.join(', ') || relatedEntities.join(', ')}, I can tell you that this is a complex topic. I'll provide a concise summary using my local knowledge, though for more detailed information, we might need to use online resources.`;
         
         // Add some simulated specific information if we have topics

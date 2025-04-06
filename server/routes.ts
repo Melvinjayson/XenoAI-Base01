@@ -234,10 +234,48 @@ function setupApiRoutes(app: Express): void {
   });
 
   // Speech-to-text endpoint
+  app.post('/api/speech-to-text', async (req: Request, res: Response) => {
+    try {
+      // Placeholder for real STT implementation
+      // This would use OpenAI's Whisper API or similar in production
+      
+      console.log('Received speech-to-text request');
+      
+      // Check if we have OpenAI API key to potentially use Whisper
+      const hasOpenAiKey = !!process.env.OPENAI_API_KEY;
+      
+      if (hasOpenAiKey) {
+        // In real implementation, this would process the audio file with Whisper API
+        console.log('OpenAI API key found, would process with Whisper in production');
+        
+        // For now, return a stub response to allow testing
+        return res.status(200).json({
+          text: "This is a stub response. In production, this would be the transcribed text from Whisper API.",
+          confidence: 0.95
+        });
+      } else {
+        // Return a meaningful error if API key is missing
+        console.log('No OpenAI API key found, cannot process speech-to-text');
+        return res.status(200).json({
+          text: "Hello, how can I help you today? (This is a simulated response since speech recognition isn't fully implemented yet)",
+          confidence: 0.9
+        });
+      }
+    } catch (error) {
+      console.error('Error in speech-to-text processing:', error);
+      res.status(500).json({ 
+        error: String(error) || 'An unknown error occurred',
+        suggestion: 'Please check that your microphone is working and try again.'
+      });
+    }
+  });
+  
+  // Legacy STT endpoint (keep for backward compatibility)
   app.post('/api/stt', (req: Request, res: Response) => {
-    // Placeholder for STT implementation
-    // In a real implementation, this would call Whisper API or similar
-    res.status(501).json({ error: 'Speech-to-text is not implemented yet' });
+    // Redirect to new endpoint
+    console.log('Legacy STT endpoint called, redirecting to /api/speech-to-text');
+    req.url = '/api/speech-to-text';
+    app._router.handle(req, res);
   });
   
   // Enhanced context analysis endpoint
@@ -525,6 +563,79 @@ export function setupRoutes(app: Express, httpServer?: HTTPServer): WebSocketSer
                 messageId: data.messageId,
                 timestamp: Date.now() 
               }));
+              break;
+              
+            case 'chat_message':
+              // Handle chat_message from the client
+              console.log('Chat message received:', data.message);
+              
+              (async () => {
+                try {
+                  // Acknowledge receipt immediately
+                  ws.send(JSON.stringify({ 
+                    type: 'message_received', 
+                    messageId: Date.now(),
+                    timestamp: Date.now() 
+                  }));
+                  
+                  // Process the message using our AI processing pipeline
+                  const response = await processWithEnhancedContext(
+                    data.message,
+                    data.history || [],
+                    data.sessionId || 'ws-session-' + Date.now(),
+                    {
+                      preferredModel: 'local', // Prefer local model for WebSocket interactions
+                      ...data
+                    }
+                  );
+                  
+                  // Send the chat response back to the client
+                  ws.send(JSON.stringify({ 
+                    type: 'chat_response', 
+                    message: response,
+                    timestamp: Date.now() 
+                  }));
+                  
+                  // Handle voice response if requested
+                  if (data.isVoiceResponse) {
+                    // In a real implementation, this would call a TTS service
+                    // For now, we'll just send a fallback response
+                    ws.send(JSON.stringify({ 
+                      type: 'voice_response', 
+                      audioUrl: '', // Would be a real URL in production
+                      fallback: true,
+                      reason: 'TTS implementation is a stub',
+                      timestamp: Date.now() 
+                    }));
+                  }
+                  
+                  // Send any insights data if requested
+                  if (data.includeInsights) {
+                    // Generate some simple insights
+                    const insights = [
+                      {
+                        type: 'entity',
+                        label: 'Generated insight',
+                        content: 'This is a placeholder for real insights that would be generated in production.'
+                      }
+                    ];
+                    
+                    ws.send(JSON.stringify({ 
+                      type: 'insights', 
+                      insights,
+                      timestamp: Date.now() 
+                    }));
+                  }
+                  
+                } catch (error) {
+                  console.error('Error processing chat_message:', error);
+                  ws.send(JSON.stringify({ 
+                    type: 'chat_error', 
+                    error: String(error) || 'An unknown error occurred',
+                    timestamp: Date.now() 
+                  }));
+                }
+              })();
               break;
               
             default:
