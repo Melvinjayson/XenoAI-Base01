@@ -1,0 +1,22 @@
+Xeno AI Version 1.0.0
+Release Date: April 6, 2025
+
+- Core Features:
+  - Conversational AI with natural language interface
+  - Voice input/output with speech recognition and text-to-speech
+  - Knowledge graph visualization
+  - Mobile-optimized interface with touch-friendly controls
+  - Self-learning and self-correction features
+  - WebSocket-based real-time communication
+  
+- AI Models:
+  - GPT-3.5 Turbo (OpenAI) - basic conversational tasks
+  - GPT-4o (OpenAI) - advanced reasoning and multimodal processing
+  - OpenAI Embedding Small - vector embeddings for semantic search
+  - OpenAI Whisper - audio transcription
+  - Local LLM fallback - for basic tasks when API quotas are reached
+  
+- System Requirements:
+  - Node.js v20+
+  - Modern web browser with WebSocket support
+  - API Keys: OpenAI, ElevenLabs (optional)
