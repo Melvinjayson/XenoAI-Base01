@@ -507,6 +507,20 @@ const WorkbenchContent = () => {
               className="relative h-full overflow-hidden bg-background/30"
             >
               <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
+  <div className="flex items-center space-x-2 mb-2 bg-card p-2 rounded-lg shadow-sm">
+    <Switch id="study-mode" />
+    <Label htmlFor="study-mode">Study Mode</Label>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <InfoIcon className="h-4 w-4 text-muted-foreground" />
+        </TooltipTrigger>
+        <TooltipContent>
+          Simplifies the interface and adds study-focused features
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  </div>
                 <Select 
                   value={visualizationPattern} 
                   onValueChange={(value) => setVisualizationPattern(value as VisualizationPattern)}
