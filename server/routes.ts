@@ -16,8 +16,8 @@ import { ChatMessage } from './types';
  * @param app Express application
  */
 export function setupRoutes(app: Express): void {
-  // Root endpoint
-  app.get('/', (req: Request, res: Response) => {
+  // API root endpoint
+  app.get('/api', (req: Request, res: Response) => {
     res.status(200).json({ message: 'API server is running' });
   });
 
@@ -157,8 +157,8 @@ export function setupRoutes(app: Express): void {
     res.status(501).json({ error: 'Speech-to-text is not implemented yet' });
   });
 
-  // Fallback for unmatched routes
-  app.use('*', (req: Request, res: Response) => {
-    res.status(404).json({ error: 'Not found' });
+  // Fallback for unmatched API routes
+  app.use('/api/*', (req: Request, res: Response) => {
+    res.status(404).json({ error: 'API endpoint not found' });
   });
 }

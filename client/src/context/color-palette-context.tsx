@@ -74,10 +74,10 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
       }
 
       // Find default palette or use the first one if available
-      const defaultPalette = data.find((p: ColorPalette) => p.isDefault === true);
-      if (defaultPalette) {
-        setCurrentPalette(defaultPalette);
-      } else if (data.length > 0) {
+      const defaultPaletteFound = data?.find((p: ColorPalette) => p.isDefault === true);
+      if (defaultPaletteFound) {
+        setCurrentPalette(defaultPaletteFound);
+      } else if (data?.length > 0) {
         setCurrentPalette(data[0]);
       }
     } catch (error) {
