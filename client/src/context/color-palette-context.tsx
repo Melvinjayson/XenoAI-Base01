@@ -1,7 +1,36 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import { ColorPalette } from '@shared/schema';
+import { ColorPalette as BaseColorPalette } from '@shared/schema';
+
+// Extend the ColorPalette interface to allow string IDs for our default palettes
+interface ColorPalette {
+  id: string | number;
+  userId?: number | null;
+  name: string;
+  description: string | null;
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  secondary: string;
+  secondaryLight: string;
+  secondaryDark: string;
+  accent: string;
+  accentLight?: string;
+  accentDark?: string;
+  background: string;
+  surface?: string;
+  error: string;
+  warning: string;
+  success: string;
+  info?: string;
+  text: string;
+  textSecondary?: string;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  metadata?: Record<string, any> | null;
+}
 
 interface ColorPaletteContextType {
   palettes: ColorPalette[];
@@ -33,9 +62,10 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiRequest('GET', '/api/color-palettes');
+      const response = await apiRequest('/api/color-palettes', 'GET');
       const defaultPalette: ColorPalette = {
         id: 'default',
+        userId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         name: 'Default',
@@ -47,11 +77,16 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
         secondaryLight: '#F3E8FF',
         secondaryDark: '#B08FFD',
         accent: '#00C2FF',
+        accentLight: '#70D7FF',
+        accentDark: '#008AC0',
         background: '#FFFFFF',
-        text: '#1A1A1A',
+        surface: '#F9FAFB',
         error: '#FF3B30',
         warning: '#FF9500',
         success: '#34C759',
+        info: '#00C2FF',
+        text: '#1A1A1A',
+        textSecondary: '#6B7280',
         isDefault: true,
         metadata: null
       };
@@ -67,40 +102,46 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
         const data = await response.json();
         setPalettes(data.length > 0 ? data : [defaultPalette]);
         setCurrentPalette(data.find((p: ColorPalette) => p.isDefault) || data[0] || defaultPalette);
+        
+        // Find default palette or use the first one if available
+        const defaultPaletteFound = data.find((p: ColorPalette) => p.isDefault === true);
+        if (defaultPaletteFound) {
+          setCurrentPalette(defaultPaletteFound);
+        } else if (data.length > 0) {
+          setCurrentPalette(data[0]);
+        }
       } catch (e) {
         console.error('Error parsing palette data:', e);
         setPalettes([defaultPalette]);
         setCurrentPalette(defaultPalette);
-      }
-
-      // Find default palette or use the first one if available
-      const defaultPaletteFound = data?.find((p: ColorPalette) => p.isDefault === true);
-      if (defaultPaletteFound) {
-        setCurrentPalette(defaultPaletteFound);
-      } else if (data?.length > 0) {
-        setCurrentPalette(data[0]);
       }
     } catch (error) {
       console.error('Failed to load color palettes:', error);
       // Set default palette if loading fails
       const defaultPalette: ColorPalette = {
         id: 'default',
+        userId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         name: 'Default',
         description: 'Default color palette',
         primary: '#7C3AED',
         primaryLight: '#A855F7',
-        primaryDark: '#5B21B6', // Added a dark shade for better palette
+        primaryDark: '#5B21B6',
         secondary: '#D8B4FE',
         secondaryLight: '#F3E8FF',
-        secondaryDark: '#B08FFD', // Added a dark shade for better palette
+        secondaryDark: '#B08FFD',
         accent: '#00C2FF',
+        accentLight: '#70D7FF',
+        accentDark: '#008AC0',
         background: '#FFFFFF',
-        text: '#1A1A1A',
+        surface: '#F9FAFB',
         error: '#FF3B30',
         warning: '#FF9500',
         success: '#34C759',
+        info: '#00C2FF',
+        text: '#1A1A1A',
+        textSecondary: '#6B7280',
         isDefault: true,
         metadata: null
       };
@@ -110,7 +151,7 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
       toast({
         title: 'Error',
         description: 'Failed to load color palettes. Using default palette.',
-        variant: 'warning',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -167,7 +208,7 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
     setSaving(true);
     setError(null);
     try {
-      const response = await apiRequest('POST', '/api/color-palettes/generate-from-url', {
+      const response = await apiRequest('/api/color-palettes/generate-from-url', 'POST', {
         imageUrl,
         name,
         brightness,
@@ -207,7 +248,7 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
 
   const setDefaultPalette = async (paletteId: number) => {
     try {
-      const response = await apiRequest('PUT', `/api/color-palettes/${paletteId}/set-default`);
+      const response = await apiRequest(`/api/color-palettes/${paletteId}/set-default`, 'PUT');
       const updatedPalette = await response.json();
 
       // Update palettes with the new default
@@ -243,6 +284,7 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
     if (!loading && palettes.length === 0 && !currentPalette) {
       const defaultPalette: ColorPalette = {
         id: 0,
+        userId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         name: 'Default Palette',
@@ -254,11 +296,16 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
         secondaryLight: '#FFFFFF',
         secondaryDark: '#DCDFE6',
         accent: '#00C2FF',
+        accentLight: '#70D7FF',
+        accentDark: '#008AC0',
         background: '#FFFFFF',
-        text: '#1A1A1A',
+        surface: '#F9FAFB',
         error: '#FF3B30',
         warning: '#FF9500',
         success: '#34C759',
+        info: '#00C2FF',
+        text: '#1A1A1A',
+        textSecondary: '#6B7280',
         isDefault: true,
         metadata: null
       };
