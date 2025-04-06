@@ -34,9 +34,12 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await apiRequest('GET', '/api/color-palettes');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       setPalettes(data);
-      
+
       // Find default palette or use the first one if available
       const defaultPalette = data.find((p: ColorPalette) => p.isDefault === true);
       if (defaultPalette) {
@@ -44,13 +47,37 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
       } else if (data.length > 0) {
         setCurrentPalette(data[0]);
       }
-    } catch (err) {
-      console.error('Failed to fetch color palettes:', err);
-      setError('Failed to load color palettes. Please try again.');
+    } catch (error) {
+      console.error('Failed to load color palettes:', error);
+      // Set default palette if loading fails
+      const defaultPalette: ColorPalette = {
+        id: 'default',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        name: 'Default',
+        description: 'Default color palette',
+        primary: '#7C3AED',
+        primaryLight: '#A855F7',
+        primaryDark: '#5B21B6', // Added a dark shade for better palette
+        secondary: '#D8B4FE',
+        secondaryLight: '#F3E8FF',
+        secondaryDark: '#B08FFD', // Added a dark shade for better palette
+        accent: '#00C2FF',
+        background: '#FFFFFF',
+        text: '#1A1A1A',
+        error: '#FF3B30',
+        warning: '#FF9500',
+        success: '#34C759',
+        isDefault: true,
+        metadata: null
+      };
+      setPalettes([defaultPalette]);
+      setCurrentPalette(defaultPalette);
+      setError('Failed to load color palettes. Using default palette.');
       toast({
         title: 'Error',
-        description: 'Failed to load color palettes',
-        variant: 'destructive',
+        description: 'Failed to load color palettes. Using default palette.',
+        variant: 'warning',
       });
     } finally {
       setLoading(false);
@@ -62,29 +89,29 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const formData = new FormData();
-      
+
       // Convert base64 data URL to a blob
       const fetchResponse = await fetch(imageData);
       const blob = await fetchResponse.blob();
-      
+
       formData.append('image', blob);
       formData.append('name', name);
       formData.append('brightness', brightness.toString());
       formData.append('hue', hue.toString());
-      
+
       const response = await fetch('/api/color-palettes/generate-from-upload', {
         method: 'POST',
         body: formData,
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error ${response.status}`);
       }
-      
+
       const palette = await response.json();
       setPalettes(prev => [palette, ...prev]);
       setCurrentPalette(palette);
-      
+
       toast({
         title: 'Success',
         description: 'New color palette created from image',
@@ -113,11 +140,11 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
         brightness,
         hue
       });
-      
+
       const palette = await response.json();
       setPalettes(prev => [palette, ...prev]);
       setCurrentPalette(palette);
-      
+
       toast({
         title: 'Success',
         description: 'New color palette created from URL',
@@ -138,7 +165,7 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
 
   const handleSetCurrentPalette = (palette: ColorPalette) => {
     setCurrentPalette(palette);
-    
+
     toast({
       title: 'Palette Preview',
       description: `Now previewing ${palette.name}`,
@@ -149,13 +176,13 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiRequest('PUT', `/api/color-palettes/${paletteId}/set-default`);
       const updatedPalette = await response.json();
-      
+
       // Update palettes with the new default
       setPalettes(prev => prev.map(p => ({
         ...p,
         isDefault: p.id === paletteId
       })));
-      
+
       // Also update current palette if it's the one being changed
       if (currentPalette && currentPalette.id === paletteId) {
         setCurrentPalette({
@@ -163,7 +190,7 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
           isDefault: true
         });
       }
-      
+
       toast({
         title: 'Default Updated',
         description: `${updatedPalette.name} is now the default palette`,
@@ -202,7 +229,7 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
         isDefault: true,
         metadata: null
       };
-      
+
       setCurrentPalette(defaultPalette);
     }
   }, [loading, palettes, currentPalette]);
