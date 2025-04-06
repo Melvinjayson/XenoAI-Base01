@@ -3,9 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { BookOpen, Video, FileText, Link as LinkIcon } from "lucide-react";
 
+import { StudyTimer } from "./study-timer";
+
 export function LearningResourcesPanel() {
   return (
     <div className="space-y-4">
+      <StudyTimer />
       <Card>
         <CardHeader>
           <CardTitle>Learning Resources</CardTitle>
