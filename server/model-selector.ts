@@ -13,17 +13,17 @@ import { apiQuotaManager, ApiService } from './api-quota-manager';
 const availableModels: ModelConfig[] = [
   // Local models
   {
-    id: 'local-basic',
-    name: 'Local LLM (Basic)',
+    id: 'llama4-behemot',
+    name: 'LLama 4 Behemot',
     provider: 'local',
-    contextSize: 2048,
+    contextSize: 128000,
     inputCostPer1K: 0,
     outputCostPer1K: 0,
-    capabilities: ['text'],
-    maxTokens: 512,
+    capabilities: ['text', 'embedding'],
+    maxTokens: 4096,
     temperature: 0.7,
-    category: 'basic',
-    latency: 'low'
+    category: 'advanced',
+    latency: 'medium'
   },
   
   // OpenAI models

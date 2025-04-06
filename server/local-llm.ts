@@ -74,10 +74,10 @@ export async function initializeLocalLLM(): Promise<boolean> {
     // Update status
     modelStatus = {
       loaded: true,
-      model: 'llama-2-7b-chat.ggmlv3.q4_0',
-      memory: 4096,
-      quantization: 'Q4_0',
-      contextLength: 2048,
+      model: 'llama-4-behemot',
+      memory: 32768,
+      quantization: 'Q5_K_M',
+      contextLength: 128000,
       error: null
     };
     
