@@ -1,21 +1,54 @@
 /**
- * Core Type Definitions
+ * Type Definitions
  * 
- * This module defines the core types and interfaces used throughout
- * the application for AI processing and data management.
+ * This module contains type definitions for the AI system.
  */
 
-/**
- * Chat message in a conversation
- */
+// Chat message
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
-/**
- * Response from an AI processor
- */
+// Model configuration
+export interface ModelConfig {
+  id: string;
+  name: string;
+  provider: 'openai' | 'anthropic' | 'perplexity' | 'local';
+  contextSize: number;
+  inputCostPer1K: number;
+  outputCostPer1K: number;
+  capabilities: ('text' | 'vision' | 'embedding' | 'audio' | 'search')[];
+  maxTokens: number;
+  temperature: number;
+  category: 'basic' | 'advanced' | 'specialized';
+  latency: 'low' | 'medium' | 'high';
+}
+
+// Chat processing options
+export interface ChatOptions {
+  systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  forceAdvanced?: boolean | string;
+  useLocalLLM?: boolean;
+}
+
+// More detailed processing options
+export interface ProcessOptions {
+  systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  includeSources?: boolean;
+}
+
+// Response from a processor
 export interface ProcessorResponse {
   message: string;
   model: string;
@@ -29,286 +62,186 @@ export interface ProcessorResponse {
     end: number;
     total: number;
   };
-  references?: Reference[];
+  sources?: Reference[];
 }
 
-/**
- * Reference to external information
- */
+// Reference to a source
 export interface Reference {
   title: string;
-  url: string;
-  content: string;
-  relevance: number;
-}
-
-/**
- * Options for processing a message
- */
-export interface ProcessOptions {
-  systemPrompt?: string;
-  temperature?: number;
-  maxTokens?: number;
-  topP?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
-  useRag?: boolean;
-}
-
-/**
- * Extended options for chat processing
- */
-export interface ChatOptions extends ProcessOptions {
-  forceAdvanced?: boolean | string;
-  useLocalLLM?: boolean;
-}
-
-/**
- * Document with vector embedding
- */
-export interface VectorDocument {
-  id: string;
-  text: string;
-  embedding?: number[];
-  metadata: {
-    source: string;
-    date?: string;
-    url?: string;
-    author?: string;
-    category?: string;
-    [key: string]: any;
-  };
-}
-
-/**
- * Configuration for local LLM
- */
-export interface LocalLLMConfig {
-  modelPath: string;
-  contextSize: number;
-  temperature: number;
-  maxTokens: number;
-  systemPrompt: string;
-}
-
-/**
- * Model configuration
- */
-export interface ModelConfig {
-  id: string;
-  name: string;
-  provider: 'openai' | 'anthropic' | 'perplexity' | 'local';
-  contextSize: number;
-  inputCostPer1K: number;
-  outputCostPer1K: number;
-  capabilities: Array<'text' | 'vision' | 'audio' | 'embedding' | 'search'>;
-  maxTokens: number;
-  temperature: number;
-  category: 'basic' | 'advanced' | 'specialized';
-  latency: 'low' | 'medium' | 'high';
-}
-
-/**
- * Detected conversation context
- */
-export interface DetectedContext {
-  topic: string;
-  entities: string[];
-  recentMessages: ChatMessage[];
-  metadata: Record<string, any>;
-}
-
-/**
- * Types of context actions
- */
-export enum ActionType {
-  SEARCH = 'search',
-  RETRIEVE_CONTEXT = 'retrieveContext',
-  LEARN = 'learn',
-  CLARIFY = 'clarify',
-  SUMMARIZE = 'summarize'
-}
-
-/**
- * Action to take based on context
- */
-export interface ContextAction {
-  type: ActionType;
-  reason: string;
-  parameters?: Record<string, any>;
-}
-
-/**
- * Node in a knowledge graph
- */
-export interface KnowledgeNode {
-  id: string;
-  label: string;
-  type: 'concept' | 'entity' | 'fact' | 'resource' | 'topic';
-  properties: Record<string, any>;
-}
-
-/**
- * Edge in a knowledge graph
- */
-export interface KnowledgeEdge {
-  id: string;
-  source: string;
-  target: string;
-  label: string;
-  weight: number;
-  properties: Record<string, any>;
-}
-
-/**
- * Complete knowledge graph
- */
-export interface KnowledgeGraph {
-  nodes: KnowledgeNode[];
-  edges: KnowledgeEdge[];
-}
-
-/**
- * Research insight
- */
-export interface ResearchInsight {
-  id: string;
-  title: string;
-  content: string;
-  sources: string[];
-  relevance: number;
+  url?: string;
+  text?: string;
   confidence: number;
-  timestamp: number;
 }
 
-/**
- * Visualization options
- */
-export interface VisualizationOptions {
-  type: 'graph' | 'tree' | 'timeline' | 'table';
-  title: string;
-  description?: string;
-  data: any;
-  config: Record<string, any>;
-}
-
-/**
- * User preferences
- */
-export interface UserPreferences {
-  theme: 'light' | 'dark' | 'system';
-  modelPreferences: {
-    defaultModel: string;
-    preferLocalLLM: boolean;
-    searchProvider: string;
-    voiceSettings: {
-      ttsVoice: string;
-      ttsSpeed: number;
-      sttLanguage: string;
-    };
-  };
-  privacySettings: {
-    storeConversations: boolean;
-    allowTelemetry: boolean;
-    allowContentAnalysis: boolean;
-  };
-  accessibilitySettings: {
-    fontSize: 'small' | 'medium' | 'large';
-    highContrast: boolean;
-    reducedMotion: boolean;
-    textToSpeech: boolean;
-  };
-  interfaceSettings: {
-    showContextPanel: boolean;
-    showReferences: boolean;
-    showTokenCount: boolean;
-    codeBlockTheme: string;
-  };
-}
-
-/**
- * Memory entry for conversation memory
- */
-export interface MemoryEntry {
-  id: string;
-  type: 'fact' | 'preference' | 'interaction';
-  content: string;
-  timestamp: number;
-  importance: number;
-  lastAccessed?: number;
-  accessCount: number;
-  metadata: Record<string, any>;
-}
-
-/**
- * Conversation memory
- */
-export interface ConversationMemory {
-  recentMessages: ChatMessage[];
-  entities: Record<string, any>;
-  topics: Record<string, number>;
-  facts: MemoryEntry[];
-  preferences: MemoryEntry[];
-}
-
-/**
- * Search result
- */
-export interface SearchResult {
-  query: string;
-  refinedQuery?: string;
-  results: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    source: string;
-    date?: string;
-    imageUrl?: string;
-  }>;
-  relatedQueries?: string[];
-  analyzedTopics?: Array<{ topic: string; relevance: number }>;
-  timing: {
+// Entity extracted from text
+export interface Entity {
+  type: string;
+  value: string;
+  position: {
     start: number;
     end: number;
-    total: number;
   };
+  confidence?: number;
 }
 
-/**
- * Canvas item for visual workspace
- */
-export interface CanvasItem {
-  id: string;
-  type: 'text' | 'image' | 'mindmap' | 'codeblock' | 'chart';
-  content: string | Record<string, any>;
-  position: { x: number; y: number };
-  size: { width: number; height: number };
-  style: Record<string, any>;
-  connections: string[];
-}
-
-/**
- * Entity for named entity recognition
- */
-export interface Entity {
-  name: string;
-  type: string;
-  aliases?: string[];
-  metadata?: Record<string, any>;
-}
-
-/**
- * Context analysis result
- */
+// Context analysis result
 export interface ContextAnalysis {
-  topic: string;
-  userGoal?: string;
   entities: Entity[];
-  relatedTopics?: string[];
-  suggestedActions: ContextAction[];
-  sentiment?: {
+  keywords: string[];
+  sentiment: {
     score: number;
     label: 'positive' | 'negative' | 'neutral';
   };
+  topics: string[];
+  intent: string;
+  userGoal?: string | null;
+  relatedTopics?: string[];
+  messageLength: number;
+  historyLength: number;
+}
+
+// Detected context
+export interface DetectedContext {
+  topic: string;
+  entities: Entity[];
+  sentiment: {
+    score: number;
+    label: 'positive' | 'negative' | 'neutral';
+  };
+  intent: string;
+  userGoal?: string | null;
+  keywords: string[];
+  recentMessages: ChatMessage[];
+  relatedTopics?: string[];
+  metadata: {
+    messageLength: number;
+    historyLength: number;
+    timestamp: string;
+  };
+}
+
+// Web search result
+export interface WebSearchResult {
+  title: string;
+  link: string;
+  snippet: string;
+  content?: string;
+  publishDate?: string | null;
+  thumbnail?: string | null;
+}
+
+// Search result
+export interface SearchResult {
+  query: string;
+  results: WebSearchResult[];
+  totalResults: number;
+  timestamp: string;
+}
+
+// File search result
+export interface FileSearchResult {
+  filePath: string;
+  fileName: string;
+  fileType: string;
+  content: string;
+  startIndex: number;
+  endIndex: number;
+  similarity: number;
+}
+
+// Voice input options
+export interface VoiceInputOptions {
+  continuous?: boolean;
+  interimResults?: boolean;
+  language?: string;
+}
+
+// Voice output options
+export interface VoiceOutputOptions {
+  voice?: string;
+  rate?: number;
+  pitch?: number;
+  volume?: number;
+}
+
+// Knowledge graph node types
+export enum NodeType {
+  CONCEPT = 'concept',
+  ENTITY = 'entity',
+  FACT = 'fact',
+  QUESTION = 'question',
+  DOCUMENT = 'document',
+  USER_INPUT = 'user_input'
+}
+
+// Knowledge graph node
+export interface KnowledgeNode {
+  id: string;
+  type: NodeType;
+  label: string;
+  properties: Record<string, any>;
+  source?: string;
+  confidence: number;
+  createdAt: string;
+}
+
+// Knowledge graph edge type
+export enum EdgeType {
+  RELATED_TO = 'related_to',
+  PART_OF = 'part_of',
+  CAUSES = 'causes',
+  IMPLIES = 'implies',
+  SAME_AS = 'same_as',
+  CONTRADICTS = 'contradicts',
+  INSTANCE_OF = 'instance_of',
+  ATTRIBUTE_OF = 'attribute_of',
+  REFERENCES = 'references'
+}
+
+// Knowledge graph edge
+export interface KnowledgeEdge {
+  id: string;
+  source: string; // Source node ID
+  target: string; // Target node ID
+  type: EdgeType;
+  label?: string;
+  weight: number;
+  properties: Record<string, any>;
+  confidence: number;
+  createdAt: string;
+}
+
+// Knowledge graph
+export interface KnowledgeGraph {
+  id: string;
+  name: string;
+  description: string;
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
+  createdAt: string;
+  updatedAt: string;
   metadata: Record<string, any>;
+}
+
+// Local Model Status
+export interface LocalModelStatus {
+  loaded: boolean;
+  model: string | null;
+  memory: number | null;  // Memory usage in MB
+  quantization: string | null;
+  contextLength: number | null;
+  error: string | null;
+}
+
+// System Configuration
+export interface SystemConfig {
+  preferLocalModels: boolean;
+  defaultSystemPrompt: string;
+  voiceEnabled: boolean;
+  voiceSettings: VoiceOutputOptions;
+  contextRetention: number; // Number of messages to retain
+  defaultTemperature: number;
+  searchEnabled: boolean;
+  knowledgeGraphEnabled: boolean;
+  logLevel: 'debug' | 'info' | 'warn' | 'error';
 }

@@ -6,8 +6,8 @@
  */
 
 import { Request, Response, Express } from 'express';
-import { processUserMessage } from './model-router';
-import { getAllModels } from './model-selector';
+import { processMessage } from './model-router';
+import { getAvailableModels } from './model-selector';
 import { apiQuotaManager } from './api-quota-manager';
 import { ChatMessage } from './types';
 
@@ -24,7 +24,7 @@ export function setupRoutes(app: Express): void {
   // Get available models
   app.get('/api/models', async (req: Request, res: Response) => {
     try {
-      const models = getAllModels();
+      const models = getAvailableModels();
       res.status(200).json({ models });
     } catch (error) {
       console.error('Error fetching models:', error);
@@ -42,7 +42,7 @@ export function setupRoutes(app: Express): void {
       }
       
       // Process the message
-      const response = await processUserMessage(
+      const response = await processMessage(
         message,
         history as ChatMessage[],
         options
@@ -84,7 +84,7 @@ export function setupRoutes(app: Express): void {
       // In a real implementation, you would connect to a streaming API
       const simulateStream = async () => {
         // First, get the actual response (we'll send it at the end)
-        const fullResponse = await processUserMessage(
+        const fullResponse = await processMessage(
           message,
           history as ChatMessage[],
           options
@@ -128,7 +128,7 @@ export function setupRoutes(app: Express): void {
 
   // API usage stats
   app.get('/api/stats/usage', (req: Request, res: Response) => {
-    const stats = apiQuotaManager.getQuotaUsageSummary();
+    const stats = apiQuotaManager.getUsageSummary();
     res.status(200).json(stats);
   });
 

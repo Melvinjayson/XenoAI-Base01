@@ -8,9 +8,9 @@
 import express from 'express';
 import * as path from 'path';
 import { setupRoutes } from './routes';
-import { initializeLocalModel } from './local-llm';
+import { initializeLocalLLM } from './local-llm';
 import { isOpenAIAvailable } from './openai';
-import { getAllModels } from './model-selector';
+import { getAvailableModels } from './model-selector';
 
 // Create Express application
 const app = express();
@@ -50,7 +50,7 @@ app.use((req, res, next) => {
 setupRoutes(app);
 
 // Start the server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5000;
 
 // Initialize local model and check API availability on startup
 (async () => {
@@ -62,13 +62,13 @@ const PORT = process.env.PORT || 3001;
     console.log(`OpenAI API available: ${openAIAvailable}`);
     
     // Initialize local model
-    await initializeLocalModel();
+    await initializeLocalLLM();
     
     // Log available models
-    const models = getAllModels();
+    const models = getAvailableModels();
     console.log('Available AI models:');
     models.forEach(model => {
-      console.log(`- ${model.name} (${model.provider}) - ${model.tier} tier`);
+      console.log(`- ${model.name} (${model.provider}) - ${model.category} category`);
     });
   } catch (error) {
     console.error('Error during initialization:', error);

@@ -242,7 +242,13 @@ export async function generateImage(prompt: string): Promise<string> {
       responseTimeMs: endTime - startTime
     });
     
-    return response.data[0].url;
+    // Ensure the URL is defined
+    const imageUrl = response.data[0].url || '';
+    if (!imageUrl) {
+      throw new Error('OpenAI image generation did not return a URL');
+    }
+    
+    return imageUrl;
   } catch (error: any) {
     console.error('Error generating image:', error);
     
@@ -284,6 +290,11 @@ export async function transcribeAudio(audioFile: File): Promise<string> {
       response_format: 'json'
     });
     
+    // Ensure we have a valid response
+    if (!response.text) {
+      throw new Error('Failed to transcribe audio: No text returned');
+    }
+    
     const endTime = Date.now();
     
     // Track API usage (for audio, we estimate based on duration)
@@ -309,6 +320,26 @@ export async function transcribeAudio(audioFile: File): Promise<string> {
     }
     
     throw error;
+  }
+}
+
+/**
+ * Check if OpenAI API is available and working
+ * @returns Promise resolving to whether the API is available
+ */
+export async function isOpenAIAvailable(): Promise<boolean> {
+  if (!process.env.OPENAI_API_KEY) {
+    console.log('OpenAI API key is missing');
+    return false;
+  }
+  
+  try {
+    // Make a simple API call to check availability
+    const models = await openai.models.list();
+    return models.data.length > 0;
+  } catch (error) {
+    console.error('OpenAI API is not available:', error);
+    return false;
   }
 }
 

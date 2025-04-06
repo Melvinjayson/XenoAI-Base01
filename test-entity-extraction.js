@@ -1,54 +1,62 @@
-// Simple test script for the entity extraction functionality
-// Run with: npx tsx test-entity-extraction.js
+/**
+ * Test script for entity extraction functionality
+ * This script demonstrates how the knowledge graph module extracts entities from text
+ */
 
-import { extractEntities } from './server/knowledge-graph';
+const { createGraphFromText, exportGraph } = require('./server/knowledge-graph');
 
-// Sample text for testing
-const sampleText = `
-Apple Inc. is an American multinational technology company headquartered in Cupertino, California. 
-It was founded by Steve Jobs, Steve Wozniak, and Ronald Wayne in 1976. 
-The company's current CEO is Tim Cook who took over in 2011 after Jobs resigned.
-Apple's market capitalization reached over $2 trillion in August 2020, making it the first U.S. company to achieve this milestone.
-The company is known for its hardware products including the iPhone, iPad, and Mac computers, 
-as well as software services such as iOS, macOS, and the App Store.
-`;
-
-// Function to test entity extraction
 async function testEntityExtraction() {
-  console.log('Testing entity extraction with AI enhancement...');
+  // Sample text with various entity types
+  const sampleText = `
+    Apple Inc. is an American multinational technology company headquartered in Cupertino, California.
+    Tim Cook is the CEO of Apple, following Steve Jobs who founded the company with Steve Wozniak in 1976.
+    The company's product lineup includes the iPhone, iPad, Mac, Apple Watch, and Apple TV.
+    In 2022, Apple became the first company to reach a market capitalization of $3 trillion.
+    Google and Microsoft are among Apple's main competitors in various markets.
+    Prof. John Smith from Stanford University published research about artificial intelligence applications in modern devices.
+    The research was conducted in collaboration with researchers from MIT and Oxford University.
+  `;
+
+  console.log('Creating knowledge graph from sample text...');
+  const graph = createGraphFromText(
+    sampleText,
+    'Technology Companies Example',
+    'Knowledge graph about technology companies and their relationships'
+  );
+
+  // Output graph statistics
+  console.log(`Graph created with ${graph.nodes.length} nodes and ${graph.edges.length} edges.`);
   
-  try {
-    const entities = await extractEntities(sampleText);
+  // Output all entity nodes
+  console.log('\nEntities extracted:');
+  graph.nodes.forEach(node => {
+    console.log(`- ${node.label} (${node.type}, confidence: ${node.confidence.toFixed(2)})`);
+  });
+
+  // Output relationships
+  console.log('\nRelationships:');
+  graph.edges.forEach(edge => {
+    const sourceNode = graph.nodes.find(node => node.id === edge.source);
+    const targetNode = graph.nodes.find(node => node.id === edge.target);
     
-    console.log(`Found ${entities.length} entities:`);
-    console.log('-------------------------------');
-    
-    entities.forEach((entity, index) => {
-      console.log(`Entity ${index + 1}:`);
-      console.log(`- Name: ${entity.entity}`);
-      console.log(`- Type: ${entity.type}`);
-      console.log(`- Score: ${entity.score}`);
-      if (entity.description) {
-        console.log(`- Description: ${entity.description}`);
-      }
-      console.log('-------------------------------');
-    });
-    
-    // Some basic analysis
-    const entityTypes = entities.reduce((types, entity) => {
-      types[entity.type] = (types[entity.type] || 0) + 1;
-      return types;
-    }, {});
-    
-    console.log('Entity type distribution:');
-    Object.entries(entityTypes).forEach(([type, count]) => {
-      console.log(`- ${type}: ${count}`);
-    });
-    
-  } catch (error) {
-    console.error('Error during entity extraction test:', error);
-  }
+    if (sourceNode && targetNode) {
+      console.log(`- ${sourceNode.label} → ${edge.type} → ${targetNode.label} (confidence: ${edge.confidence.toFixed(2)})`);
+    }
+  });
+
+  // Export graph for visualization
+  const d3Format = exportGraph(graph, 'd3');
+  console.log('\nD3 format ready for visualization:', 
+    `${d3Format.nodes.length} nodes and ${d3Format.links.length} links exported`);
+  
+  return graph;
 }
 
 // Run the test
-testEntityExtraction();
+testEntityExtraction()
+  .then(graph => {
+    console.log('\nEntity extraction test completed successfully.');
+  })
+  .catch(error => {
+    console.error('Error during entity extraction test:', error);
+  });

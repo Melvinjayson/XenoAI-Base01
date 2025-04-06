@@ -5,21 +5,30 @@
  * enabling it to understand user intent and provide more relevant responses.
  */
 
-import { ChatMessage, DetectedContext, Entity, ContextAnalysis, ActionType } from './types';
-import { processUserMessage } from './model-router';
-import { apiQuotaManager } from './api-quota-manager';
+import * as natural from 'natural';
+import { ChatMessage, ContextAnalysis, DetectedContext, Entity } from './types';
+import { processMessage } from './model-router';
+import { apiQuotaManager, ApiService } from './api-quota-manager';
 
-// Default system prompt for context analysis
-const CONTEXT_ANALYSIS_PROMPT = `
-You are a context analysis agent. Your task is to analyze a conversation history and extract:
-1. The main topic or topics being discussed
-2. The user's intent or goal
-3. Key entities mentioned in the conversation
-4. Related topics that might be relevant
-5. Any specific constraints or preferences mentioned by the user
+// Initialize NLP tools
+const tokenizer = new natural.WordTokenizer();
+const stemmer = natural.PorterStemmer;
+const sentimentAnalyzer = new natural.SentimentAnalyzer('English', stemmer, 'afinn');
 
-Return this information in a structured format that can be used to improve the relevance of AI responses.
-`;
+// Enum for action types
+export enum ActionType {
+  CREATE_KNOWLEDGE_GRAPH = 'create_knowledge_graph',
+  CREATE_MIND_MAP = 'create_mind_map',
+  CREATE_PROJECT = 'create_project',
+  ADD_RESEARCH_INSIGHT = 'add_research_insight',
+  ANALYZE_SENTIMENT = 'analyze_sentiment',
+  EXTRACT_ENTITIES = 'extract_entities',
+  GENERATE_SUMMARY = 'generate_summary',
+  SEARCH_WEB = 'search_web',
+  SEARCH_FILES = 'search_files',
+  GET_SYSTEM_INFO = 'get_system_info',
+  FILE_MANAGEMENT = 'file_management'
+}
 
 /**
  * Extract entities from a message
@@ -27,60 +36,114 @@ Return this information in a structured format that can be used to improve the r
  * @returns Array of extracted entities
  */
 async function extractEntities(message: string): Promise<Entity[]> {
-  try {
-    // Use a lightweight approach for entity extraction
-    const entities: Entity[] = [];
-    
-    // Extract potential named entities (people, organizations, locations) with simple pattern matching
-    // This is a simplified approach - in a real system you'd use NER models or APIs
-    
-    // Match potential people names (capitalized words)
-    const nameRegex = /\b[A-Z][a-z]+ (?:[A-Z][a-z]+ )?[A-Z][a-z]+\b/g;
-    const names = message.match(nameRegex) || [];
-    
-    for (const name of names) {
-      entities.push({
-        name,
-        type: 'PERSON',
-        confidence: 0.7,
-        startPosition: message.indexOf(name),
-        endPosition: message.indexOf(name) + name.length
-      });
+  // Simple NLP-based entity extraction for basic entities
+  const entities: Entity[] = [];
+  
+  // Use pattern matching for dates
+  const datePattern = /\b(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}(?:st|nd|rd|th)?,? \d{4}|(?:january|february|march|april|may|june|july|august|september|october|november|december) \d{1,2}(?:st|nd|rd|th)?,? \d{4}|tomorrow|yesterday|today|next (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|last (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/gi;
+  
+  const dateMatches = message.match(datePattern) || [];
+  dateMatches.forEach(match => {
+    entities.push({
+      type: 'date',
+      value: match,
+      position: {
+        start: message.indexOf(match),
+        end: message.indexOf(match) + match.length
+      }
+    });
+  });
+  
+  // Use pattern matching for URLs
+  const urlPattern = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi;
+  
+  const urlMatches = message.match(urlPattern) || [];
+  urlMatches.forEach(match => {
+    entities.push({
+      type: 'url',
+      value: match,
+      position: {
+        start: message.indexOf(match),
+        end: message.indexOf(match) + match.length
+      }
+    });
+  });
+  
+  // Use pattern matching for email addresses
+  const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+  
+  const emailMatches = message.match(emailPattern) || [];
+  emailMatches.forEach(match => {
+    entities.push({
+      type: 'email',
+      value: match,
+      position: {
+        start: message.indexOf(match),
+        end: message.indexOf(match) + match.length
+      }
+    });
+  });
+  
+  // For more complex entities (people, organizations, locations),
+  // we would typically use NER (Named Entity Recognition)
+  // For simplicity, we're using a simplified approach with advanced models
+  
+  // Only use advanced entity extraction for longer messages
+  if (message.length > 50) {
+    try {
+      // Check if OpenAI API is available for entity extraction
+      if (process.env.OPENAI_API_KEY && apiQuotaManager.getRemainingQuota(ApiService.OPENAI) > 0) {
+        const entityPrompt = 
+          `Extract named entities from the following text. Return a JSON array with objects containing "type" (person, organization, location, product, or other), "value" (the entity text), and "position" (start and end character indices).
+          
+          Text: ${message}
+          
+          JSON entities:`;
+        
+        // Use model router for consistent quota management
+        const result = await processMessage(entityPrompt, [], { 
+          systemPrompt: 'You are an expert in named entity recognition. Extract entities accurately and return only valid JSON.',
+          forceAdvanced: false // Use basic model to conserve quota
+        });
+        
+        try {
+          const jsonStart = result.message.indexOf('[');
+          const jsonEnd = result.message.lastIndexOf(']') + 1;
+          
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            const jsonStr = result.message.substring(jsonStart, jsonEnd);
+            const extractedEntities = JSON.parse(jsonStr);
+            
+            // Add extracted entities to our collection
+            extractedEntities.forEach((entity: any) => {
+              if (entity.type && entity.value) {
+                entities.push({
+                  type: entity.type,
+                  value: entity.value,
+                  position: entity.position || {
+                    start: message.indexOf(entity.value),
+                    end: message.indexOf(entity.value) + entity.value.length
+                  }
+                });
+              }
+            });
+          }
+        } catch (parseError) {
+          console.error('Error parsing entity extraction result:', parseError);
+        }
+      }
+    } catch (error) {
+      console.error('Error in advanced entity extraction:', error);
+      // Fallback to basic extraction already done
     }
-    
-    // Match potential organizations (all caps words)
-    const orgRegex = /\b[A-Z]{2,}\b/g;
-    const orgs = message.match(orgRegex) || [];
-    
-    for (const org of orgs) {
-      entities.push({
-        name: org,
-        type: 'ORGANIZATION',
-        confidence: 0.6,
-        startPosition: message.indexOf(org),
-        endPosition: message.indexOf(org) + org.length
-      });
-    }
-    
-    // Match dates
-    const dateRegex = /\b(0?[1-9]|[12][0-9]|3[01])[\/\-](0?[1-9]|1[012])[\/\-]\d{4}\b/g;
-    const dates = message.match(dateRegex) || [];
-    
-    for (const date of dates) {
-      entities.push({
-        name: date,
-        type: 'DATE',
-        confidence: 0.9,
-        startPosition: message.indexOf(date),
-        endPosition: message.indexOf(date) + date.length
-      });
-    }
-    
-    return entities;
-  } catch (error) {
-    console.error('Error extracting entities:', error);
-    return [];
   }
+  
+  // Remove duplicates
+  const uniqueEntities = entities.filter((entity, index, self) => 
+    index === self.findIndex(e => e.type === entity.type && e.value === entity.value)
+  );
+  
+  return uniqueEntities;
 }
 
 /**
@@ -89,39 +152,72 @@ async function extractEntities(message: string): Promise<Entity[]> {
  * @returns Array of keywords
  */
 function extractKeywords(message: string): string[] {
-  // Simple keyword extraction - remove stopwords and keep important terms
-  // In a real implementation, use TF-IDF or similar algorithms
+  // Tokenize the message
+  const tokens = tokenizer.tokenize(message) || [];
   
-  const stopwords = new Set([
-    'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were',
-    'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
-    'to', 'from', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
-    'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why',
-    'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other',
-    'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so',
-    'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should',
-    'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', 'couldn',
-    'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn', 'ma', 'mightn', 'mustn',
-    'needn', 'shan', 'shouldn', 'wasn', 'weren', 'won', 'wouldn'
-  ]);
+  // Remove stopwords (common words with little semantic meaning)
+  const stopwords = ['a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 
+                    'be', 'been', 'being', 'in', 'on', 'at', 'to', 'for', 'with', 'by',
+                    'about', 'against', 'between', 'into', 'through', 'during', 'before',
+                    'after', 'above', 'below', 'from', 'up', 'down', 'of', 'off', 'over',
+                    'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when',
+                    'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+                    'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
+                    'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just',
+                    'don', 'should', 'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain',
+                    'aren', 'couldn', 'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn',
+                    'ma', 'mightn', 'mustn', 'needn', 'shan', 'shouldn', 'wasn', 'weren',
+                    'won', 'wouldn', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours',
+                    'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves', 'he',
+                    'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its',
+                    'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what',
+                    'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'have',
+                    'has', 'had', 'do', 'does', 'did', 'doing', 'would', 'should', 'could',
+                    'ought', 'i\'m', 'you\'re', 'he\'s', 'she\'s', 'it\'s', 'we\'re',
+                    'they\'re', 'i\'ve', 'you\'ve', 'we\'ve', 'they\'ve', 'i\'d', 'you\'d',
+                    'he\'d', 'she\'d', 'we\'d', 'they\'d', 'i\'ll', 'you\'ll', 'he\'ll',
+                    'she\'ll', 'we\'ll', 'they\'ll', 'isn\'t', 'aren\'t', 'wasn\'t',
+                    'weren\'t', 'hasn\'t', 'haven\'t', 'hadn\'t', 'doesn\'t', 'don\'t',
+                    'didn\'t', 'won\'t', 'wouldn\'t', 'shan\'t', 'shouldn\'t', 'can\'t',
+                    'cannot', 'couldn\'t', 'mustn\'t', 'let\'s', 'that\'s', 'who\'s',
+                    'what\'s', 'here\'s', 'there\'s', 'when\'s', 'where\'s', 'why\'s',
+                    'how\'s'];
   
-  // Tokenize and filter out stopwords
-  const words = message.toLowerCase()
-    .replace(/[^\w\s]/g, '')
-    .split(/\s+/)
-    .filter(word => !stopwords.has(word) && word.length > 2);
+  const filteredTokens = tokens.filter(token => 
+    !stopwords.includes(token.toLowerCase()) && token.length > 2
+  );
   
-  // Count occurrences of each word
-  const wordCounts = new Map<string, number>();
-  for (const word of words) {
-    wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
-  }
+  // Stem the tokens to get base forms
+  const stemmedTokens = filteredTokens.map(token => 
+    stemmer.stem(token.toLowerCase())
+  );
   
-  // Sort by frequency and take top keywords
-  return Array.from(wordCounts.entries())
+  // Count token frequencies
+  const tokenCounts: Record<string, number> = {};
+  stemmedTokens.forEach(token => {
+    tokenCounts[token] = (tokenCounts[token] || 0) + 1;
+  });
+  
+  // Sort tokens by frequency
+  const sortedTokens = Object.entries(tokenCounts)
     .sort((a, b) => b[1] - a[1])
+    .map(entry => entry[0]);
+  
+  // Map back to original tokens (unstemmed) using the first occurrence
+  const originalTokens = new Map<string, string>();
+  tokens.forEach(token => {
+    const stemmed = stemmer.stem(token.toLowerCase());
+    if (!originalTokens.has(stemmed)) {
+      originalTokens.set(stemmed, token);
+    }
+  });
+  
+  // Get top keywords (unstemmed)
+  const keywords = sortedTokens
     .slice(0, 10)
-    .map(([word]) => word);
+    .map(stemmed => originalTokens.get(stemmed) || stemmed);
+  
+  return keywords;
 }
 
 /**
@@ -130,52 +226,18 @@ function extractKeywords(message: string): string[] {
  * @returns Sentiment analysis results
  */
 function analyzeSentiment(message: string): { score: number; label: 'positive' | 'negative' | 'neutral' } {
-  // Simple rule-based sentiment analysis
-  // In a real implementation, use a proper sentiment analysis model
+  // Tokenize the message
+  const tokens = tokenizer.tokenize(message) || [];
   
-  const positiveWords = new Set([
-    'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic',
-    'terrific', 'outstanding', 'exceptional', 'superb', 'perfect',
-    'happy', 'glad', 'pleased', 'delighted', 'satisfied', 'enjoy',
-    'love', 'like', 'appreciate', 'impressive', 'awesome', 'brilliant',
-    'helpful', 'useful', 'valuable', 'beneficial', 'effective', 'efficient'
-  ]);
+  // Calculate sentiment score
+  const score = sentimentAnalyzer.getSentiment(tokens);
   
-  const negativeWords = new Set([
-    'bad', 'poor', 'terrible', 'horrible', 'awful', 'dreadful',
-    'disappointing', 'frustrating', 'annoying', 'irritating', 'unpleasant',
-    'sad', 'unhappy', 'upset', 'angry', 'furious', 'dislike',
-    'hate', 'despise', 'resent', 'useless', 'worthless', 'ineffective',
-    'inefficient', 'problematic', 'difficult', 'challenging', 'confusing'
-  ]);
-  
-  // Count positive and negative words
-  const words = message.toLowerCase().split(/\s+/);
-  let positiveCount = 0;
-  let negativeCount = 0;
-  
-  for (const word of words) {
-    if (positiveWords.has(word)) {
-      positiveCount++;
-    } else if (negativeWords.has(word)) {
-      negativeCount++;
-    }
-  }
-  
-  // Calculate sentiment score (-1 to 1)
-  const totalSentimentWords = positiveCount + negativeCount;
-  const score = totalSentimentWords === 0 
-    ? 0 
-    : (positiveCount - negativeCount) / totalSentimentWords;
-  
-  // Determine sentiment label
-  let label: 'positive' | 'negative' | 'neutral';
+  // Map score to label
+  let label: 'positive' | 'negative' | 'neutral' = 'neutral';
   if (score > 0.2) {
     label = 'positive';
   } else if (score < -0.2) {
     label = 'negative';
-  } else {
-    label = 'neutral';
   }
   
   return { score, label };
@@ -188,70 +250,124 @@ function analyzeSentiment(message: string): { score: number; label: 'positive' |
  * @returns Context analysis
  */
 export async function analyzeContext(message: string, history: ChatMessage[] = []): Promise<ContextAnalysis> {
-  try {
-    // Extract entities from the current message
-    const entities = await extractEntities(message);
-    
-    // Extract keywords from the entire conversation
-    const allText = [
-      ...history.map(msg => msg.content), 
-      message
-    ].join(' ');
-    
-    const keywords = extractKeywords(allText);
-    
-    // Analyze sentiment
-    const sentiment = analyzeSentiment(message);
-    
-    // Attempt to determine the user's intent (simplified approach)
-    // In a production system, use an intent classifier model
-    let intent = 'information_request'; // Default intent
-    
-    if (message.includes('?')) {
-      intent = 'question';
-    } else if (message.toLowerCase().includes('help')) {
-      intent = 'help_request';
-    } else if (message.toLowerCase().includes('thank')) {
-      intent = 'gratitude';
-    } else if (sentiment.label === 'negative') {
-      intent = 'complaint';
-    } else if (message.toLowerCase().match(/^(hi|hello|hey|greetings)/)) {
-      intent = 'greeting';
-    }
-    
-    // Determine the main topic (simplified approach)
-    // In a production system, use topic modeling
-    let topic = keywords.length > 0 ? keywords[0] : 'general';
-    
-    // Generate a summary (simplified approach)
-    // In a production system, use a summarization model
-    const summary = message.length > 100 
-      ? message.substring(0, 100) + '...' 
-      : message;
-    
-    return {
-      topic,
-      intent,
-      entities,
-      sentiment,
-      keywords,
-      summary,
-      confidence: 0.7 // Confidence score for this analysis
-    };
-  } catch (error) {
-    console.error('Error analyzing context:', error);
-    
-    // Return a minimal context analysis on error
-    return {
-      topic: 'general',
-      intent: 'unknown',
-      entities: [],
-      sentiment: { score: 0, label: 'neutral' },
-      keywords: [],
-      summary: message.substring(0, 100),
-      confidence: 0.1
-    };
+  console.log('Analyzing context for message:', message.substring(0, 50) + (message.length > 50 ? '...' : ''));
+  
+  // Extract entities
+  const entities = await extractEntities(message);
+  
+  // Extract keywords
+  const keywords = extractKeywords(message);
+  
+  // Analyze sentiment
+  const sentiment = analyzeSentiment(message);
+  
+  // Determine intent (simple rule-based approach)
+  const lowerMessage = message.toLowerCase();
+  let intent = 'unknown';
+  
+  // Simple intent detection
+  if (lowerMessage.includes('?') || lowerMessage.startsWith('what') || 
+      lowerMessage.startsWith('how') || lowerMessage.startsWith('why') || 
+      lowerMessage.startsWith('when') || lowerMessage.startsWith('where') || 
+      lowerMessage.startsWith('who') || lowerMessage.startsWith('which') || 
+      lowerMessage.startsWith('can you') || lowerMessage.startsWith('could you')) {
+    intent = 'question';
+  } else if (lowerMessage.startsWith('search') || lowerMessage.includes('find') || 
+             lowerMessage.includes('look for') || lowerMessage.includes('look up')) {
+    intent = 'search';
+  } else if (lowerMessage.startsWith('create') || lowerMessage.startsWith('make') || 
+             lowerMessage.startsWith('generate') || lowerMessage.startsWith('build')) {
+    intent = 'creation';
+  } else if (lowerMessage.includes('thank') || lowerMessage.includes('thanks')) {
+    intent = 'gratitude';
+  } else if (lowerMessage.includes('hello') || lowerMessage.includes('hi ') || 
+             lowerMessage === 'hi' || lowerMessage.includes('hey') || 
+             lowerMessage.includes('greetings')) {
+    intent = 'greeting';
+  } else if (sentiment.score > 0.5) {
+    intent = 'positive_feedback';
+  } else if (sentiment.score < -0.5) {
+    intent = 'negative_feedback';
+  } else if (message.length < 20) {
+    intent = 'short_response';
+  } else {
+    intent = 'statement';
   }
+  
+  // Perform advanced context analysis for complex interactions
+  let topics: string[] = [];
+  let userGoal: string | null = null;
+  let relatedTopics: string[] = [];
+  
+  // Only perform advanced analysis for longer messages or conversations with history
+  if (message.length > 50 || history.length > 3) {
+    try {
+      // Check if OpenAI API is available for advanced analysis
+      if (process.env.OPENAI_API_KEY && apiQuotaManager.getRemainingQuota(ApiService.OPENAI) > 0) {
+        const contextPrompt = `
+          Analyze the following conversation to determine:
+          1. The main topics being discussed (max 3, comma-separated)
+          2. The user's apparent goal or objective
+          3. Related topics that might be relevant (max 3, comma-separated)
+          
+          ${history.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n')}
+          USER: ${message}
+          
+          Respond in this exact format:
+          Topics: topic1, topic2, topic3
+          User Goal: user's goal
+          Related Topics: related1, related2, related3
+        `;
+        
+        // Use model router for consistent quota management
+        const result = await processMessage(contextPrompt, [], { 
+          systemPrompt: 'You are an expert conversation analyst. Provide accurate and concise analysis.',
+          forceAdvanced: false // Use basic model to conserve quota
+        });
+        
+        // Parse the structured response
+        const lines = result.message.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('Topics:')) {
+            topics = line.substring('Topics:'.length)
+              .split(',')
+              .map(topic => topic.trim())
+              .filter(topic => topic.length > 0);
+          } else if (line.startsWith('User Goal:')) {
+            userGoal = line.substring('User Goal:'.length).trim();
+            if (userGoal === 'None' || userGoal === 'Unknown' || userGoal === 'N/A') {
+              userGoal = null;
+            }
+          } else if (line.startsWith('Related Topics:')) {
+            relatedTopics = line.substring('Related Topics:'.length)
+              .split(',')
+              .map(topic => topic.trim())
+              .filter(topic => topic.length > 0);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in advanced context analysis:', error);
+      // Fallback to basic keyword extraction for topics
+      topics = keywords.slice(0, 3);
+    }
+  } else {
+    // For simpler messages, use keywords as topics
+    topics = keywords.slice(0, 3);
+  }
+  
+  // Create and return the context analysis
+  return {
+    entities,
+    keywords,
+    sentiment,
+    topics,
+    intent,
+    userGoal,
+    relatedTopics,
+    messageLength: message.length,
+    historyLength: history.length
+  };
 }
 
 /**
@@ -261,82 +377,38 @@ export async function analyzeContext(message: string, history: ChatMessage[] = [
  * @returns Detected context
  */
 export async function detectContext(message: string, history: ChatMessage[] = []): Promise<DetectedContext> {
-  try {
-    // First do a lightweight analysis
-    const analysis = await analyzeContext(message, history);
-    
-    // Prepare the context object
-    const context: DetectedContext = {
-      topic: analysis.topic,
-      entities: analysis.entities,
-      recentMessages: history.slice(-5), // Keep only the 5 most recent messages
-      metadata: {}
-    };
-    
-    // For more complex cases, we can use the AI model to analyze the context more deeply
-    if (message.length > 50 || history.length > 3) {
-      // Check API quota before making additional calls
-      const quotaWarning = apiQuotaManager.checkRateLimit('openai');
-      if (quotaWarning) {
-        console.warn(`Skipping deep context analysis due to rate limits: ${quotaWarning}`);
-        return context;
-      }
-      
-      try {
-        // Use the LLM to analyze the context more deeply
-        const systemPrompt = CONTEXT_ANALYSIS_PROMPT;
-        const contextMessage = `
-        Please analyze this conversation and extract the key information:
-        
-        Conversation history:
-        ${history.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-        
-        Current message:
-        ${message}
-        `;
-        
-        const response = await processUserMessage(contextMessage, [], {
-          systemPrompt,
-          forceAdvanced: true,
-          useRag: false
-        });
-        
-        // Extract additional context from the response
-        // Note: in a real implementation, have the model return structured JSON
-        // For demo purposes, we'll just extract some simple patterns
-        
-        const topicMatch = response.message.match(/Topic: ([^\n]+)/);
-        const goalMatch = response.message.match(/Goal: ([^\n]+)/);
-        const relatedMatch = response.message.match(/Related topics: ([^\n]+)/);
-        
-        if (topicMatch && topicMatch[1]) {
-          context.topic = topicMatch[1].trim();
-        }
-        
-        if (goalMatch && goalMatch[1]) {
-          context.userGoal = goalMatch[1].trim();
-        }
-        
-        if (relatedMatch && relatedMatch[1]) {
-          context.relatedTopics = relatedMatch[1].split(',').map(t => t.trim());
-        }
-      } catch (error) {
-        console.error('Error in deep context analysis:', error);
-        // Continue with the lightweight analysis results
-      }
+  // Analyze the message context
+  const analysis = await analyzeContext(message, history);
+  
+  // Extract recent messages from history (last 5)
+  const recentMessages = history.slice(-5);
+  
+  // Determine primary topic
+  const primaryTopic = analysis.topics[0] || '';
+  
+  // Determine relevant entities
+  const relevantEntities = analysis.entities.filter(entity => 
+    ['person', 'organization', 'location', 'product', 'date'].includes(entity.type)
+  );
+  
+  // Create the detected context
+  const context: DetectedContext = {
+    topic: primaryTopic,
+    entities: relevantEntities,
+    sentiment: analysis.sentiment,
+    intent: analysis.intent,
+    userGoal: analysis.userGoal,
+    keywords: analysis.keywords,
+    recentMessages,
+    relatedTopics: analysis.relatedTopics,
+    metadata: {
+      messageLength: analysis.messageLength,
+      historyLength: analysis.historyLength,
+      timestamp: new Date().toISOString()
     }
-    
-    return context;
-  } catch (error) {
-    console.error('Error detecting context:', error);
-    
-    // Return a minimal context on error
-    return {
-      topic: 'general',
-      entities: [],
-      recentMessages: history.slice(-3)
-    };
-  }
+  };
+  
+  return context;
 }
 
 /**
@@ -345,55 +417,66 @@ export async function detectContext(message: string, history: ChatMessage[] = []
  * @returns Customized system prompt
  */
 export function buildContextAwarePrompt(context: DetectedContext): string {
-  let systemPrompt = `
-  You are Xeno AI, an intelligent assistant focused on providing helpful, accurate responses.
+  // Base prompt
+  let prompt = 'You are Xeno AI, a helpful, respectful, and accurate assistant. ';
   
-  Current conversation topic: ${context.topic}
-  `;
-  
-  if (context.userGoal) {
-    systemPrompt += `\nUser's goal: ${context.userGoal}`;
+  // Add context-aware customization
+  if (context.topic) {
+    prompt += `The current topic appears to be ${context.topic}. `;
   }
   
+  // Add intent-specific instructions
+  switch (context.intent) {
+    case 'question':
+      prompt += 'Provide clear, direct answers to questions. If you\'re unsure, admit what you don\'t know rather than guessing. ';
+      break;
+    case 'search':
+      prompt += 'Help find specific information efficiently. Organize your response to make it easy to scan. ';
+      break;
+    case 'creation':
+      prompt += 'Provide creative, helpful content that meets the user\'s needs. Be detailed and thorough. ';
+      break;
+    case 'negative_feedback':
+      prompt += 'Address concerns empathetically and provide constructive solutions. ';
+      break;
+  }
+  
+  // Add entity-specific context if available
   if (context.entities.length > 0) {
-    systemPrompt += `\n\nKey entities in the conversation:`;
-    context.entities.slice(0, 5).forEach(entity => {
-      systemPrompt += `\n- ${entity.name} (${entity.type})`;
+    prompt += 'The conversation involves ';
+    
+    const entityTypes = new Map<string, string[]>();
+    context.entities.forEach(entity => {
+      if (!entityTypes.has(entity.type)) {
+        entityTypes.set(entity.type, []);
+      }
+      entityTypes.get(entity.type)?.push(entity.value);
     });
+    
+    const entityDescriptions = [];
+    for (const [type, values] of entityTypes.entries()) {
+      if (values.length > 0) {
+        entityDescriptions.push(`${type}s: ${values.slice(0, 3).join(', ')}`);
+      }
+    }
+    
+    prompt += entityDescriptions.join('; ') + '. ';
   }
   
+  // Add related topics if available
   if (context.relatedTopics && context.relatedTopics.length > 0) {
-    systemPrompt += `\n\nRelated topics: ${context.relatedTopics.join(', ')}`;
+    prompt += `Related topics that may be relevant include: ${context.relatedTopics.join(', ')}. `;
   }
   
-  // Add special instructions based on detected context
-  if (context.topic.toLowerCase().includes('research') || 
-      context.topic.toLowerCase().includes('study') ||
-      context.topic.toLowerCase().includes('learn')) {
-    systemPrompt += `
-    \n\nThe user appears to be conducting research or studying. Provide comprehensive, 
-    educational responses that explain concepts clearly. Include relevant facts and 
-    cite sources when possible. Organize information in a structured way that aids learning.
-    `;
-  } else if (context.topic.toLowerCase().includes('tech') || 
-             context.topic.toLowerCase().includes('code') ||
-             context.topic.toLowerCase().includes('programming')) {
-    systemPrompt += `
-    \n\nThe user appears to be discussing technology or programming. Provide technically 
-    accurate information, with code examples when relevant. Be precise and thorough in your 
-    explanations, assuming the user has technical background.
-    `;
+  // Add user goal if available
+  if (context.userGoal) {
+    prompt += `The user appears to be trying to: ${context.userGoal}. `;
   }
   
-  systemPrompt += `
-  \n\nGeneral guidelines:
-  - Be conversational and friendly, but focused on providing accurate information
-  - Give concise answers unless the user asks for detailed explanations
-  - If you're unsure about something, be transparent about your limitations
-  - When appropriate, suggest related topics the user might be interested in
-  `;
+  // Add final instruction
+  prompt += 'Respond in a helpful, concise manner that addresses the user\'s specific needs.';
   
-  return systemPrompt;
+  return prompt;
 }
 
 /**
@@ -404,33 +487,71 @@ export function buildContextAwarePrompt(context: DetectedContext): string {
 export function recommendActions(context: DetectedContext): ActionType[] {
   const actions: ActionType[] = [];
   
-  // Recommend actions based on the topic and entities
-  if (context.topic.toLowerCase().includes('research') || 
-      context.entities.some(e => e.type === 'RESEARCH_TOPIC')) {
+  // Analyze context to recommend appropriate actions
+  
+  // Context-based action recommendations
+  if (context.entities.some(e => e.type === 'person' || e.type === 'organization' || e.type === 'concept')) {
     actions.push(ActionType.CREATE_KNOWLEDGE_GRAPH);
     actions.push(ActionType.EXTRACT_ENTITIES);
   }
   
-  if (context.topic.toLowerCase().includes('project') || 
-      context.userGoal?.toLowerCase().includes('plan')) {
-    actions.push(ActionType.CREATE_PROJECT);
-    actions.push(ActionType.CREATE_MIND_MAP);
+  // Intent-based recommendations
+  if (context.intent === 'creation') {
+    if (context.userGoal && context.userGoal.includes('project')) {
+      actions.push(ActionType.CREATE_PROJECT);
+    } else {
+      actions.push(ActionType.CREATE_MIND_MAP);
+    }
   }
   
-  if (context.topic.toLowerCase().includes('analyze') || 
-      context.topic.toLowerCase().includes('sentiment')) {
+  // Keyword-based recommendations
+  if (context.keywords.some(k => 
+    ['sentiment', 'feeling', 'opinion', 'review', 'feedback'].includes(k.toLowerCase())
+  )) {
     actions.push(ActionType.ANALYZE_SENTIMENT);
   }
   
-  if (context.topic.toLowerCase().includes('search') || 
-      context.topic.toLowerCase().includes('find information')) {
+  // Topic-based recommendations
+  if (context.topic && ['news', 'current events', 'recent', 'latest'].some(t => 
+    context.topic.toLowerCase().includes(t)
+  )) {
     actions.push(ActionType.SEARCH_WEB);
   }
   
-  // If no specific actions are recommended, suggest general ones
-  if (actions.length === 0) {
+  // Entity-based recommendations
+  if (context.entities.length > 5) {
     actions.push(ActionType.EXTRACT_ENTITIES);
     actions.push(ActionType.GENERATE_SUMMARY);
+  }
+  
+  // Message length based recommendations
+  if (context.metadata.messageLength > 500) {
+    actions.push(ActionType.GENERATE_SUMMARY);
+  }
+  
+  // File-related actions
+  if (context.keywords.some(k => 
+    ['file', 'document', 'read', 'write', 'save', 'load'].includes(k.toLowerCase())
+  )) {
+    actions.push(ActionType.FILE_MANAGEMENT);
+    actions.push(ActionType.SEARCH_FILES);
+  }
+  
+  // System-related actions
+  if (context.keywords.some(k => 
+    ['system', 'computer', 'laptop', 'desktop', 'device', 'hardware'].includes(k.toLowerCase())
+  )) {
+    actions.push(ActionType.GET_SYSTEM_INFO);
+  }
+  
+  // Ensure we have at least one action
+  if (actions.length === 0) {
+    // Default actions based on intent
+    if (context.intent === 'question') {
+      actions.push(ActionType.SEARCH_WEB);
+    } else {
+      actions.push(ActionType.EXTRACT_ENTITIES);
+    }
   }
   
   return actions;
@@ -447,38 +568,36 @@ export async function processWithContextAwareness(
   message: string,
   history: ChatMessage[] = [],
   options: any = {}
-) {
-  try {
-    // Detect the context
-    const context = await detectContext(message, history);
-    
-    // Build a context-aware system prompt
-    const contextAwarePrompt = buildContextAwarePrompt(context);
-    
-    // Get the AI response with the context-aware prompt
-    const response = await processUserMessage(
-      message,
-      history,
-      {
-        ...options,
-        systemPrompt: contextAwarePrompt,
-        useRag: true // Enable RAG for context-aware responses
-      }
-    );
-    
-    // Recommend actions based on the context
-    const recommendedActions = recommendActions(context);
-    
-    // Return the enhanced response with context and recommendations
-    return {
-      ...response,
-      context,
-      recommendedActions
-    };
-  } catch (error) {
-    console.error('Error in context-aware processing:', error);
-    
-    // Fall back to standard processing without context awareness
-    return processUserMessage(message, history, options);
-  }
+): Promise<{ 
+  response: string; 
+  context: DetectedContext; 
+  recommendedActions: ActionType[];
+}> {
+  // Detect context
+  const context = await detectContext(message, history);
+  
+  // Build context-aware system prompt
+  const systemPrompt = buildContextAwarePrompt(context);
+  
+  // Get recommended actions
+  const recommendedActions = recommendActions(context);
+  
+  // Process message with context-aware prompt
+  const result = await processMessage(
+    message,
+    history,
+    {
+      systemPrompt,
+      ...options,
+      // Use advanced model for complex contexts
+      forceAdvanced: options.forceAdvanced ?? 
+        (context.metadata.messageLength > 100 || context.metadata.historyLength > 5)
+    }
+  );
+  
+  return {
+    response: result.message,
+    context,
+    recommendedActions
+  };
 }

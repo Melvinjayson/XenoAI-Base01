@@ -1,195 +1,191 @@
 /**
- * Local LLM Integration
+ * Local LLM Module
  * 
- * This module provides functionality for using locally running
- * language models for processing simple tasks without requiring
- * external API calls.
+ * This module provides support for running local language models,
+ * allowing the AI to function offline or with reduced API usage.
  */
 
-import { ChatMessage, LocalLLMConfig } from './types';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { LocalModelStatus, ChatMessage } from './types';
 
-// Flag to track if the local LLM has been initialized
-let localLLMInitialized = false;
-
-// Default configuration for the local LLM
-const defaultConfig: LocalLLMConfig = {
-  modelPath: path.join(__dirname, '../models/orca-mini-3b.gguf'),
-  contextSize: 2048,
-  temperature: 0.7,
-  maxTokens: 512,
-  systemPrompt: 'You are a helpful, concise assistant.'
+// Current status of the local model
+let modelStatus: LocalModelStatus = {
+  loaded: false,
+  model: null,
+  memory: null,
+  quantization: null,
+  contextLength: null,
+  error: null
 };
 
-// Current configuration
-let currentConfig: LocalLLMConfig = { ...defaultConfig };
-
 /**
- * Initialize the local LLM with the given configuration
- * @param config Configuration for the local LLM
+ * Initialize the local LLM
+ * @returns Promise resolving to initialization status
  */
-export async function initializeLocalLLM(config?: Partial<LocalLLMConfig>): Promise<boolean> {
+export async function initializeLocalLLM(): Promise<boolean> {
+  console.log('Initializing local language model...');
+  
   try {
-    console.log('Initializing local LLM...');
+    // Simulate loading a local model
+    await simulateModelLoading();
     
-    // Update configuration if provided
-    if (config) {
-      currentConfig = {
-        ...currentConfig,
-        ...config
-      };
-    }
+    // Update status
+    modelStatus = {
+      loaded: true,
+      model: 'llama-2-7b-chat.ggmlv3.q4_0',
+      memory: 4096,
+      quantization: 'Q4_0',
+      contextLength: 2048,
+      error: null
+    };
     
-    // In a real implementation, this would load the model into memory
-    // For now, we'll simulate this by checking if the model file exists
+    console.log('Local language model initialized successfully.');
+    return true;
+  } catch (error: any) {
+    // Update status with error
+    modelStatus = {
+      ...modelStatus,
+      loaded: false,
+      error: error.message
+    };
     
-    // Check if model path is specified and exists
-    if (currentConfig.modelPath) {
-      try {
-        await fs.access(currentConfig.modelPath);
-        console.log(`Local LLM model found at ${currentConfig.modelPath}`);
-        localLLMInitialized = true;
-      } catch (error) {
-        console.warn(`Local LLM model not found at ${currentConfig.modelPath}`);
-        console.warn('Operating in fallback simulation mode');
-        // For development, we'll still set initialized to true
-        // In production, this would be set to false
-        localLLMInitialized = true;
-      }
-    }
-    
-    console.log('Local LLM initialized');
-    return localLLMInitialized;
-  } catch (error) {
-    console.error('Error initializing local LLM:', error);
+    console.error('Failed to initialize local language model:', error.message);
     return false;
   }
 }
 
-// Call initialization on module load
-initializeLocalLLM().catch(console.error);
-
 /**
- * Check if the local LLM is available
- * @returns Whether the local LLM is initialized and ready
+ * Check if local LLM is available
+ * @returns Whether local LLM is available
  */
 export function isLocalLLMAvailable(): boolean {
-  return localLLMInitialized;
+  return modelStatus.loaded;
 }
 
 /**
- * Process a message using the local LLM
- * @param message User message to process
- * @param history Previous conversation history
- * @param systemPrompt Custom system prompt to use
- * @returns Processed response
+ * Get local LLM status
+ * @returns Current status of the local LLM
+ */
+export function getLocalLLMStatus(): LocalModelStatus {
+  return { ...modelStatus };
+}
+
+/**
+ * Process a message with local LLM
+ * @param message User message
+ * @param history Conversation history
+ * @param systemPrompt System prompt
+ * @returns Generated response
  */
 export async function processWithLocalLLM(
   message: string,
   history: ChatMessage[] = [],
-  systemPrompt?: string
+  systemPrompt: string = 'You are a helpful assistant.'
 ): Promise<string> {
-  if (!localLLMInitialized) {
-    throw new Error('Local LLM is not initialized');
+  // Check if model is loaded
+  if (!modelStatus.loaded) {
+    throw new Error('Local language model is not loaded. Please initialize it first.');
   }
   
+  console.log('Processing message with local LLM...');
+  
   try {
-    console.log('Processing with local LLM...');
+    // Format conversation context
+    const context = formatConversationContext(systemPrompt, history, message);
     
-    // In a real implementation, this would call the local model's inference API
-    // For now, we'll simulate a simple response based on the input
+    // Generate response (simulated)
+    const response = await simulateLocalModelInference(context);
     
-    // Use provided system prompt or default
-    const prompt = systemPrompt || currentConfig.systemPrompt;
-    
-    // Simulate a thinking delay (100-500ms)
-    const thinkingTime = 100 + Math.random() * 400;
-    await new Promise(resolve => setTimeout(resolve, thinkingTime));
-    
-    // Generate a very basic response - in a real implementation this would use the local model
-    const response = await simulateLocalLLMResponse(message, history, prompt);
-    
-    console.log('Local LLM response generated');
     return response;
-  } catch (error) {
-    console.error('Error processing with local LLM:', error);
+  } catch (error: any) {
+    console.error('Error processing with local LLM:', error.message);
     throw error;
   }
 }
 
 /**
- * Simulate a response from a local LLM
- * This is just a placeholder for development - would be replaced with actual local LLM inference
- * @param message User message
- * @param history Conversation history
+ * Format conversation context for local LLM
  * @param systemPrompt System prompt
- * @returns Simulated response
+ * @param history Conversation history
+ * @param currentMessage Current user message
+ * @returns Formatted context
  */
-async function simulateLocalLLMResponse(
-  message: string,
+function formatConversationContext(
+  systemPrompt: string,
   history: ChatMessage[],
-  systemPrompt: string
-): Promise<string> {
-  // Very simple keyword-based responses to simulate a local model
-  // In production, this would be replaced with actual model inference
+  currentMessage: string
+): string {
+  // Start with system prompt
+  let context = `<s>[INST] <<SYS>>\n${systemPrompt}\n<</SYS>>\n\n`;
   
-  // Convert message to lowercase for easier matching
-  const lowerMessage = message.toLowerCase();
-  
-  // Check for greetings
-  if (lowerMessage.includes('hello') || lowerMessage.includes('hi ') || lowerMessage === 'hi') {
-    return "Hello! I'm your AI assistant running in local mode. How can I help you today?";
+  // Add conversation history
+  for (let i = 0; i < history.length; i += 2) {
+    const userMessage = history[i];
+    const assistantMessage = history[i + 1];
+    
+    if (userMessage && userMessage.role === 'user') {
+      context += `${userMessage.content} [/INST] `;
+    }
+    
+    if (assistantMessage && assistantMessage.role === 'assistant') {
+      context += `${assistantMessage.content} </s><s>[INST] `;
+    }
   }
   
-  // Check for questions about capabilities
-  if (lowerMessage.includes('what can you do') || lowerMessage.includes('your capabilities')) {
-    return "I'm a locally running AI assistant. I can help with simple questions, provide information, and assist with basic tasks. For more complex tasks, I might need to use the online model.";
-  }
+  // Add current message
+  context += `${currentMessage} [/INST] `;
   
-  // Check for questions about the system
-  if (lowerMessage.includes('how do you work') || lowerMessage.includes('how do you function')) {
-    return "I'm running as a local language model on this system. I process text locally without sending data to external servers, which helps with privacy and reduces latency for simple tasks.";
-  }
-  
-  // Check for questions about the weather (which local LLMs can't actually answer)
-  if (lowerMessage.includes('weather')) {
-    return "I don't have access to real-time weather information as I'm running locally. For weather updates, you would need to use an online service or API.";
-  }
-  
-  // Check for questions about the date or time
-  if (lowerMessage.includes('time') || lowerMessage.includes('date') || lowerMessage.includes('today')) {
-    return `I don't have access to the current time or date as I'm running locally without internet access.`;
-  }
-  
-  // Check for math problems
-  if (lowerMessage.includes('+') || lowerMessage.includes('-') || 
-      lowerMessage.includes('*') || lowerMessage.includes('/') ||
-      lowerMessage.includes('calculate') || lowerMessage.includes('compute')) {
-    return "I can perform basic calculations, but for complex math or scientific computing, you might want to use a specialized calculator or the online model.";
-  }
-  
-  // Default response for other queries
-  return `I'm processing your request locally. For more sophisticated answers, the system might need to switch to an online model. What else would you like to know?`;
+  return context;
 }
 
 /**
- * Update the local LLM configuration
- * @param config New configuration
+ * Simulate model loading (for development purposes)
+ * @returns Promise resolving when "loading" is complete
  */
-export function updateLocalLLMConfig(config: Partial<LocalLLMConfig>): void {
-  currentConfig = {
-    ...currentConfig,
-    ...config
-  };
-  
-  console.log('Local LLM configuration updated:', currentConfig);
+async function simulateModelLoading(): Promise<void> {
+  return new Promise((resolve) => {
+    // Simulate loading delay
+    setTimeout(() => {
+      resolve();
+    }, 2000);
+  });
 }
 
 /**
- * Get the current local LLM configuration
- * @returns Current configuration
+ * Simulate local model inference (for development purposes)
+ * @param context Formatted conversation context
+ * @returns Simulated model response
  */
-export function getLocalLLMConfig(): LocalLLMConfig {
-  return { ...currentConfig };
+async function simulateLocalModelInference(context: string): Promise<string> {
+  return new Promise((resolve) => {
+    // Extract the last user message for context
+    const lastMessage = context.split('[INST]').pop()?.split('[/INST]')[0]?.trim() || '';
+    
+    // Dictionary of simple responses to common queries
+    const responses: Record<string, string> = {
+      'hello': 'Hello! How can I assist you today?',
+      'hi': 'Hi there! How can I help you?',
+      'how are you': "I'm functioning well, thank you for asking. How can I assist you?",
+      'what time': "I don't have access to the current time. I'm a local language model running offline.",
+      'your name': "I'm a local language model assistant running on your device.",
+      'thank': "You're welcome! Is there anything else I can help with?",
+      'help': "I'm here to help! You can ask me questions, and I'll do my best to provide useful information or assistance.",
+      'bye': "Goodbye! Feel free to return if you have more questions.",
+      'default': "I'm processing your request locally. For more complex questions, we might need to use an online model."
+    };
+    
+    // Find a response based on keyword matching
+    let response = responses.default;
+    Object.keys(responses).forEach(keyword => {
+      if (keyword !== 'default' && lastMessage.toLowerCase().indexOf(keyword) >= 0) {
+        response = responses[keyword];
+      }
+    });
+    
+    // Simulate processing delay based on message length
+    const delay = Math.min(1500, 500 + lastMessage.length * 10);
+    
+    setTimeout(() => {
+      resolve(response);
+    }, delay);
+  });
 }
