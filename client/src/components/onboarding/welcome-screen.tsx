@@ -92,11 +92,59 @@ export function WelcomeScreen({ open, onClose }: WelcomeScreenProps) {
         {step === "welcome" ? (
           <>
             <DialogHeader>
-              <DialogTitle className="text-2xl">Welcome to AI Assistant</DialogTitle>
-              <DialogDescription>
-                Your personal AI assistant that helps you find information, learn new topics,
-                and keep track of what matters to you.
-              </DialogDescription>
+              {(() => {
+                const hour = new Date().getHours();
+                const greetings = [
+                  "Welcome to your AI companion",
+                  "Ready to explore together",
+                  "Let's create something amazing",
+                  "Your creative journey begins here",
+                  "Time to discover new possibilities"
+                ];
+                
+                const timeBasedGreetings = {
+                  morning: ["Good morning! Fresh ideas await", "Start your day with innovation"],
+                  afternoon: ["Good afternoon! Let's achieve more", "Time to amplify your creativity"],
+                  evening: ["Good evening! Let's make progress", "Evening of possibilities ahead"],
+                  night: ["Night owls unite! Let's create", "Late night innovation session"]
+                };
+
+                const getTimeBasedGreeting = () => {
+                  if (hour < 12) return timeBasedGreetings.morning;
+                  if (hour < 17) return timeBasedGreetings.afternoon;
+                  if (hour < 21) return timeBasedGreetings.evening;
+                  return timeBasedGreetings.night;
+                };
+
+                const timeGreetings = getTimeBasedGreeting();
+                const allGreetings = [...greetings, ...timeGreetings];
+                const randomGreeting = allGreetings[Math.floor(Math.random() * allGreetings.length)];
+
+                return (
+                  <>
+                    <DialogTitle className="text-2xl bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent animate-gradient">
+                      {randomGreeting}
+                    </DialogTitle>
+                    <DialogDescription className="mt-2">
+                      <span className="font-medium">Your intelligent companion</span> for:
+                      <ul className="mt-2 space-y-1">
+                        <li className="flex items-center gap-2">
+                          <span className="text-primary">✦</span> Exploring knowledge graphs
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="text-primary">✦</span> Creative mind mapping
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="text-primary">✦</span> Research synthesis
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="text-primary">✦</span> Interactive learning
+                        </li>
+                      </ul>
+                    </DialogDescription>
+                  </>
+                );
+              })()}
             </DialogHeader>
             <div className="py-8 flex flex-col items-center">
               <img
