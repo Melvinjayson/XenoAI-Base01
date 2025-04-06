@@ -676,6 +676,9 @@ Format your response as a JSON object with this structure:
     params: Record<string, any>
   ): Promise<ActionExecutionResult> {
     try {
+      // Import the knowledge graph functionality
+      const { createKnowledgeGraphFromSearch } = await import('./knowledge-graph');
+      
       // Use the createKnowledgeGraphFromSearch function from knowledge-graph.ts
       const query = context.topic + (context.keywords.length > 0 ? ' ' + context.keywords.join(' ') : '');
       const graphResult = await createKnowledgeGraphFromSearch(query);

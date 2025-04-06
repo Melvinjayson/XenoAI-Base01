@@ -1,70 +1,82 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+/**
+ * Server Entry Point
+ * 
+ * This is the main entry point for the server application.
+ * It sets up the Express server and all necessary middleware.
+ */
 
+import express from 'express';
+import * as path from 'path';
+import { setupRoutes } from './routes';
+import { initializeLocalModel } from './local-llm';
+import { isOpenAIAvailable } from './openai';
+import { getAllModels } from './model-selector';
+
+// Create Express application
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
+// Middleware
+app.use(express.json({ limit: '50mb' })); // For parsing application/json with large payload support
+app.use(express.urlencoded({ extended: true })); // For parsing application/x-www-form-urlencoded
+
+// CORS headers for development
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  return next();
+});
+
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
+  
+  // Log once the response is finished
+  res.on('finish', () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
+    console.log(`${req.method} ${req.originalUrl} - ${res.statusCode} - ${duration}ms`);
   });
-
+  
   next();
 });
 
+// Set up API routes
+setupRoutes(app);
+
+// Start the server
+const PORT = process.env.PORT || 3001;
+
+// Initialize local model and check API availability on startup
 (async () => {
-  const server = await registerRoutes(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+  console.log('Checking AI service availability...');
+  
+  try {
+    // Check OpenAI API availability
+    const openAIAvailable = await isOpenAIAvailable();
+    console.log(`OpenAI API available: ${openAIAvailable}`);
+    
+    // Initialize local model
+    await initializeLocalModel();
+    
+    // Log available models
+    const models = getAllModels();
+    console.log('Available AI models:');
+    models.forEach(model => {
+      console.log(`- ${model.name} (${model.provider}) - ${model.tier} tier`);
+    });
+  } catch (error) {
+    console.error('Error during initialization:', error);
   }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  
+  // Start server regardless of AI service availability
+  const port = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${port}`);
   });
 })();
