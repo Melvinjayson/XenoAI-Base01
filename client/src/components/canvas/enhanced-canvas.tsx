@@ -95,7 +95,7 @@ const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
   const [isResearchPanelCollapsed, setIsResearchPanelCollapsed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
-  const [canvasSize, setCanvasSize] = useState({ width: 5000, height: 3000 });
+  const [canvasSize, setCanvasSize] = useState({ width: 10000, height: 10000 }); // Increased for larger infinite canvas
   const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [gridSize, setGridSize] = useState(20);
@@ -753,7 +753,7 @@ const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
           ref={canvasRef}
           className="absolute inset-0"
         >
-          {/* Canvas background with grid */}
+          {/* Canvas background with fixed infinite grid */}
           <div 
             className="absolute"
             style={{
@@ -761,8 +761,13 @@ const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
               height: `${canvasSize.height}px`,
               transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
               transformOrigin: '0 0',
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              marginLeft: `-${canvasSize.width / 2}px`,
+              marginTop: `-${canvasSize.height / 2}px`,
               background: showGrid 
-                ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${gridSize}' height='${gridSize}' viewBox='0 0 ${gridSize} ${gridSize}'%3E%3Cpath d='M ${gridSize} 0 L 0 0 0 ${gridSize}' fill='none' stroke='rgba(0,0,0,0.05)' stroke-width='1'/%3E%3C/svg%3E")` 
+                ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${gridSize}' height='${gridSize}' viewBox='0 0 ${gridSize} ${gridSize}'%3E%3Cpath d='M ${gridSize} 0 L 0 0 0 ${gridSize}' fill='none' stroke='rgba(0,0,0,0.08)' stroke-width='1'/%3E%3C/svg%3E")` 
                 : 'white',
               backgroundColor: 'white',
             }}
@@ -862,7 +867,13 @@ const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
                       color: element.style?.backgroundColor,
                       borderColor: element.style?.borderColor
                     }}
-                    edges={canvasConnections}
+                    edges={canvasConnections.map(conn => ({
+                      id: conn.id,
+                      source: conn.sourceId,
+                      target: conn.targetId,
+                      label: conn.label,
+                      type: conn.type
+                    }))}
                     selected={selectedElementId === element.id}
                     onSelect={id => setSelectedElementId(id)}
                     onAddChild={handleAddMindMapChild}

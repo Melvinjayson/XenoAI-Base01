@@ -66,12 +66,13 @@ const MindMapNode: React.FC<MindMapNodeProps> = ({
   const parentEdges = edges.filter(edge => edge.target === node.id);
   
   const nodeTypeStyles: Record<string, { bg: string, border: string, text: string }> = {
-    concept: { bg: '#E8F4FD', border: '#2B8DD4', text: '#05355C' },
-    insight: { bg: '#F5EBFF', border: '#9B4DE3', text: '#4A0B8C' },
-    question: { bg: '#FFF9E6', border: '#E6A700', text: '#663D00' },
-    evidence: { bg: '#E5F8EF', border: '#28AE74', text: '#0A4E2E' },
-    task: { bg: '#FFE8E8', border: '#E35D5D', text: '#8C1D1D' },
-    default: { bg: '#F3F4F6', border: '#9CA3AF', text: '#1F2937' },
+    // Improved contrast for better accessibility
+    concept: { bg: '#E8F4FD', border: '#2B8DD4', text: '#03284B' },
+    insight: { bg: '#F5EBFF', border: '#9B4DE3', text: '#3A0080' },
+    question: { bg: '#FFF9E6', border: '#E6A700', text: '#5C3700' },
+    evidence: { bg: '#E5F8EF', border: '#28AE74', text: '#053E20' },
+    task: { bg: '#FFE8E8', border: '#E35D5D', text: '#7A0F0F' },
+    default: { bg: '#F3F4F6', border: '#9CA3AF', text: '#111827' },
   };
   
   // Use the node type to determine styling, with fallback to default
@@ -219,7 +220,7 @@ const MindMapNode: React.FC<MindMapNodeProps> = ({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <div className="text-sm font-medium" onDoubleClick={startEditing}>
+            <div className="text-sm font-medium leading-tight" onDoubleClick={startEditing} style={{ fontWeight: 500 }}>
               {node.label}
             </div>
           )}
