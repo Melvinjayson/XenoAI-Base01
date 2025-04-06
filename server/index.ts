@@ -13,6 +13,15 @@ import { initializeLocalLLM } from './local-llm';
 import { isOpenAIAvailable } from './openai';
 import { getAvailableModels } from './model-selector';
 import { setupVite, serveStatic, log } from './vite';
+import { enhancedMemoryManager } from './enhanced-memory-manager';
+import { ChatMessage } from './types';
+import { 
+  enhancedContextAnalysis, 
+  enhancedContextDetection, 
+  processWithEnhancedContext,
+  suggestFollowUpQuestion,
+  suggestNextActions
+} from './context-integration';
 
 // Create Express application
 const app = express();
@@ -70,6 +79,25 @@ const PORT = process.env.PORT || 5000;
     // Check OpenAI API availability
     const openAIAvailable = await isOpenAIAvailable();
     console.log(`OpenAI API available: ${openAIAvailable}`);
+    
+    // Initialize enhanced memory manager
+    console.log('Initializing enhanced memory system...');
+    // Preload a default session memory
+    const defaultSessionId = 'default-session';
+    // Initialize with a system message
+    const systemMessage: ChatMessage = {
+      role: 'system',
+      content: 'Memory system initialized with default session.',
+      timestamp: new Date().toISOString()
+    };
+    
+    await enhancedMemoryManager.processMessage(
+      systemMessage,
+      defaultSessionId,
+      [], // No entities for system message
+      ['system', 'initialization'] // Basic topics
+    );
+    console.log('Enhanced memory system initialized.');
     
     // Initialize local model
     await initializeLocalLLM();

@@ -8,6 +8,7 @@
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  timestamp?: string; // ISO timestamp string for when message was created
 }
 
 // Model configuration
@@ -113,11 +114,14 @@ export interface DetectedContext {
   keywords: string[];
   recentMessages: ChatMessage[];
   relatedTopics?: string[];
+  topics?: string[]; // Added for enhanced context support
   metadata: {
     messageLength: number;
     historyLength: number;
     timestamp: string;
   };
+  sessionId?: string; // Added for enhanced context support
+  hasEnhancedMemory?: boolean; // Added for enhanced context support
 }
 
 // Web search result
@@ -244,4 +248,25 @@ export interface SystemConfig {
   searchEnabled: boolean;
   knowledgeGraphEnabled: boolean;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+}
+
+// API Service types
+export enum ApiService {
+  OPENAI = 'openai',
+  ANTHROPIC = 'anthropic',
+  PERPLEXITY = 'perplexity',
+  ELEVENLABS = 'elevenlabs',
+  LOCAL_LLM = 'local_llm',
+  WEB_SEARCH = 'web_search'
+}
+
+// Action types for context-aware assistance
+export enum ActionType {
+  SEARCH_WEB = 'search_web',
+  CREATE_KNOWLEDGE_GRAPH = 'create_knowledge_graph',
+  CREATE_MIND_MAP = 'create_mind_map',
+  ANALYZE_SENTIMENT = 'analyze_sentiment',
+  CREATE_PROJECT = 'create_project',
+  SUGGEST_RESOURCES = 'suggest_resources',
+  SUMMARIZE = 'summarize'
 }

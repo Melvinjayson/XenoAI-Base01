@@ -11,9 +11,11 @@ import { processMessage } from './model-router';
 import { apiQuotaManager, ApiService } from './api-quota-manager';
 
 // Initialize NLP tools
-const tokenizer = new natural.WordTokenizer();
+const tokenizer = natural.WordTokenizer ? new natural.WordTokenizer() : { tokenize: (text: string) => text.split(/\s+/) };
 const stemmer = natural.PorterStemmer;
-const sentimentAnalyzer = new natural.SentimentAnalyzer('English', stemmer, 'afinn');
+const sentimentAnalyzer = natural.SentimentAnalyzer ? 
+  new natural.SentimentAnalyzer('English', stemmer, 'afinn') : 
+  { getSentiment: (arr: string[]) => arr.length ? 0 : 0 };
 
 // Enum for action types
 export enum ActionType {

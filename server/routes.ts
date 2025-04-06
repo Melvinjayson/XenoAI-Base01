@@ -9,9 +9,18 @@ import { Request, Response, Express } from 'express';
 import { processMessage } from './model-router';
 import { getAvailableModels } from './model-selector';
 import { apiQuotaManager } from './api-quota-manager';
-import { ChatMessage } from './types';
+import { ChatMessage, ApiService, ActionType } from './types';
 import { storage } from './storage';
 import { insertColorPaletteSchema } from '@shared/schema';
+import { 
+  enhancedContextAnalysis, 
+  enhancedContextDetection,
+  processWithEnhancedContext,
+  suggestNextActions,
+  suggestFollowUpQuestion
+} from './context-integration';
+import { memoryManager } from './memory-manager';
+import { enhancedMemoryManager } from './enhanced-memory-manager';
 
 /**
  * Set up all routes for the application
@@ -42,18 +51,28 @@ export function setupRoutes(app: Express): void {
   // Chat endpoint
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { message, history = [], options = {} } = req.body;
+      const { message, history = [], options = {}, sessionId = 'anonymous-session', useEnhancedContext = true } = req.body;
       
       if (!message) {
         return res.status(400).json({ error: 'Message is required' });
       }
       
-      // Process the message
-      const response = await processMessage(
-        message,
-        history as ChatMessage[],
-        options
-      );
+      // Process the message with enhanced context if requested
+      let response;
+      if (useEnhancedContext) {
+        response = await processWithEnhancedContext(
+          message,
+          history as ChatMessage[],
+          sessionId,
+          options
+        );
+      } else {
+        response = await processMessage(
+          message,
+          history as ChatMessage[],
+          options
+        );
+      }
       
       res.status(200).json(response);
     } catch (error) {
@@ -65,7 +84,7 @@ export function setupRoutes(app: Express): void {
   // Streaming chat endpoint
   app.post('/api/chat/stream', async (req: Request, res: Response) => {
     try {
-      const { message, history = [], options = {} } = req.body;
+      const { message, history = [], options = {}, sessionId = 'anonymous-session', useEnhancedContext = true } = req.body;
       
       if (!message) {
         return res.status(400).json({ error: 'Message is required' });
@@ -91,11 +110,22 @@ export function setupRoutes(app: Express): void {
       // In a real implementation, you would connect to a streaming API
       const simulateStream = async () => {
         // First, get the actual response (we'll send it at the end)
-        const fullResponse = await processMessage(
-          message,
-          history as ChatMessage[],
-          options
-        );
+        let fullResponse;
+        
+        if (useEnhancedContext) {
+          fullResponse = await processWithEnhancedContext(
+            message,
+            history as ChatMessage[],
+            sessionId,
+            options
+          );
+        } else {
+          fullResponse = await processMessage(
+            message,
+            history as ChatMessage[],
+            options
+          );
+        }
         
         // Simulate streaming chunks of text
         let sentChars = 0;
@@ -151,12 +181,159 @@ export function setupRoutes(app: Express): void {
     // In a real implementation, this would call ElevenLabs, OpenAI TTS, or browser APIs
     res.status(501).json({ error: 'Text-to-speech is not implemented yet' });
   });
+  
+  // Speech synthesis endpoint (alias for TTS that was being called by the frontend)
+  app.post('/api/synthesize', async (req: Request, res: Response) => {
+    try {
+      const { text, voice = 'default', language = 'en' } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ error: 'Text is required' });
+      }
+      
+      // Check if we have ElevenLabs API key
+      if (process.env.ELEVENLABS_API_KEY) {
+        // Stub implementation - in a full implementation this would use ElevenLabs API
+        console.log(`Synthesizing speech with ElevenLabs: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+        // Return a 201 Accepted status but with an error message to indicate it's a stub
+        return res.status(201).json({ 
+          status: 'stub', 
+          message: 'ElevenLabs synthesis would happen here in a complete implementation'
+        });
+      }
+      
+      // Check if we have OpenAI API key as fallback
+      if (process.env.OPENAI_API_KEY) {
+        // Stub implementation - in a full implementation this would use OpenAI TTS
+        console.log(`Synthesizing speech with OpenAI TTS: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+        // Return a 201 Accepted status but with an error message to indicate it's a stub
+        return res.status(201).json({ 
+          status: 'stub', 
+          message: 'OpenAI TTS synthesis would happen here in a complete implementation'
+        });
+      }
+      
+      // As a last resort, tell the client to use browser TTS
+      return res.status(200).json({
+        status: 'browser',
+        message: 'Use browser text-to-speech capabilities',
+        text,
+        voice,
+        language
+      });
+    } catch (error) {
+      console.error('Error in speech synthesis:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
 
   // Speech-to-text endpoint
   app.post('/api/stt', (req: Request, res: Response) => {
     // Placeholder for STT implementation
     // In a real implementation, this would call Whisper API or similar
     res.status(501).json({ error: 'Speech-to-text is not implemented yet' });
+  });
+  
+  // Enhanced context analysis endpoint
+  app.post('/api/context/analyze', async (req: Request, res: Response) => {
+    try {
+      const { message, history = [], sessionId = 'anonymous-session' } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+      
+      const contextAnalysis = await enhancedContextAnalysis(
+        message,
+        history as ChatMessage[],
+        sessionId
+      );
+      
+      res.status(200).json({ context: contextAnalysis });
+    } catch (error) {
+      console.error('Error analyzing context:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+  
+  // Context detection endpoint
+  app.post('/api/context/detect', async (req: Request, res: Response) => {
+    try {
+      const { message, history = [], sessionId = 'anonymous-session' } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+      
+      const detectedContext = await enhancedContextDetection(
+        message,
+        history as ChatMessage[],
+        sessionId
+      );
+      
+      res.status(200).json({ context: detectedContext });
+    } catch (error) {
+      console.error('Error detecting context:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+  
+  // Get memory context endpoint
+  app.post('/api/context/memory', async (req: Request, res: Response) => {
+    try {
+      const { message, sessionId = 'anonymous-session', options = {} } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+      
+      const memoryContext = await enhancedMemoryManager.getEnhancedContext(
+        sessionId,
+        message,
+        options
+      );
+      
+      res.status(200).json({ context: memoryContext });
+    } catch (error) {
+      console.error('Error retrieving memory context:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+  
+  // Get follow-up question suggestions
+  app.post('/api/context/follow-up', async (req: Request, res: Response) => {
+    try {
+      const { context, sessionId = 'anonymous-session' } = req.body;
+      
+      if (!context) {
+        return res.status(400).json({ error: 'Context is required' });
+      }
+      
+      const followUp = await suggestFollowUpQuestion(context, sessionId);
+      
+      res.status(200).json({ followUp });
+    } catch (error) {
+      console.error('Error generating follow-up question:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+  
+  // Get suggested actions based on context
+  app.post('/api/context/actions', async (req: Request, res: Response) => {
+    try {
+      const { context, sessionId = 'anonymous-session' } = req.body;
+      
+      if (!context) {
+        return res.status(400).json({ error: 'Context is required' });
+      }
+      
+      const actions = await suggestNextActions(context, sessionId);
+      
+      res.status(200).json({ actions });
+    } catch (error) {
+      console.error('Error suggesting actions:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
   });
 
   // Color Palette endpoints
