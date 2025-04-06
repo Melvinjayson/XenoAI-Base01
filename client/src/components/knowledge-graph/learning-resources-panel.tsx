@@ -9,6 +9,7 @@ export function LearningResourcesPanel() {
   return (
     <div className="space-y-4">
       <StudyTimer />
+      <ProgressTracker />
       <Card>
         <CardHeader>
           <CardTitle>Learning Resources</CardTitle>
