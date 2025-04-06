@@ -190,7 +190,7 @@ export function estimateTokenCount(text?: string | null): number {
  */
 export function shouldUseAdvancedModel(message: string, history: any[] = []): boolean {
   const complexity = estimateComplexity(message, history);
-  return complexity > 0.6;
+  return complexity > 0.75; // Increased from 0.6 to 0.75 to favor local models for more tasks
 }
 
 /**
@@ -224,9 +224,9 @@ export function selectModel(
     if (a.category === preferredCategory) scoreA += 5;
     if (b.category === preferredCategory) scoreB += 5;
     
-    // Local models get a bonus if preferred
-    if (preferLocal && a.provider === 'local') scoreA += 10;
-    if (preferLocal && b.provider === 'local') scoreB += 10;
+    // Local models get a significant bonus if preferred
+    if (preferLocal && a.provider === 'local') scoreA += 25; // Increased from 10 to 25
+    if (preferLocal && b.provider === 'local') scoreB += 25; // Increased from 10 to 25
     
     // Lower latency is better
     if (a.latency === 'low') scoreA += 3;

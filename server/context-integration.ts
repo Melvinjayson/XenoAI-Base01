@@ -19,7 +19,7 @@ import {
   Entity,
   ProcessorResponse
 } from './types';
-import { processMessage } from './model-router';
+import { processMessage, DEFAULT_PROMPTS } from './model-router';
 import { apiQuotaManager, ApiService } from './api-quota-manager';
 
 /**
@@ -218,8 +218,12 @@ export async function processWithEnhancedContext(
   );
   
   // Create a custom system prompt that includes the enhanced context
-  let systemPrompt = options.systemPrompt || 
-    'You are Xeno AI, a helpful, respectful, and accurate assistant. You provide clear, concise answers, making use of your context awareness to provide more relevant and personalized responses.';
+  let systemPrompt = options.systemPrompt;
+  
+  // Use the contextual prompt if not explicitly set
+  if (!systemPrompt) {
+    systemPrompt = DEFAULT_PROMPTS.contextual;
+  }
   
   // Add memory context if available
   if (memoryContext && memoryContext.length > 0) {
@@ -236,7 +240,10 @@ export async function processWithEnhancedContext(
   // Process the message with the enhanced context
   const response = await processMessage(message, history, {
     ...options,
-    systemPrompt
+    systemPrompt,
+    sessionId: sessionId,
+    entities: context.entities,
+    topics: context.topics || []
   });
   
   // After getting the response, update the memory

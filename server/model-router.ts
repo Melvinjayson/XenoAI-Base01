@@ -24,10 +24,11 @@ import {
 import { apiQuotaManager, ApiService } from './api-quota-manager';
 
 // Default system prompts
-const DEFAULT_PROMPTS = {
+export const DEFAULT_PROMPTS = {
   generic: 'You are Xeno AI, a helpful, respectful, and accurate assistant. You provide clear, concise answers to questions, and you admit when you don\'t know something rather than making up information.',
-  local: 'You are Xeno AI running locally. You provide brief, direct answers to simple questions. For complex topics, you may suggest using the advanced online AI model.',
-  search: 'You are Xeno AI, a helpful search assistant. Analyze the user\'s query and provide relevant information from search results. Include sources when available.'
+  local: 'You are Xeno AI running locally. You maintain context awareness between messages and provide personalized responses based on conversation history and user preferences. Your primary goal is to solve user requests using local processing capabilities when possible, only suggesting external API usage for highly complex tasks. You have knowledge in various domains and provide structured, clear explanations tailored to the user\'s context.',
+  search: 'You are Xeno AI, a helpful search assistant. Analyze the user\'s query and provide relevant information from search results. Include sources when available.',
+  contextual: 'You are Xeno AI with enhanced context awareness. You understand the user\'s history and preferences, and you tailor your responses to their specific situation. You maintain awareness of previously discussed topics and entities, and you provide cohesive responses that build on prior interactions. You prioritize providing accurate and relevant information while indicating when advanced processing is necessary.'
 };
 
 /**
@@ -92,6 +93,11 @@ export async function processMessage(
   // Check if local model should be used
   const useLocalModel = selectedModel.provider === 'local';
   
+  // Extract any detected entities and topics from options
+  const entities = options.entities || [];
+  const topics = options.topics || [];
+  const sessionId = options.sessionId || 'default-session';
+  
   // Prepare system prompt
   const systemPrompt = options.systemPrompt || 
     (useLocalModel ? DEFAULT_PROMPTS.local : DEFAULT_PROMPTS.generic);
@@ -101,8 +107,18 @@ export async function processMessage(
     let response: ProcessorResponse;
     
     if (useLocalModel) {
-      // Route to local model processor
-      const localResponse = await processWithLocalLLM(message, history, systemPrompt);
+      // Route to local model processor with enhanced context
+      const localResponse = await processWithLocalLLM(
+        message, 
+        history, 
+        systemPrompt,
+        sessionId,
+        entities,
+        topics
+      );
+      
+      // Get approximate start time
+      const approximateStartTime = Date.now() - 500;
       
       // Create a structured response object
       response = {
@@ -114,9 +130,9 @@ export async function processMessage(
           total: estimatedTokens + estimateTokenCount(localResponse)
         },
         timing: {
-          start: Date.now() - 500, // Approximate timing
+          start: approximateStartTime,
           end: Date.now(),
-          total: 500 // Approximate timing
+          total: Date.now() - approximateStartTime
         }
       };
     } else if (selectedModel.provider === 'openai') {
@@ -222,10 +238,17 @@ async function fallbackToLocalModel(
     }
     
     const systemPrompt = options.systemPrompt || DEFAULT_PROMPTS.local;
+    const entities = options.entities || [];
+    const topics = options.topics || [];
+    const sessionId = options.sessionId || 'default-session';
+    
     const localResponse = await processWithLocalLLM(
       message, 
       history, 
-      systemPrompt + ' Note: I am the fallback local model because the online AI service is currently unavailable.'
+      systemPrompt + ' Note: I am the fallback local model because the online AI service is currently unavailable.',
+      sessionId,
+      entities,
+      topics
     );
     
     return {

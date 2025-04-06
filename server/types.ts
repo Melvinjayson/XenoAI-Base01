@@ -36,6 +36,9 @@ export interface ChatOptions {
   presencePenalty?: number;
   forceAdvanced?: boolean | string;
   useLocalLLM?: boolean;
+  sessionId?: string;
+  entities?: Entity[];
+  topics?: string[];
 }
 
 // More detailed processing options
