@@ -34,12 +34,44 @@ export function ColorPaletteProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await apiRequest('GET', '/api/color-palettes');
+      const defaultPalette: ColorPalette = {
+        id: 'default',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        name: 'Default',
+        description: 'Default color palette',
+        primary: '#7C3AED',
+        primaryLight: '#A855F7',
+        primaryDark: '#5B21B6',
+        secondary: '#D8B4FE',
+        secondaryLight: '#F3E8FF',
+        secondaryDark: '#B08FFD',
+        accent: '#00C2FF',
+        background: '#FFFFFF',
+        text: '#1A1A1A',
+        error: '#FF3B30',
+        warning: '#FF9500',
+        success: '#34C759',
+        isDefault: true,
+        metadata: null
+      };
+
       if (!response?.ok) {
         console.warn('Failed to load palettes, using default');
-        return [];
+        setPalettes([defaultPalette]);
+        setCurrentPalette(defaultPalette);
+        return;
       }
-      const data = await response.json();
-      setPalettes(data);
+      
+      try {
+        const data = await response.json();
+        setPalettes(data.length > 0 ? data : [defaultPalette]);
+        setCurrentPalette(data.find((p: ColorPalette) => p.isDefault) || data[0] || defaultPalette);
+      } catch (e) {
+        console.error('Error parsing palette data:', e);
+        setPalettes([defaultPalette]);
+        setCurrentPalette(defaultPalette);
+      }
 
       // Find default palette or use the first one if available
       const defaultPalette = data.find((p: ColorPalette) => p.isDefault === true);
