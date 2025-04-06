@@ -16,6 +16,11 @@ import { ChatMessage } from './types';
  * @param app Express application
  */
 export function setupRoutes(app: Express): void {
+  // Root endpoint
+  app.get('/', (req: Request, res: Response) => {
+    res.status(200).json({ message: 'API server is running' });
+  });
+
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', timestamp: Date.now() });
