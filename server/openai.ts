@@ -1,70 +1,59 @@
 /**
  * OpenAI Integration
  * 
- * This module provides functions to interact with OpenAI's API
- * for advanced language model and image processing capabilities.
+ * This module provides functionality for interacting with OpenAI services,
+ * including text generation, image generation, and embedding computation.
  */
 
 import OpenAI from 'openai';
-import { ChatMessage, ChatResponse, Embedding } from './types';
-import { apiQuotaManager } from './api-quota-manager';
+import { ChatCompletionMessageParam } from 'openai/resources';
+import {
+  ChatMessage,
+  ProcessOptions,
+  ProcessorResponse,
+  Reference
+} from './types';
+import { apiQuotaManager, ApiService } from './api-quota-manager';
+import { estimateTokenCount } from './model-selector';
 
-// Initialize OpenAI API client
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// Check if we have a valid OpenAI API key
-let openaiApiKeyValid: boolean | null = null;
-
-/**
- * Check if OpenAI API is available (valid API key)
- * @returns Promise that resolves to true if API is available
- */
-export async function isOpenAIAvailable(): Promise<boolean> {
-  // If we've already validated the API key, return the cached result
-  if (openaiApiKeyValid !== null) {
-    return openaiApiKeyValid;
-  }
-  
-  // If no API key is set, return false
-  if (!process.env.OPENAI_API_KEY) {
-    console.warn('OpenAI API key not set');
-    openaiApiKeyValid = false;
-    return false;
-  }
-  
-  try {
-    // Make a minimal API call to check if the key is valid
-    const models = await openai.models.list();
-    openaiApiKeyValid = true;
-    return true;
-  } catch (error) {
-    console.error('Error validating OpenAI API key:', error);
-    openaiApiKeyValid = false;
-    return false;
-  }
-}
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || ''
+});
 
 /**
- * Process a user message using OpenAI's API
- * @param modelId Model ID (e.g., 'gpt-4o')
- * @param userMessage User's message
+ * Process a message using OpenAI
+ * @param message User message
  * @param history Conversation history
+ * @param model OpenAI model to use
  * @param options Processing options
- * @returns ChatResponse with model's response
+ * @returns Processed response
  */
 export async function processWithOpenAI(
-  modelId: string,
-  userMessage: string,
+  message: string,
   history: ChatMessage[] = [],
-  options: {
-    systemPrompt?: string;
-    maxTokens?: number;
-    temperature?: number;
-  } = {}
-): Promise<ChatResponse> {
+  model: string = 'gpt-4o',
+  options: ProcessOptions = {}
+): Promise<ProcessorResponse> {
+  // Check API key
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key is missing');
+  }
+  
+  // Check quota limits
+  const quotaCheck = apiQuotaManager.checkRateLimit(ApiService.OPENAI);
+  if (quotaCheck) {
+    throw new Error(`Rate limit exceeded: ${quotaCheck}`);
+  }
+  
   try {
-    // Prepare messages format for OpenAI API
-    const messages = [];
+    console.log(`Processing with OpenAI (${model})`);
+    
+    // Start timing
+    const startTime = Date.now();
+    
+    // Format messages for OpenAI API
+    const messages: ChatCompletionMessageParam[] = [];
     
     // Add system message if provided
     if (options.systemPrompt) {
@@ -75,136 +64,312 @@ export async function processWithOpenAI(
     }
     
     // Add conversation history
-    for (const msg of history.slice(-10)) { // Use last 10 messages to stay within context
-      messages.push({
-        role: msg.role,
-        content: msg.content
-      });
+    if (history && history.length > 0) {
+      for (const historyItem of history) {
+        messages.push({
+          role: historyItem.role,
+          content: historyItem.content
+        });
+      }
     }
     
-    // Add current user message if not already included in history
-    if (!history.length || history[history.length - 1].role !== 'user') {
-      messages.push({
-        role: 'user',
-        content: userMessage
-      });
-    }
-    
-    // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
-    const startTime = Date.now();
-    const response = await openai.chat.completions.create({
-      model: modelId, // Use the requested model (e.g., gpt-4o)
-      messages,
-      max_tokens: options.maxTokens || 1000,
-      temperature: options.temperature || 0.7,
+    // Add current message
+    messages.push({
+      role: 'user',
+      content: message
     });
+    
+    // Process with OpenAI
+    // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const completion = await openai.chat.completions.create({
+      model: model || 'gpt-4o',
+      messages: messages as any,
+      temperature: options.temperature || 0.7,
+      max_tokens: options.maxTokens || 2048,
+      top_p: options.topP || 1,
+      frequency_penalty: options.frequencyPenalty || 0,
+      presence_penalty: options.presencePenalty || 0
+    });
+    
+    // End timing
     const endTime = Date.now();
     
-    // Extract response data
-    const completion = response.choices[0]?.message?.content || 'No response generated';
-    const usage = response.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    // Extract response
+    const response = completion.choices[0].message.content || '';
     
-    // Record API usage
-    apiQuotaManager.recordApiUsage('openai', usage.total_tokens, {
-      model: modelId,
-      promptTokens: usage.prompt_tokens,
-      completionTokens: usage.completion_tokens,
-      totalTokens: usage.total_tokens,
+    // Get usage statistics
+    const promptTokens = completion.usage?.prompt_tokens || estimateTokenCount(messages.map(m => m.content).join(' '));
+    const completionTokens = completion.usage?.completion_tokens || estimateTokenCount(response);
+    const totalTokens = completion.usage?.total_tokens || (promptTokens + completionTokens);
+    
+    // Track API usage
+    apiQuotaManager.trackUsage(ApiService.OPENAI, {
+      model,
+      promptTokens,
+      completionTokens,
+      totalTokens,
       responseTimeMs: endTime - startTime
     });
     
-    // Return formatted response
-    return {
-      message: completion,
-      modelInfo: `OpenAI (${modelId})`,
+    // Create response object
+    const result: ProcessorResponse = {
+      message: response,
+      model,
       tokens: {
-        prompt: usage.prompt_tokens,
-        completion: usage.completion_tokens,
-        total: usage.total_tokens
+        prompt: promptTokens,
+        completion: completionTokens,
+        total: totalTokens
+      },
+      timing: {
+        start: startTime,
+        end: endTime,
+        total: endTime - startTime
       }
     };
     
-  } catch (error) {
-    console.error('Error in OpenAI processing:', error);
-    apiQuotaManager.recordApiFailure('openai', `Processing failed: ${error}`);
-    throw new Error(`OpenAI processing failed: ${error}`);
+    return result;
+  } catch (error: any) {
+    console.error('Error processing with OpenAI:', error);
+    
+    // Track failure
+    if (error.message && error.message.includes('rate limit')) {
+      apiQuotaManager.trackFailure(ApiService.OPENAI, true);
+    } else {
+      apiQuotaManager.trackFailure(ApiService.OPENAI, false);
+    }
+    
+    throw error;
   }
 }
 
 /**
- * Process an image with OpenAI's vision capabilities
- * @param imageData Base64-encoded image or URL
- * @param prompt Text prompt for image analysis
- * @returns Text description/analysis of the image
- */
-export async function processImage(imageData: string, prompt: string): Promise<string> {
-  try {
-    // Determine if input is a URL or base64 data
-    const isUrl = imageData.startsWith('http');
-    
-    const imageContent = isUrl
-      ? { url: imageData }
-      : { url: `data:image/jpeg;base64,${imageData}` };
-    
-    // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: imageContent }
-          ]
-        }
-      ],
-      max_tokens: 1000
-    });
-    
-    const description = response.choices[0]?.message?.content || 'No description generated';
-    
-    // Record API usage (estimate tokens as image processing is complex)
-    apiQuotaManager.recordApiUsage('openai', 1000, {
-      model: 'gpt-4o',
-      isVisionRequest: true
-    });
-    
-    return description;
-    
-  } catch (error) {
-    console.error('Error in image processing:', error);
-    apiQuotaManager.recordApiFailure('openai', `Vision processing failed: ${error}`);
-    throw new Error(`Image processing failed: ${error}`);
-  }
-}
-
-/**
- * Create embeddings for a text using OpenAI's embeddings API
+ * Generate embeddings for text
  * @param text Text to embed
- * @returns Vector representation (embedding) of the text
+ * @returns Embedding vector
  */
-export async function createEmbedding(text: string): Promise<Embedding> {
+export async function generateEmbedding(text: string): Promise<number[]> {
+  // Check API key
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key is missing');
+  }
+  
+  // Check quota limits
+  const quotaCheck = apiQuotaManager.checkRateLimit(ApiService.OPENAI_EMBEDDING);
+  if (quotaCheck) {
+    throw new Error(`Rate limit exceeded: ${quotaCheck}`);
+  }
+  
   try {
+    const startTime = Date.now();
+    
+    // Truncate text if it's too long (max 8191 tokens for embedding models)
+    const tokensEstimate = estimateTokenCount(text);
+    if (tokensEstimate > 8000) {
+      console.warn(`Text too long for embedding: ~${tokensEstimate} tokens. Truncating.`);
+      text = text.substring(0, Math.floor(text.length * (8000 / tokensEstimate)));
+    }
+    
+    // Generate embedding
     const response = await openai.embeddings.create({
-      model: 'text-embedding-3-large',
+      model: 'text-embedding-3-small',
       input: text,
-      encoding_format: 'float'
+      dimensions: 1536
     });
     
-    const embedding = response.data[0]?.embedding || [];
+    const endTime = Date.now();
     
-    // Record API usage
-    const tokenCount = Math.ceil(text.length / 4); // Rough estimate
-    apiQuotaManager.recordApiUsage('openai', tokenCount, {
-      model: 'text-embedding-3-large',
+    // Track API usage
+    apiQuotaManager.trackUsage(ApiService.OPENAI_EMBEDDING, {
+      model: 'text-embedding-3-small',
+      promptTokens: response.usage.prompt_tokens,
+      totalTokens: response.usage.prompt_tokens,
+      responseTimeMs: endTime - startTime,
       isEmbedding: true
     });
     
-    return embedding;
+    return response.data[0].embedding;
+  } catch (error: any) {
+    console.error('Error generating embedding:', error);
     
-  } catch (error) {
-    console.error('Error creating embedding:', error);
-    apiQuotaManager.recordApiFailure('openai', `Embedding creation failed: ${error}`);
-    throw new Error(`Embedding creation failed: ${error}`);
+    // Track failure
+    if (error.message && error.message.includes('rate limit')) {
+      apiQuotaManager.trackFailure(ApiService.OPENAI_EMBEDDING, true);
+    } else {
+      apiQuotaManager.trackFailure(ApiService.OPENAI_EMBEDDING, false);
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Generate an image from a text prompt
+ * @param prompt Text prompt for image generation
+ * @returns Generated image URL
+ */
+export async function generateImage(prompt: string): Promise<string> {
+  // Check API key
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key is missing');
+  }
+  
+  // Check quota limits
+  const quotaCheck = apiQuotaManager.checkRateLimit(ApiService.OPENAI_IMAGE);
+  if (quotaCheck) {
+    throw new Error(`Rate limit exceeded: ${quotaCheck}`);
+  }
+  
+  try {
+    const startTime = Date.now();
+    
+    // Generate image
+    const response = await openai.images.generate({
+      model: 'dall-e-3',
+      prompt,
+      n: 1,
+      size: '1024x1024',
+      quality: 'standard',
+      response_format: 'url'
+    });
+    
+    const endTime = Date.now();
+    
+    // Track API usage (for DALL-E, we count 1 image as 1000 tokens)
+    apiQuotaManager.trackUsage(ApiService.OPENAI_IMAGE, {
+      model: 'dall-e-3',
+      promptTokens: 1000,
+      totalTokens: 1000,
+      responseTimeMs: endTime - startTime
+    });
+    
+    return response.data[0].url;
+  } catch (error: any) {
+    console.error('Error generating image:', error);
+    
+    // Track failure
+    if (error.message && error.message.includes('rate limit')) {
+      apiQuotaManager.trackFailure(ApiService.OPENAI_IMAGE, true);
+    } else {
+      apiQuotaManager.trackFailure(ApiService.OPENAI_IMAGE, false);
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Transcribe audio to text
+ * @param audioFile Audio file (as File object)
+ * @returns Transcribed text
+ */
+export async function transcribeAudio(audioFile: File): Promise<string> {
+  // Check API key
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key is missing');
+  }
+  
+  // Check quota limits
+  const quotaCheck = apiQuotaManager.checkRateLimit(ApiService.OPENAI_AUDIO);
+  if (quotaCheck) {
+    throw new Error(`Rate limit exceeded: ${quotaCheck}`);
+  }
+  
+  try {
+    const startTime = Date.now();
+    
+    // Transcribe audio
+    const response = await openai.audio.transcriptions.create({
+      file: audioFile as any,
+      model: 'whisper-1',
+      response_format: 'json'
+    });
+    
+    const endTime = Date.now();
+    
+    // Track API usage (for audio, we estimate based on duration)
+    // Assuming roughly 1000 tokens per minute of audio
+    const tokensEstimate = Math.max(1000, Math.ceil((endTime - startTime) / 1000)); // At least 1000 tokens
+    
+    apiQuotaManager.trackUsage(ApiService.OPENAI_AUDIO, {
+      model: 'whisper-1',
+      promptTokens: tokensEstimate,
+      totalTokens: tokensEstimate,
+      responseTimeMs: endTime - startTime
+    });
+    
+    return response.text;
+  } catch (error: any) {
+    console.error('Error transcribing audio:', error);
+    
+    // Track failure
+    if (error.message && error.message.includes('rate limit')) {
+      apiQuotaManager.trackFailure(ApiService.OPENAI_AUDIO, true);
+    } else {
+      apiQuotaManager.trackFailure(ApiService.OPENAI_AUDIO, false);
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Convert text to speech
+ * @param text Text to convert to speech
+ * @param voice Voice ID (default: alloy)
+ * @returns Audio as ArrayBuffer
+ */
+export async function textToSpeech(
+  text: string,
+  voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' = 'nova'
+): Promise<ArrayBuffer> {
+  // Check API key
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key is missing');
+  }
+  
+  // Check quota limits
+  const quotaCheck = apiQuotaManager.checkRateLimit(ApiService.OPENAI_AUDIO);
+  if (quotaCheck) {
+    throw new Error(`Rate limit exceeded: ${quotaCheck}`);
+  }
+  
+  try {
+    const startTime = Date.now();
+    
+    // Generate speech
+    const response = await openai.audio.speech.create({
+      model: 'tts-1',
+      voice,
+      input: text,
+      speed: 1.0
+    });
+    
+    const buffer = await response.arrayBuffer();
+    
+    const endTime = Date.now();
+    
+    // Track API usage (estimate based on character count)
+    // Approximately 1 token per 4 characters
+    const tokensEstimate = Math.ceil(text.length / 4);
+    
+    apiQuotaManager.trackUsage(ApiService.OPENAI_AUDIO, {
+      model: 'tts-1',
+      promptTokens: tokensEstimate,
+      totalTokens: tokensEstimate,
+      responseTimeMs: endTime - startTime
+    });
+    
+    return buffer;
+  } catch (error: any) {
+    console.error('Error generating speech:', error);
+    
+    // Track failure
+    if (error.message && error.message.includes('rate limit')) {
+      apiQuotaManager.trackFailure(ApiService.OPENAI_AUDIO, true);
+    } else {
+      apiQuotaManager.trackFailure(ApiService.OPENAI_AUDIO, false);
+    }
+    
+    throw error;
   }
 }

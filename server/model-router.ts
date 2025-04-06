@@ -1,122 +1,229 @@
 /**
  * Model Router
  * 
- * This module routes user messages to the appropriate AI model based on
- * message complexity and availability of different AI services.
+ * This module manages routing between different AI providers and models,
+ * implementing the tiered approach of using local models for simpler tasks
+ * and cloud-based models for more complex reasoning.
  */
 
-import { selectModel } from './model-selector';
-import { apiQuotaManager } from './api-quota-manager';
-import { ChatMessage, ChatResponse, ProcessOptions } from './types';
+import {
+  ChatMessage,
+  ChatOptions,
+  ProcessorResponse,
+  ProcessOptions
+} from './types';
+import { processWithOpenAI } from './openai';
+import { processWithLocalLLM } from './local-llm';
+import {
+  selectModel,
+  shouldUseAdvancedModel,
+  estimateComplexity,
+  estimateTokenCount,
+  getModelById
+} from './model-selector';
+import { apiQuotaManager, ApiService } from './api-quota-manager';
 
-// Placeholder for actual implementations
-async function processWithOpenAI(message: string, history: ChatMessage[], options: ProcessOptions = {}): Promise<ChatResponse> {
-  try {
-    console.log('Processing with OpenAI:', message.substring(0, 50) + '...');
-    
-    // This is a placeholder for the actual OpenAI processing
-    // In a real implementation, this would call the OpenAI API
-    
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-    
-    // Record API usage
-    apiQuotaManager.recordApiUsage('openai', 
-      message.length + (options.systemPrompt?.length || 0), 
-      { model: 'gpt-4o' }
-    );
-    
-    return {
-      message: `OpenAI response to: "${message.substring(0, 30)}..."`,
-      modelInfo: 'gpt-4o',
-      tokens: {
-        prompt: Math.ceil(message.length / 4),
-        completion: Math.ceil((message.length * 1.5) / 4),
-        total: Math.ceil((message.length * 2.5) / 4)
-      }
-    };
-  } catch (error) {
-    console.error('Error processing with OpenAI:', error);
-    
-    // Record API failure
-    apiQuotaManager.recordApiFailure('openai', error.message || 'Unknown error');
-    
-    throw error;
+// Default system prompts
+const DEFAULT_PROMPTS = {
+  generic: 'You are Xeno AI, a helpful, respectful, and accurate assistant. You provide clear, concise answers to questions, and you admit when you don\'t know something rather than making up information.',
+  local: 'You are Xeno AI running locally. You provide brief, direct answers to simple questions. For complex topics, you may suggest using the advanced online AI model.',
+  search: 'You are Xeno AI, a helpful search assistant. Analyze the user\'s query and provide relevant information from search results. Include sources when available.'
+};
+
+/**
+ * Process a user message using the appropriate AI model
+ * @param message User message to process
+ * @param history Conversation history
+ * @param options Processing options
+ * @returns Processed response
+ */
+export async function processMessage(
+  message: string,
+  history: ChatMessage[] = [],
+  options: ChatOptions = {}
+): Promise<ProcessorResponse> {
+  console.log('Processing message, length:', message.length);
+  
+  // Estimate message complexity
+  const complexity = estimateComplexity(message, history);
+  console.log(`Message complexity: ${complexity.toFixed(2)}`);
+  
+  // Determine if we should use an advanced model
+  const needsAdvancedModel = options.forceAdvanced || 
+    (options.forceAdvanced !== false && shouldUseAdvancedModel(message, history));
+  
+  console.log(`Using advanced model: ${needsAdvancedModel}`);
+  
+  // Force specific model if requested
+  let selectedModel;
+  if (typeof options.forceAdvanced === 'string') {
+    selectedModel = getModelById(options.forceAdvanced);
+    if (!selectedModel) {
+      console.warn(`Requested model ${options.forceAdvanced} not found, using automatic selection`);
+    }
   }
-}
-
-async function processWithLocalModel(message: string, history: ChatMessage[], options: ProcessOptions = {}): Promise<ChatResponse> {
+  
+  // Select model based on needs if not explicitly set
+  if (!selectedModel) {
+    const preferredCategory = needsAdvancedModel ? 'advanced' : 'basic';
+    const preferLocal = options.useLocalLLM ?? true;
+    
+    selectedModel = selectModel(['text'], preferredCategory, preferLocal);
+    
+    // Fall back to basic if no advanced model is available
+    if (!selectedModel && preferredCategory === 'advanced') {
+      console.log('No advanced model available, falling back to basic');
+      selectedModel = selectModel(['text'], 'basic', preferLocal);
+    }
+  }
+  
+  // If we still don't have a model, something went wrong
+  if (!selectedModel) {
+    throw new Error('No suitable AI model available');
+  }
+  
+  console.log(`Selected model: ${selectedModel.name} (${selectedModel.provider})`);
+  
+  // Estimate token usage
+  const estimatedTokens = estimateTokenCount(message);
+  const estimatedCost = selectedModel.inputCostPer1K * (estimatedTokens / 1000);
+  console.log(`Estimated tokens: ${estimatedTokens}, cost: $${estimatedCost.toFixed(5)}`);
+  
+  // Check if local model should be used
+  const useLocalModel = selectedModel.provider === 'local';
+  
+  // Prepare system prompt
+  const systemPrompt = options.systemPrompt || 
+    (useLocalModel ? DEFAULT_PROMPTS.local : DEFAULT_PROMPTS.generic);
+  
   try {
-    console.log('Processing with local model:', message.substring(0, 50) + '...');
+    // Route to appropriate processor based on provider
+    let response: ProcessorResponse;
     
-    // This is a placeholder for the actual local model processing
-    // In a real implementation, this would call a locally deployed model
+    if (useLocalModel) {
+      // Route to local model processor
+      const localResponse = await processWithLocalLLM(message, history, systemPrompt);
+      
+      // Create a structured response object
+      response = {
+        message: localResponse,
+        model: selectedModel.id,
+        tokens: {
+          prompt: estimatedTokens,
+          completion: estimatedTokenCount(localResponse),
+          total: estimatedTokens + estimatedTokenCount(localResponse)
+        },
+        timing: {
+          start: Date.now() - 500, // Approximate timing
+          end: Date.now(),
+          total: 500 // Approximate timing
+        }
+      };
+    } else if (selectedModel.provider === 'openai') {
+      // Route to OpenAI
+      const processingOptions: ProcessOptions = {
+        systemPrompt,
+        temperature: options.temperature ?? selectedModel.temperature,
+        maxTokens: options.maxTokens ?? selectedModel.maxTokens,
+        topP: options.topP,
+        frequencyPenalty: options.frequencyPenalty,
+        presencePenalty: options.presencePenalty
+      };
+      
+      response = await processWithOpenAI(message, history, selectedModel.id, processingOptions);
+    } else {
+      // Unsupported provider
+      throw new Error(`Provider ${selectedModel.provider} not supported yet`);
+    }
     
-    await new Promise(resolve => setTimeout(resolve, 300)); // Simulate model inference
-    
-    // Record API usage (even though it's local, we track it)
-    apiQuotaManager.recordApiUsage('local-llm', 
-      message.length + (options.systemPrompt?.length || 0), 
-      { model: 'local-model' }
-    );
-    
-    return {
-      message: `Local model response to: "${message.substring(0, 30)}..."`,
-      modelInfo: 'local-model',
-      tokens: {
-        prompt: Math.ceil(message.length / 4),
-        completion: Math.ceil(message.length / 4),
-        total: Math.ceil(message.length / 2)
-      }
-    };
+    return response;
   } catch (error) {
-    console.error('Error processing with local model:', error);
+    console.error('Error in model router:', error);
     
-    // Record API failure
-    apiQuotaManager.recordApiFailure('local-llm', error.message || 'Unknown error');
+    // Try to fall back to local model if available and not already using it
+    if (!useLocalModel && apiQuotaManager.getRemainingQuota(ApiService.OPENAI) <= 0) {
+      console.log('Falling back to local model due to quota restrictions');
+      return await fallbackToLocalModel(message, history, options);
+    }
     
+    // Re-throw the error if no fallback available
     throw error;
   }
 }
 
 /**
- * Process a user message with the appropriate model
- * @param message User's message
- * @param history Previous conversation history
+ * Fallback to local model when other models are unavailable
+ * @param message User message
+ * @param history Conversation history
  * @param options Processing options
- * @returns Model response
+ * @returns Processed response with local model
  */
-export async function processUserMessage(
+async function fallbackToLocalModel(
   message: string,
-  history: ChatMessage[] = [],
-  options: ProcessOptions = {}
-): Promise<ChatResponse> {
+  history: ChatMessage[],
+  options: ChatOptions
+): Promise<ProcessorResponse> {
   try {
-    // Select the appropriate model based on message complexity
-    const selectedModel = await selectModel(message, history, options.forceAdvanced);
+    const systemPrompt = options.systemPrompt || DEFAULT_PROMPTS.local;
+    const localResponse = await processWithLocalLLM(
+      message, 
+      history, 
+      systemPrompt + ' Note: I am the fallback local model because the online AI service is currently unavailable.'
+    );
     
-    console.log(`Selected model: ${selectedModel.name} (${selectedModel.provider})`);
-    
-    // Route to the appropriate processing function based on the selected model
-    if (selectedModel.provider === 'OpenAI') {
-      return await processWithOpenAI(message, history, options);
-    } else if (selectedModel.provider === 'Local') {
-      return await processWithLocalModel(message, history, options);
-    } else {
-      throw new Error(`Unsupported model provider: ${selectedModel.provider}`);
-    }
-  } catch (error) {
-    console.error('Error processing user message:', error);
-    
-    // Return an error response
     return {
-      message: 'Sorry, I encountered an error processing your message. Please try again later.',
-      modelInfo: 'error',
+      message: localResponse,
+      model: 'local-basic',
       tokens: {
-        prompt: 0,
-        completion: 0,
-        total: 0
+        prompt: estimateTokenCount(message),
+        completion: estimateTokenCount(localResponse),
+        total: estimateTokenCount(message) + estimateTokenCount(localResponse)
       },
-      error: error.message || 'Unknown error'
+      timing: {
+        start: Date.now() - 300, // Approximate timing
+        end: Date.now(),
+        total: 300 // Approximate timing
+      }
     };
+  } catch (error) {
+    console.error('Error in local model fallback:', error);
+    throw new Error('All AI services are currently unavailable. Please try again later.');
+  }
+}
+
+/**
+ * Check if a model is available
+ * @param modelId Model ID to check
+ * @returns Whether the model is available
+ */
+export function isModelAvailable(modelId: string): boolean {
+  const model = getModelById(modelId);
+  if (!model) return false;
+  
+  const apiService = getApiServiceForModel(model);
+  if (!apiService) return true; // Local models are always available
+  
+  return apiQuotaManager.getRemainingQuota(apiService) > 0;
+}
+
+/**
+ * Map model to API service for quota tracking
+ * @param model Model ID
+ * @returns Corresponding API service
+ */
+function getApiServiceForModel(model: any): ApiService | null {
+  if (!model) return null;
+  
+  switch (model.provider) {
+    case 'openai':
+      return ApiService.OPENAI;
+    case 'anthropic':
+      return ApiService.ANTHROPIC;
+    case 'perplexity':
+      return ApiService.PERPLEXITY;
+    case 'local':
+      return null; // No quota for local models
+    default:
+      return null;
   }
 }

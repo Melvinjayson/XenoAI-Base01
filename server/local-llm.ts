@@ -1,190 +1,195 @@
 /**
  * Local LLM Integration
  * 
- * This module provides functions to interact with locally-run language models
- * for offline text generation capabilities.
+ * This module provides functionality for using locally running
+ * language models for processing simple tasks without requiring
+ * external API calls.
  */
 
-import { ChatMessage, ChatResponse, LocalLLMConfig } from './types';
-import { apiQuotaManager } from './api-quota-manager';
-import path from 'path';
-import { promises as fs } from 'fs';
+import { ChatMessage, LocalLLMConfig } from './types';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
-// Configuration for the local language model
-// In a real implementation, these paths would point to actual local models
-const DEFAULT_CONFIG: LocalLLMConfig = {
-  modelPath: path.join(process.cwd(), 'models', 'local-model.bin'),
-  contextSize: 4096,
+// Flag to track if the local LLM has been initialized
+let localLLMInitialized = false;
+
+// Default configuration for the local LLM
+const defaultConfig: LocalLLMConfig = {
+  modelPath: path.join(__dirname, '../models/orca-mini-3b.gguf'),
+  contextSize: 2048,
   temperature: 0.7,
-  maxTokens: 500,
-  systemPrompt: "You are a helpful assistant that provides accurate and concise information."
+  maxTokens: 512,
+  systemPrompt: 'You are a helpful, concise assistant.'
 };
 
-// Model loading state
-let isModelLoaded = false;
-let isModelLoading = false;
-let modelLoadError: Error | null = null;
+// Current configuration
+let currentConfig: LocalLLMConfig = { ...defaultConfig };
 
 /**
- * Check if the local model is available
- * @returns True if the model is available and ready
+ * Initialize the local LLM with the given configuration
+ * @param config Configuration for the local LLM
  */
-export async function isLocalModelAvailable(): Promise<boolean> {
-  // If model is already loaded, return true
-  if (isModelLoaded) {
-    return true;
-  }
-  
-  // If model is currently loading, wait and check again
-  if (isModelLoading) {
-    let attempts = 0;
-    while (isModelLoading && attempts < 10) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      attempts++;
-    }
-    return isModelLoaded;
-  }
-  
-  // Check if model file exists (this is a simplified check)
+export async function initializeLocalLLM(config?: Partial<LocalLLMConfig>): Promise<boolean> {
   try {
-    isModelLoading = true;
+    console.log('Initializing local LLM...');
     
-    // This is a placeholder - in a real implementation, you would check
-    // if the model file exists and is valid
-    // await fs.access(DEFAULT_CONFIG.modelPath);
-    
-    // Since this is just an example, simulate a delay for model loading
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Simulate model loading success (with 70% probability)
-    const randomSuccess = Math.random() < 0.7;
-    
-    if (randomSuccess) {
-      isModelLoaded = true;
-      modelLoadError = null;
-      console.log('Local model loaded successfully');
-    } else {
-      isModelLoaded = false;
-      modelLoadError = new Error('Failed to load local model (simulated failure)');
-      console.error('Local model loading failed:', modelLoadError);
+    // Update configuration if provided
+    if (config) {
+      currentConfig = {
+        ...currentConfig,
+        ...config
+      };
     }
     
-    isModelLoading = false;
-    return isModelLoaded;
+    // In a real implementation, this would load the model into memory
+    // For now, we'll simulate this by checking if the model file exists
     
+    // Check if model path is specified and exists
+    if (currentConfig.modelPath) {
+      try {
+        await fs.access(currentConfig.modelPath);
+        console.log(`Local LLM model found at ${currentConfig.modelPath}`);
+        localLLMInitialized = true;
+      } catch (error) {
+        console.warn(`Local LLM model not found at ${currentConfig.modelPath}`);
+        console.warn('Operating in fallback simulation mode');
+        // For development, we'll still set initialized to true
+        // In production, this would be set to false
+        localLLMInitialized = true;
+      }
+    }
+    
+    console.log('Local LLM initialized');
+    return localLLMInitialized;
   } catch (error) {
-    isModelLoading = false;
-    isModelLoaded = false;
-    modelLoadError = error as Error;
-    console.error('Error checking local model availability:', error);
+    console.error('Error initializing local LLM:', error);
     return false;
   }
 }
 
+// Call initialization on module load
+initializeLocalLLM().catch(console.error);
+
 /**
- * Process a message using the local language model
- * @param userMessage User's message to process
- * @param history Previous conversation history
- * @param options Processing options
- * @returns Chat response from the local model
+ * Check if the local LLM is available
+ * @returns Whether the local LLM is initialized and ready
  */
-export async function processWithLocalModel(
-  userMessage: string,
+export function isLocalLLMAvailable(): boolean {
+  return localLLMInitialized;
+}
+
+/**
+ * Process a message using the local LLM
+ * @param message User message to process
+ * @param history Previous conversation history
+ * @param systemPrompt Custom system prompt to use
+ * @returns Processed response
+ */
+export async function processWithLocalLLM(
+  message: string,
   history: ChatMessage[] = [],
-  options: {
-    systemPrompt?: string;
-    maxTokens?: number;
-    temperature?: number;
-  } = {}
-): Promise<ChatResponse> {
-  // Check if model is available
-  const isAvailable = await isLocalModelAvailable();
-  if (!isAvailable) {
-    throw new Error(`Local model is not available: ${modelLoadError?.message}`);
+  systemPrompt?: string
+): Promise<string> {
+  if (!localLLMInitialized) {
+    throw new Error('Local LLM is not initialized');
   }
   
   try {
-    // Create a combined prompt from system prompt, history and user message
-    const systemPrompt = options.systemPrompt || DEFAULT_CONFIG.systemPrompt;
-    let combinedPrompt = `${systemPrompt}\n\n`;
+    console.log('Processing with local LLM...');
     
-    // Add conversation history
-    for (const msg of history.slice(-5)) { // Only use last 5 messages to keep context small
-      const role = msg.role === 'assistant' ? 'Assistant' : 'User';
-      combinedPrompt += `${role}: ${msg.content}\n`;
-    }
+    // In a real implementation, this would call the local model's inference API
+    // For now, we'll simulate a simple response based on the input
     
-    // Add the current user message
-    combinedPrompt += `User: ${userMessage}\nAssistant:`;
+    // Use provided system prompt or default
+    const prompt = systemPrompt || currentConfig.systemPrompt;
     
-    // In a real implementation, this would call the local LLM's inference API
-    // Here we simulate a delayed response for demonstration
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
+    // Simulate a thinking delay (100-500ms)
+    const thinkingTime = 100 + Math.random() * 400;
+    await new Promise(resolve => setTimeout(resolve, thinkingTime));
     
-    // Simple response generation logic based on keywords in the message
-    // This is just a placeholder for demonstration
-    let response = "";
+    // Generate a very basic response - in a real implementation this would use the local model
+    const response = await simulateLocalLLMResponse(message, history, prompt);
     
-    // Generate a simple response based on the message content
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('hello') || lowerMessage.includes('hi ')) {
-      response = "Hello! I'm the local AI assistant. How can I help you today?";
-    } else if (lowerMessage.includes('weather')) {
-      response = "I'm sorry, I don't have access to current weather information while running in local mode.";
-    } else if (lowerMessage.includes('name')) {
-      response = "I'm a local AI assistant running on your device. You can call me Xeno AI.";
-    } else if (lowerMessage.includes('time') || lowerMessage.includes('date')) {
-      response = `I'm running locally and can tell you that the current time is ${new Date().toLocaleTimeString()} and today's date is ${new Date().toLocaleDateString()}.`;
-    } else if (lowerMessage.includes('thank')) {
-      response = "You're welcome! I'm happy to assist you.";
-    } else if (lowerMessage.includes('joke')) {
-      response = "Why don't scientists trust atoms? Because they make up everything!";
-    } else if (lowerMessage.includes('help')) {
-      response = "I'm currently running in local mode, which means I have limited capabilities. I can answer basic questions, but can't access the internet or external data sources.";
-    } else {
-      // Default response for other queries
-      response = "I'm processing your request locally with limited capabilities. For more complex queries, you might want to use an online model when available.";
-    }
-    
-    // Record API usage for the local model
-    // Even though it's local, we track usage for analytics
-    apiQuotaManager.recordApiUsage('local-llm', userMessage.length + response.length);
-    
-    // Return formatted response
-    return {
-      message: response,
-      modelInfo: 'Local Model',
-      tokens: {
-        prompt: Math.ceil(userMessage.length / 4),
-        completion: Math.ceil(response.length / 4),
-        total: Math.ceil((userMessage.length + response.length) / 4)
-      }
-    };
-    
+    console.log('Local LLM response generated');
+    return response;
   } catch (error) {
-    console.error('Error in local LLM processing:', error);
-    apiQuotaManager.recordApiFailure('local-llm', `Processing failed: ${error}`);
-    throw new Error(`Local LLM processing failed: ${error}`);
+    console.error('Error processing with local LLM:', error);
+    throw error;
   }
 }
 
 /**
- * Initialize and preload the local model
- * @returns Promise that resolves when initialization is complete
+ * Simulate a response from a local LLM
+ * This is just a placeholder for development - would be replaced with actual local LLM inference
+ * @param message User message
+ * @param history Conversation history
+ * @param systemPrompt System prompt
+ * @returns Simulated response
  */
-export async function initializeLocalModel(): Promise<void> {
-  console.log('Initializing local language model...');
+async function simulateLocalLLMResponse(
+  message: string,
+  history: ChatMessage[],
+  systemPrompt: string
+): Promise<string> {
+  // Very simple keyword-based responses to simulate a local model
+  // In production, this would be replaced with actual model inference
   
-  try {
-    await isLocalModelAvailable();
-    
-    if (isModelLoaded) {
-      console.log('Local model initialized successfully');
-    } else {
-      console.error('Failed to initialize local model');
-    }
-  } catch (error) {
-    console.error('Error initializing local model:', error);
+  // Convert message to lowercase for easier matching
+  const lowerMessage = message.toLowerCase();
+  
+  // Check for greetings
+  if (lowerMessage.includes('hello') || lowerMessage.includes('hi ') || lowerMessage === 'hi') {
+    return "Hello! I'm your AI assistant running in local mode. How can I help you today?";
   }
+  
+  // Check for questions about capabilities
+  if (lowerMessage.includes('what can you do') || lowerMessage.includes('your capabilities')) {
+    return "I'm a locally running AI assistant. I can help with simple questions, provide information, and assist with basic tasks. For more complex tasks, I might need to use the online model.";
+  }
+  
+  // Check for questions about the system
+  if (lowerMessage.includes('how do you work') || lowerMessage.includes('how do you function')) {
+    return "I'm running as a local language model on this system. I process text locally without sending data to external servers, which helps with privacy and reduces latency for simple tasks.";
+  }
+  
+  // Check for questions about the weather (which local LLMs can't actually answer)
+  if (lowerMessage.includes('weather')) {
+    return "I don't have access to real-time weather information as I'm running locally. For weather updates, you would need to use an online service or API.";
+  }
+  
+  // Check for questions about the date or time
+  if (lowerMessage.includes('time') || lowerMessage.includes('date') || lowerMessage.includes('today')) {
+    return `I don't have access to the current time or date as I'm running locally without internet access.`;
+  }
+  
+  // Check for math problems
+  if (lowerMessage.includes('+') || lowerMessage.includes('-') || 
+      lowerMessage.includes('*') || lowerMessage.includes('/') ||
+      lowerMessage.includes('calculate') || lowerMessage.includes('compute')) {
+    return "I can perform basic calculations, but for complex math or scientific computing, you might want to use a specialized calculator or the online model.";
+  }
+  
+  // Default response for other queries
+  return `I'm processing your request locally. For more sophisticated answers, the system might need to switch to an online model. What else would you like to know?`;
+}
+
+/**
+ * Update the local LLM configuration
+ * @param config New configuration
+ */
+export function updateLocalLLMConfig(config: Partial<LocalLLMConfig>): void {
+  currentConfig = {
+    ...currentConfig,
+    ...config
+  };
+  
+  console.log('Local LLM configuration updated:', currentConfig);
+}
+
+/**
+ * Get the current local LLM configuration
+ * @returns Current configuration
+ */
+export function getLocalLLMConfig(): LocalLLMConfig {
+  return { ...currentConfig };
 }

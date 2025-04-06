@@ -1,357 +1,434 @@
 /**
  * API Quota Manager
  * 
- * This module manages API usage quotas for various AI services,
- * tracking token usage, request counts, and estimated costs.
+ * This module manages API quota usage and rate limiting for various AI services.
+ * It tracks usage, enforces rate limits, and provides cost estimation.
  */
 
-// Types of AI services we're tracking
-type ApiService = 'openai' | 'anthropic' | 'elevenlabs' | 'perplexity' | 'local-llm';
-
-/**
- * Interface for tracking API usage
- */
-interface QuotaUsage {
-  requestCount: number;
-  tokenCount: number;
-  failureCount: number;
-  lastUsedTimestamp?: number;
-  dailyUsage: Map<string, number>; // Date string -> token count
-  modelUsage: Map<string, number>; // Model ID -> token count
-  details: UsageRecord[]; // Array of detailed usage records
+// Enum for services that require quota management
+export enum ApiService {
+  OPENAI = 'openai',
+  OPENAI_EMBEDDING = 'openai_embedding',
+  OPENAI_IMAGE = 'openai_image',
+  OPENAI_AUDIO = 'openai_audio',
+  ANTHROPIC = 'anthropic',
+  PERPLEXITY = 'perplexity'
 }
 
-/**
- * Config for API quotas
- */
-interface QuotaConfig {
-  dailyTokenLimit: number;
-  hourlyRequestLimit: number;
-  costPerThousandTokens: number;
-  name: string;
-}
-
-/**
- * Detailed usage record
- */
-interface UsageRecord {
-  timestamp: number;
-  requestType: string;
-  tokensUsed: number;
-  model?: string;
-  promptTokens?: number;
+// Interface for API usage tracking
+interface ApiUsage {
+  model: string;
+  promptTokens: number;
   completionTokens?: number;
-  totalTokens?: number;
-  responseTimeMs?: number;
-  isVisionRequest?: boolean;
+  totalTokens: number;
+  responseTimeMs: number;
   isEmbedding?: boolean;
-  success: boolean;
-  errorMessage?: string;
 }
 
-/**
- * API Quota Manager class
- */
-class ApiQuotaManager {
-  private usage: Map<ApiService, QuotaUsage>;
-  private config: Record<ApiService, QuotaConfig>;
-  private startTime: number;
+// Interface for quota limits
+interface QuotaLimit {
+  tokensPerMinute: number;
+  tokensPerHour: number;
+  tokensPerDay: number;
+  maxResponseTimeMs: number;
+}
 
+// Interface for quota usage
+interface QuotaUsage {
+  totalTokens: number;
+  totalCost: number;
+  usageHistory: {
+    last1Min: number;
+    last1Hour: number;
+    last24Hours: number;
+  };
+  statusHistory: {
+    rateLimited: number;
+    errors: number;
+    successful: number;
+  };
+  lastUsed: number;
+}
+
+// Class to manage API quotas
+class ApiQuotaManager {
+  private quotaLimits: Map<ApiService, QuotaLimit>;
+  private quotaUsage: Map<ApiService, QuotaUsage>;
+  private usageLog: Array<{
+    service: ApiService;
+    timestamp: number;
+    tokens: number;
+    model: string;
+    cost: number;
+  }>;
+  
   constructor() {
-    this.startTime = Date.now();
+    // Initialize quota limits
+    this.quotaLimits = new Map<ApiService, QuotaLimit>([
+      [ApiService.OPENAI, {
+        tokensPerMinute: 10000,    // 10k tokens per minute
+        tokensPerHour: 100000,     // 100k tokens per hour
+        tokensPerDay: 1000000,     // 1M tokens per day
+        maxResponseTimeMs: 20000   // 20 seconds max response time
+      }],
+      [ApiService.OPENAI_EMBEDDING, {
+        tokensPerMinute: 30000,    // 30k tokens per minute
+        tokensPerHour: 300000,     // 300k tokens per hour
+        tokensPerDay: 3000000,     // 3M tokens per day
+        maxResponseTimeMs: 10000   // 10 seconds max response time
+      }],
+      [ApiService.OPENAI_IMAGE, {
+        tokensPerMinute: 20,       // 20 images per minute
+        tokensPerHour: 200,        // 200 images per hour
+        tokensPerDay: 2000,        // 2000 images per day
+        maxResponseTimeMs: 30000   // 30 seconds max response time
+      }],
+      [ApiService.OPENAI_AUDIO, {
+        tokensPerMinute: 10,       // 10 audio requests per minute
+        tokensPerHour: 100,        // 100 audio requests per hour
+        tokensPerDay: 1000,        // 1000 audio requests per day
+        maxResponseTimeMs: 30000   // 30 seconds max response time
+      }],
+      [ApiService.ANTHROPIC, {
+        tokensPerMinute: 10000,    // 10k tokens per minute
+        tokensPerHour: 100000,     // 100k tokens per hour
+        tokensPerDay: 1000000,     // 1M tokens per day
+        maxResponseTimeMs: 20000   // 20 seconds max response time
+      }],
+      [ApiService.PERPLEXITY, {
+        tokensPerMinute: 10000,    // 10k tokens per minute
+        tokensPerHour: 100000,     // 100k tokens per hour
+        tokensPerDay: 1000000,     // 1M tokens per day
+        maxResponseTimeMs: 15000   // 15 seconds max response time
+      }]
+    ]);
     
     // Initialize usage tracking
-    this.usage = new Map();
-    this.initializeUsage('openai');
-    this.initializeUsage('anthropic');
-    this.initializeUsage('elevenlabs');
-    this.initializeUsage('perplexity');
-    this.initializeUsage('local-llm');
+    this.quotaUsage = new Map<ApiService, QuotaUsage>();
+    for (const service of Object.values(ApiService)) {
+      this.quotaUsage.set(service, {
+        totalTokens: 0,
+        totalCost: 0,
+        usageHistory: {
+          last1Min: 0,
+          last1Hour: 0,
+          last24Hours: 0
+        },
+        statusHistory: {
+          rateLimited: 0,
+          errors: 0,
+          successful: 0
+        },
+        lastUsed: 0
+      });
+    }
     
-    // Configure quota limits and costs
-    this.config = {
-      'openai': {
-        dailyTokenLimit: 100000,
-        hourlyRequestLimit: 100,
-        costPerThousandTokens: 0.01, // GPT-3.5 rate as baseline
-        name: 'OpenAI'
-      },
-      'anthropic': {
-        dailyTokenLimit: 100000,
-        hourlyRequestLimit: 100,
-        costPerThousandTokens: 0.015, // Claude rate as baseline
-        name: 'Anthropic'
-      },
-      'elevenlabs': {
-        dailyTokenLimit: 30000, // Character count
-        hourlyRequestLimit: 50,
-        costPerThousandTokens: 0.2, // Cost per 1000 characters
-        name: 'ElevenLabs'
-      },
-      'perplexity': {
-        dailyTokenLimit: 100000,
-        hourlyRequestLimit: 100, 
-        costPerThousandTokens: 0.008, // Estimated rate
-        name: 'Perplexity'
-      },
-      'local-llm': {
-        dailyTokenLimit: 1000000, // Much higher for local models
-        hourlyRequestLimit: 1000,  // Much higher for local models
-        costPerThousandTokens: 0, // Free
-        name: 'Local LLM'
-      }
-    };
+    // Initialize usage log
+    this.usageLog = [];
   }
-
+  
   /**
-   * Initialize usage tracking for a service
-   */
-  private initializeUsage(service: ApiService): void {
-    this.usage.set(service, {
-      requestCount: 0,
-      tokenCount: 0,
-      failureCount: 0,
-      lastUsedTimestamp: undefined,
-      dailyUsage: new Map(),
-      modelUsage: new Map(),
-      details: []
-    });
-  }
-
-  /**
-   * Get today's date as a string
-   */
-  private getTodayDateString(): string {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  }
-
-  /**
-   * Record API usage
+   * Track API usage for a service
    * @param service API service used
-   * @param tokens Number of tokens used in the request
-   * @param details Additional usage details
+   * @param usage Usage details
    */
-  public recordApiUsage(service: ApiService, tokens: number, details: Record<string, any> = {}): void {
-    const serviceUsage = this.usage.get(service);
-    if (!serviceUsage) return;
-    
+  trackUsage(service: ApiService, usage: ApiUsage): void {
     const now = Date.now();
-    const today = this.getTodayDateString();
+    const usageEntry = this.quotaUsage.get(service);
     
-    // Update service usage
-    serviceUsage.requestCount++;
-    serviceUsage.tokenCount += tokens;
-    serviceUsage.lastUsedTimestamp = now;
-    
-    // Update daily usage
-    serviceUsage.dailyUsage.set(
-      today, 
-      (serviceUsage.dailyUsage.get(today) || 0) + tokens
-    );
-    
-    // Update model usage if model is specified
-    if (details.model) {
-      serviceUsage.modelUsage.set(
-        details.model,
-        (serviceUsage.modelUsage.get(details.model) || 0) + tokens
-      );
+    if (!usageEntry) {
+      console.error(`Unknown service: ${service}`);
+      return;
     }
     
-    // Record detailed usage
-    const usageRecord: UsageRecord = {
+    // Calculate cost based on model and token usage
+    const cost = this.calculateCost(service, usage.model, usage.promptTokens, usage.completionTokens || 0);
+    
+    // Update usage statistics
+    usageEntry.totalTokens += usage.totalTokens;
+    usageEntry.totalCost += cost;
+    usageEntry.lastUsed = now;
+    usageEntry.statusHistory.successful++;
+    
+    // Update usage history
+    usageEntry.usageHistory.last1Min += usage.totalTokens;
+    usageEntry.usageHistory.last1Hour += usage.totalTokens;
+    usageEntry.usageHistory.last24Hours += usage.totalTokens;
+    
+    // Log usage
+    this.usageLog.push({
+      service,
       timestamp: now,
-      requestType: details.requestType || 'text-completion',
-      tokensUsed: tokens,
-      model: details.model,
-      promptTokens: details.promptTokens,
-      completionTokens: details.completionTokens,
-      totalTokens: details.totalTokens || tokens,
-      responseTimeMs: details.responseTimeMs,
-      isVisionRequest: details.isVisionRequest || false,
-      isEmbedding: details.isEmbedding || false,
-      success: true
-    };
+      tokens: usage.totalTokens,
+      model: usage.model,
+      cost
+    });
     
-    serviceUsage.details.push(usageRecord);
-    
-    // Check and log if approaching limits
-    const warning = this.checkQuotaLimits(service);
-    if (warning) {
-      console.warn(`[API Quota Warning] ${warning}`);
-    }
+    // Prune old usage data
+    this.pruneUsageHistory();
   }
-
+  
   /**
-   * Record an API failure
+   * Track API failures
    * @param service API service that failed
-   * @param errorMessage Error description
+   * @param isRateLimit Whether the failure was due to rate limiting
    */
-  public recordApiFailure(service: ApiService, errorMessage: string): void {
-    const serviceUsage = this.usage.get(service);
-    if (!serviceUsage) return;
+  trackFailure(service: ApiService, isRateLimit: boolean = false): void {
+    const usageEntry = this.quotaUsage.get(service);
     
-    const now = Date.now();
+    if (!usageEntry) {
+      console.error(`Unknown service: ${service}`);
+      return;
+    }
     
-    // Increment failure count
-    serviceUsage.failureCount++;
-    serviceUsage.lastUsedTimestamp = now;
-    
-    // Record failure
-    const usageRecord: UsageRecord = {
-      timestamp: now,
-      requestType: 'error',
-      tokensUsed: 0,
-      success: false,
-      errorMessage
-    };
-    
-    serviceUsage.details.push(usageRecord);
+    if (isRateLimit) {
+      usageEntry.statusHistory.rateLimited++;
+    } else {
+      usageEntry.statusHistory.errors++;
+    }
   }
-
+  
   /**
-   * Check if a service is exceeding quota limits
+   * Get the remaining quota for a service
+   * @param service API service
+   * @returns Remaining token quota or 0 if exceeded
+   */
+  getRemainingQuota(service: ApiService): number {
+    const limits = this.quotaLimits.get(service);
+    const usage = this.quotaUsage.get(service);
+    
+    if (!limits || !usage) {
+      console.error(`Unknown service: ${service}`);
+      return 0;
+    }
+    
+    // Calculate remaining quota based on most restrictive limit
+    const remainingPerMinute = Math.max(0, limits.tokensPerMinute - usage.usageHistory.last1Min);
+    const remainingPerHour = Math.max(0, limits.tokensPerHour - usage.usageHistory.last1Hour);
+    const remainingPerDay = Math.max(0, limits.tokensPerDay - usage.usageHistory.last24Hours);
+    
+    // Return the most restrictive remaining quota
+    return Math.min(remainingPerMinute, remainingPerHour, remainingPerDay);
+  }
+  
+  /**
+   * Check if we've hit rate limits for a service
    * @param service API service to check
-   * @returns Warning message if approaching limits, null otherwise
+   * @returns Null if not rate limited, or a string describing the limit hit
    */
-  private checkQuotaLimits(service: ApiService): string | null {
-    const serviceUsage = this.usage.get(service);
-    const serviceConfig = this.config[service];
+  checkRateLimit(service: ApiService): string | null {
+    const limits = this.quotaLimits.get(service);
+    const usage = this.quotaUsage.get(service);
     
-    if (!serviceUsage || !serviceConfig) return null;
-    
-    const today = this.getTodayDateString();
-    const todayUsage = serviceUsage.dailyUsage.get(today) || 0;
-    
-    // Check daily token limit
-    if (todayUsage > serviceConfig.dailyTokenLimit * 0.8) {
-      return `${serviceConfig.name}: Daily token usage at ${Math.round(todayUsage / serviceConfig.dailyTokenLimit * 100)}% of limit`;
+    if (!limits || !usage) {
+      console.error(`Unknown service: ${service}`);
+      return 'Unknown service';
     }
     
-    // Calculate recent request rate (last hour)
-    const hourAgo = Date.now() - 60 * 60 * 1000;
-    const recentRequests = serviceUsage.details.filter(r => r.timestamp > hourAgo).length;
-    
-    // Check hourly request limit
-    if (recentRequests > serviceConfig.hourlyRequestLimit * 0.8) {
-      return `${serviceConfig.name}: Hourly request rate at ${Math.round(recentRequests / serviceConfig.hourlyRequestLimit * 100)}% of limit`;
+    // Check each limit
+    if (usage.usageHistory.last1Min >= limits.tokensPerMinute) {
+      return 'Exceeded per-minute limit';
     }
     
-    return null;
+    if (usage.usageHistory.last1Hour >= limits.tokensPerHour) {
+      return 'Exceeded hourly limit';
+    }
+    
+    if (usage.usageHistory.last24Hours >= limits.tokensPerDay) {
+      return 'Exceeded daily limit';
+    }
+    
+    return null; // Not rate limited
   }
-
+  
   /**
-   * Get current quota status for all tracked services
-   * @returns Object with usage data for each service
+   * Calculate the cost of an API call
+   * @param service API service used
+   * @param model Model used
+   * @param promptTokens Number of prompt tokens
+   * @param completionTokens Number of completion tokens
+   * @returns Estimated cost in USD
    */
-  public getQuotaUsageSummary(): Record<string, any> {
-    const summary: Record<string, any> = {};
-    
-    for (const [service, usage] of this.usage) {
-      const config = this.config[service];
-      const today = this.getTodayDateString();
-      const todayUsage = usage.dailyUsage.get(today) || 0;
+  calculateCost(
+    service: ApiService,
+    model: string,
+    promptTokens: number,
+    completionTokens: number
+  ): number {
+    // Cost per 1000 tokens for different models
+    const costMap: Record<string, { input: number; output: number }> = {
+      // OpenAI models
+      'gpt-3.5-turbo': { input: 0.0015, output: 0.002 },
+      'gpt-4-turbo': { input: 0.01, output: 0.03 },
+      'gpt-4o': { input: 0.01, output: 0.03 },
+      'gpt-4-vision-preview': { input: 0.01, output: 0.03 },
+      'text-embedding-3-small': { input: 0.0001, output: 0.0001 },
+      'text-embedding-3-large': { input: 0.00025, output: 0.00025 },
+      'dall-e-3': { input: 0.04, output: 0.04 }, // Per image
+      'whisper-1': { input: 0.006, output: 0.006 }, // Per minute
+      'tts-1': { input: 0.015, output: 0.015 }, // Per 1000 characters
       
-      // Calculate recent request rate (last hour)
-      const hourAgo = Date.now() - 60 * 60 * 1000;
-      const recentRequests = usage.details.filter(r => r.timestamp > hourAgo).length;
+      // Anthropic models
+      'claude-3-7-sonnet-20250219': { input: 0.012, output: 0.036 },
+      'claude-3-7-haiku-20250211': { input: 0.004, output: 0.012 },
+      'claude-3-5-sonnet-20240620': { input: 0.012, output: 0.036 },
       
-      // Collect top models
-      const topModels: Record<string, number> = {};
-      Array.from(usage.modelUsage.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .forEach(([model, count]) => {
-          topModels[model] = count;
-        });
-        
-      // Add service summary
-      summary[service] = {
-        totalRequests: usage.requestCount,
-        totalTokens: usage.tokenCount,
-        failureCount: usage.failureCount,
-        failureRate: usage.requestCount ? (usage.failureCount / usage.requestCount) : 0,
-        dailyTokensUsed: todayUsage,
-        dailyTokensRemaining: config.dailyTokenLimit - todayUsage,
-        dailyUsagePercent: Math.round((todayUsage / config.dailyTokenLimit) * 100),
-        hourlyRequestRate: recentRequests,
-        hourlyRequestLimit: config.hourlyRequestLimit,
-        hourlyUsagePercent: Math.round((recentRequests / config.hourlyRequestLimit) * 100),
-        lastUsed: usage.lastUsedTimestamp,
-        topModels
-      };
-    }
-    
-    return summary;
-  }
-
-  /**
-   * Get estimated cost for API usage
-   * @returns Object with cost estimates for each service
-   */
-  public getEstimatedCosts(): Record<string, any> {
-    const costs: Record<string, any> = {
-      total: 0
+      // Perplexity models
+      'llama-3.1-sonar-small-128k-online': { input: 0.0025, output: 0.0075 },
+      'llama-3.1-sonar-large-128k-online': { input: 0.007, output: 0.021 },
+      'llama-3.1-sonar-huge-128k-online': { input: 0.012, output: 0.036 },
+      
+      // Local models (free)
+      'local-basic': { input: 0, output: 0 }
     };
     
-    for (const [service, usage] of this.usage) {
-      const config = this.config[service];
-      const serviceCost = (usage.tokenCount / 1000) * config.costPerThousandTokens;
-      
-      costs[service] = {
-        totalCost: serviceCost.toFixed(4),
-        costPerThousandTokens: config.costPerThousandTokens,
-        totalTokens: usage.tokenCount
-      };
-      
-      costs.total += serviceCost;
-    }
+    // Get cost rates for the model
+    const costRates = costMap[model] || { input: 0.01, output: 0.03 }; // Default to GPT-4 pricing
     
-    costs.total = costs.total.toFixed(4);
-    costs.currency = 'USD';
-    costs.since = new Date(this.startTime).toISOString();
+    // Calculate cost
+    const inputCost = (promptTokens / 1000) * costRates.input;
+    const outputCost = (completionTokens / 1000) * costRates.output;
     
-    return costs;
+    return inputCost + outputCost;
   }
-
+  
   /**
-   * Get all usage details for a specific service
-   * @param service The service to get details for
-   * @returns Array of detailed usage records
+   * Estimate cost for a given model and token count
+   * @param model Model name
+   * @param promptTokens Prompt tokens
+   * @param completionTokens Completion tokens
+   * @returns Estimated cost in USD
    */
-  public getServiceDetails(service: ApiService): UsageRecord[] {
-    const serviceUsage = this.usage.get(service);
-    return serviceUsage ? [...serviceUsage.details] : [];
+  estimateCost(model: string, promptTokens: number, completionTokens: number): number {
+    // Map model to service
+    let service = ApiService.OPENAI;
+    
+    if (model.startsWith('claude')) {
+      service = ApiService.ANTHROPIC;
+    } else if (model.startsWith('llama')) {
+      service = ApiService.PERPLEXITY;
+    } else if (model.startsWith('text-embedding')) {
+      service = ApiService.OPENAI_EMBEDDING;
+    } else if (model === 'whisper-1' || model === 'tts-1') {
+      service = ApiService.OPENAI_AUDIO;
+    } else if (model === 'dall-e-3') {
+      service = ApiService.OPENAI_IMAGE;
+    }
+    
+    return this.calculateCost(service, model, promptTokens, completionTokens);
   }
-
+  
   /**
-   * Check if a request would exceed rate limits
-   * @param service The service to check
-   * @returns Warning message if limit would be exceeded, null otherwise
+   * Prune old usage history data
    */
-  public checkRateLimit(service: ApiService): string | null {
-    const serviceUsage = this.usage.get(service);
-    const serviceConfig = this.config[service];
+  private pruneUsageHistory(): void {
+    const now = Date.now();
+    const oneMinAgo = now - 60 * 1000;
+    const oneHourAgo = now - 60 * 60 * 1000;
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
     
-    if (!serviceUsage || !serviceConfig) return null;
+    // Remove entries older than necessary from the log
+    this.usageLog = this.usageLog.filter(entry => entry.timestamp >= oneDayAgo);
     
-    // Calculate recent request rate (last hour)
-    const hourAgo = Date.now() - 60 * 60 * 1000;
-    const recentRequests = serviceUsage.details.filter(r => r.timestamp > hourAgo).length;
+    // Update usage history for each service
+    for (const [service, usage] of this.quotaUsage.entries()) {
+      // Recalculate last minute usage
+      usage.usageHistory.last1Min = this.usageLog
+        .filter(entry => entry.service === service && entry.timestamp >= oneMinAgo)
+        .reduce((sum, entry) => sum + entry.tokens, 0);
+      
+      // Recalculate last hour usage
+      usage.usageHistory.last1Hour = this.usageLog
+        .filter(entry => entry.service === service && entry.timestamp >= oneHourAgo)
+        .reduce((sum, entry) => sum + entry.tokens, 0);
+      
+      // Recalculate last 24 hours usage
+      usage.usageHistory.last24Hours = this.usageLog
+        .filter(entry => entry.service === service && entry.timestamp >= oneDayAgo)
+        .reduce((sum, entry) => sum + entry.tokens, 0);
+    }
+  }
+  
+  /**
+   * Get detailed usage summary for a service
+   * @param service API service to get summary for
+   * @returns Usage summary
+   */
+  getUsageSummary(service: ApiService): any {
+    const usage = this.quotaUsage.get(service);
+    const limits = this.quotaLimits.get(service);
     
-    // Check if we're at the limit
-    if (recentRequests >= serviceConfig.hourlyRequestLimit) {
-      return `${serviceConfig.name}: Rate limit exceeded (${recentRequests}/${serviceConfig.hourlyRequestLimit} requests in the last hour)`;
+    if (!usage || !limits) {
+      return { error: 'Unknown service' };
     }
     
-    // Check if we're at 95% of the limit
-    if (recentRequests >= serviceConfig.hourlyRequestLimit * 0.95) {
-      return `${serviceConfig.name}: Approaching rate limit (${recentRequests}/${serviceConfig.hourlyRequestLimit} requests in the last hour)`;
+    return {
+      service,
+      totalTokens: usage.totalTokens,
+      totalCost: usage.totalCost,
+      current: {
+        lastMinute: usage.usageHistory.last1Min,
+        lastHour: usage.usageHistory.last1Hour,
+        last24Hours: usage.usageHistory.last24Hours
+      },
+      limits: {
+        perMinute: limits.tokensPerMinute,
+        perHour: limits.tokensPerHour,
+        perDay: limits.tokensPerDay
+      },
+      remaining: {
+        perMinute: Math.max(0, limits.tokensPerMinute - usage.usageHistory.last1Min),
+        perHour: Math.max(0, limits.tokensPerHour - usage.usageHistory.last1Hour),
+        perDay: Math.max(0, limits.tokensPerDay - usage.usageHistory.last24Hours)
+      },
+      status: {
+        rateLimited: usage.statusHistory.rateLimited,
+        errors: usage.statusHistory.errors,
+        successful: usage.statusHistory.successful
+      },
+      lastUsed: usage.lastUsed
+    };
+  }
+  
+  /**
+   * Get summaries for all services
+   * @returns Map of usage summaries
+   */
+  getAllUsageSummaries(): Record<string, any> {
+    const summaries: Record<string, any> = {};
+    
+    for (const service of Object.values(ApiService)) {
+      summaries[service] = this.getUsageSummary(service);
     }
     
-    return null;
+    return summaries;
+  }
+  
+  /**
+   * Reset usage statistics for testing
+   */
+  resetUsage(): void {
+    this.usageLog = [];
+    
+    for (const service of Object.values(ApiService)) {
+      this.quotaUsage.set(service, {
+        totalTokens: 0,
+        totalCost: 0,
+        usageHistory: {
+          last1Min: 0,
+          last1Hour: 0,
+          last24Hours: 0
+        },
+        statusHistory: {
+          rateLimited: 0,
+          errors: 0,
+          successful: 0
+        },
+        lastUsed: 0
+      });
+    }
   }
 }
 
-// Export singleton instance
+// Export a singleton instance
 export const apiQuotaManager = new ApiQuotaManager();

@@ -1,428 +1,484 @@
 /**
  * Context-Aware Agent
  * 
- * This module analyzes conversation context to enhance decision-making
- * and provide intelligent suggestions throughout the application.
+ * This module provides contextual awareness to the AI system,
+ * enabling it to understand user intent and provide more relevant responses.
  */
 
-import { ChatMessage } from './types';
-import { ActionType, DetectedContext } from './types';
+import { ChatMessage, DetectedContext, Entity, ContextAnalysis, ActionType } from './types';
+import { processUserMessage } from './model-router';
+import { apiQuotaManager } from './api-quota-manager';
 
-// Enum for different types of conversational contexts
-export enum ContextType {
-  RESEARCH = 'research',
-  PROJECT_MANAGEMENT = 'project_management',
-  KNOWLEDGE_GRAPH = 'knowledge_graph',
-  MIND_MAP = 'mind_map',
-  CODE_ANALYSIS = 'code_analysis',
-  DATA_VISUALIZATION = 'data_visualization',
-  GENERAL = 'general'
-}
+// Default system prompt for context analysis
+const CONTEXT_ANALYSIS_PROMPT = `
+You are a context analysis agent. Your task is to analyze a conversation history and extract:
+1. The main topic or topics being discussed
+2. The user's intent or goal
+3. Key entities mentioned in the conversation
+4. Related topics that might be relevant
+5. Any specific constraints or preferences mentioned by the user
 
-// Command categories for parsing user intent
-export enum CommandCategory {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  SEARCH = 'search',
-  ANALYZE = 'analyze',
-  ORGANIZE = 'organize',
-  SHARE = 'share',
-  VISUALIZE = 'visualize'
-}
-
-// Structure for commands detected in user messages
-export interface DetectedCommand {
-  category: CommandCategory;
-  intent: string;
-  confidence: number;
-  parameters?: Record<string, any>;
-  suggestedAction?: string;
-}
-
-// Structure for entities detected in user messages
-export interface DetectedEntity {
-  type: string;
-  value: string;
-  confidence: number;
-  metadata?: Record<string, any>;
-}
-
-// Full context information extracted from conversation
-export interface ConversationContext {
-  primaryType: ContextType;
-  secondaryTypes: ContextType[];
-  tokens: {
-    contextIndicators: string[];
-    entityIndicators: string[];
-    commandIndicators: string[];
-  };
-  entities: DetectedEntity[];
-  suggestedCommands: DetectedCommand[];
-  confidence: number;
-  recentMessages: number;
-  overallTopic?: string;
-  recentFocus?: string;
-  userIntent?: string;
-  timestamp: number;
-}
+Return this information in a structured format that can be used to improve the relevance of AI responses.
+`;
 
 /**
- * Simple rule-based context analysis function
- * Used when AI processing is unavailable or not needed
+ * Extract entities from a message
+ * @param message Text to analyze
+ * @returns Array of extracted entities
  */
-function simpleContextAnalysis(messages: ChatMessage[]): ConversationContext {
-  const keywordMap: Record<ContextType, string[]> = {
-    [ContextType.RESEARCH]: ['research', 'study', 'papers', 'article', 'literature', 'references', 'sources', 'findings', 'evidence'],
-    [ContextType.PROJECT_MANAGEMENT]: ['project', 'task', 'milestone', 'deadline', 'progress', 'status', 'assign', 'schedule', 'priority'],
-    [ContextType.KNOWLEDGE_GRAPH]: ['graph', 'node', 'connection', 'relationship', 'entity', 'network', 'link', 'concept'],
-    [ContextType.MIND_MAP]: ['mind map', 'brainstorm', 'idea', 'thought', 'branch', 'connect', 'topic', 'subtopic'],
-    [ContextType.CODE_ANALYSIS]: ['code', 'function', 'method', 'variable', 'class', 'object', 'algorithm', 'syntax'],
-    [ContextType.DATA_VISUALIZATION]: ['chart', 'graph', 'visualization', 'plot', 'dashboard', 'data', 'metrics', 'statistics'],
-    [ContextType.GENERAL]: ['help', 'question', 'explain', 'summary', 'overview', 'general', 'info']
-  };
-
-  const commandKeywords: Record<CommandCategory, string[]> = {
-    [CommandCategory.CREATE]: ['create', 'new', 'make', 'start', 'generate', 'build'],
-    [CommandCategory.UPDATE]: ['update', 'change', 'modify', 'edit', 'revise', 'adjust'],
-    [CommandCategory.DELETE]: ['delete', 'remove', 'erase', 'clear', 'drop'],
-    [CommandCategory.SEARCH]: ['search', 'find', 'look for', 'query', 'locate'],
-    [CommandCategory.ANALYZE]: ['analyze', 'examine', 'review', 'evaluate', 'assess'],
-    [CommandCategory.ORGANIZE]: ['organize', 'arrange', 'group', 'categorize', 'classify'],
-    [CommandCategory.SHARE]: ['share', 'export', 'publish', 'send', 'distribute'],
-    [CommandCategory.VISUALIZE]: ['visualize', 'show', 'display', 'render', 'draw']
-  };
-
-  // Extract the last 5 messages or fewer
-  const recentMessages = messages.slice(-5).map(msg => msg.content.toLowerCase());
-  const combinedText = recentMessages.join(' ');
-  
-  // Count keyword occurrences
-  const contextScores: Record<ContextType, number> = {
-    [ContextType.RESEARCH]: 0,
-    [ContextType.PROJECT_MANAGEMENT]: 0,
-    [ContextType.KNOWLEDGE_GRAPH]: 0,
-    [ContextType.MIND_MAP]: 0,
-    [ContextType.CODE_ANALYSIS]: 0,
-    [ContextType.DATA_VISUALIZATION]: 0,
-    [ContextType.GENERAL]: 0
-  };
-  
-  // Score each context type based on keyword matches
-  Object.entries(keywordMap).forEach(([context, keywords]) => {
-    keywords.forEach(keyword => {
-      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
-      const matches = combinedText.match(regex);
-      if (matches) {
-        contextScores[context as ContextType] += matches.length;
-      }
-    });
-  });
-  
-  // Determine primary and secondary context types
-  const sortedContexts = Object.entries(contextScores)
-    .sort((a, b) => b[1] - a[1])
-    .map(entry => entry[0] as ContextType);
-  
-  const primaryType = sortedContexts[0] || ContextType.GENERAL;
-  const secondaryTypes = sortedContexts.slice(1, 3);
-  
-  // Find matching context indicator tokens
-  const contextIndicators: string[] = [];
-  Object.entries(keywordMap).forEach(([context, keywords]) => {
-    keywords.forEach(keyword => {
-      if (combinedText.includes(keyword)) {
-        contextIndicators.push(keyword);
-      }
-    });
-  });
-  
-  // Detect command indicators
-  const commandIndicators: string[] = [];
-  Object.entries(commandKeywords).forEach(([command, keywords]) => {
-    keywords.forEach(keyword => {
-      if (combinedText.includes(keyword)) {
-        commandIndicators.push(keyword);
-      }
-    });
-  });
-  
-  // Extract simple entities using regex patterns
-  const entities: DetectedEntity[] = [];
-  
-  // Look for project names (quoted text or specific patterns)
-  const projectRegex = /"([^"]+)"\s*project|project\s*"([^"]+)"|project\s+named\s+([a-zA-Z0-9_\s]+)/gi;
-  let projectMatch;
-  const addedProjects = new Set();
-  
-  // Use RegExp.exec in a loop to find all matches
-  while ((projectMatch = projectRegex.exec(combinedText)) !== null) {
-    const projectName = projectMatch[1] || projectMatch[2] || projectMatch[3];
-    if (projectName && !addedProjects.has(projectName)) {
-      addedProjects.add(projectName);
-      entities.push({
-        type: 'project',
-        value: projectName.trim(),
-        confidence: 0.8
-      });
-    }
-  }
-  
-  // Look for dates
-  const dateRegex = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}(st|nd|rd|th)?( \d{4})?|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\b\d{4}-\d{2}-\d{2}\b/gi;
-  let dateMatch;
-  
-  while ((dateMatch = dateRegex.exec(combinedText)) !== null) {
-    entities.push({
-      type: 'date',
-      value: dateMatch[0].trim(),
-      confidence: 0.7
-    });
-  }
-  
-  // Look for URLs
-  const urlRegex = /https?:\/\/[^\s]+/g;
-  let urlMatch;
-  
-  while ((urlMatch = urlRegex.exec(combinedText)) !== null) {
-    entities.push({
-      type: 'url',
-      value: urlMatch[0].trim(),
-      confidence: 0.9
-    });
-  }
-  
-  // Detect suggested commands based on context and keywords
-  const suggestedCommands: DetectedCommand[] = [];
-  
-  // Suggest commands based on detected context
-  if (contextScores[ContextType.RESEARCH] > 1) {
-    if (combinedText.includes('summarize') || combinedText.includes('summary')) {
-      suggestedCommands.push({
-        category: CommandCategory.ANALYZE,
-        intent: 'summarize_research',
-        confidence: 0.8,
-        suggestedAction: 'Create a summary of the research findings'
-      });
-    }
-    
-    if (combinedText.includes('visual') || combinedText.includes('graph') || combinedText.includes('map')) {
-      suggestedCommands.push({
-        category: CommandCategory.VISUALIZE,
-        intent: 'create_knowledge_graph',
-        confidence: 0.7,
-        suggestedAction: 'Create a knowledge graph from this research'
-      });
-    }
-  }
-  
-  if (contextScores[ContextType.PROJECT_MANAGEMENT] > 1) {
-    if (combinedText.includes('create') || combinedText.includes('new') || combinedText.includes('start')) {
-      suggestedCommands.push({
-        category: CommandCategory.CREATE,
-        intent: 'create_project',
-        confidence: 0.8,
-        suggestedAction: 'Create a new project'
-      });
-    }
-    
-    if (combinedText.includes('update') || combinedText.includes('progress') || combinedText.includes('status')) {
-      suggestedCommands.push({
-        category: CommandCategory.UPDATE,
-        intent: 'update_project_status',
-        confidence: 0.75,
-        suggestedAction: 'Update project status'
-      });
-    }
-  }
-  
-  // Assemble the context object
-  const context: ConversationContext = {
-    primaryType,
-    secondaryTypes,
-    tokens: {
-      contextIndicators: contextIndicators.slice(0, 10), // Limit to top 10
-      entityIndicators: [], // Simple analysis doesn't do complex entity extraction
-      commandIndicators: commandIndicators.slice(0, 5) // Limit to top 5
-    },
-    entities,
-    suggestedCommands,
-    confidence: contextScores[primaryType] > 3 ? 0.8 : 0.6, // Higher confidence with more keyword matches
-    recentMessages: recentMessages.length,
-    overallTopic: primaryType !== ContextType.GENERAL ? 
-      keywordMap[primaryType][0].charAt(0).toUpperCase() + keywordMap[primaryType][0].slice(1) : 
-      'General conversation',
-    timestamp: Date.now()
-  };
-  
-  return context;
-}
-
-/**
- * Analyze conversation context using AI
- * @param messages The conversation messages to analyze
- * @param useAI Whether to use AI for analysis (defaults to true)
- * @returns The extracted context information
- */
-export async function analyzeConversationContext(
-  messages: ChatMessage[],
-  useAI: boolean = true
-): Promise<ConversationContext> {
-  // If AI analysis is disabled or there are too few messages, use simple analysis
-  if (!useAI || messages.length < 2) {
-    return simpleContextAnalysis(messages);
-  }
-
+async function extractEntities(message: string): Promise<Entity[]> {
   try {
-    // Use dynamic import to avoid circular dependencies
-    const { processUserMessage } = await import('./model-router');
+    // Use a lightweight approach for entity extraction
+    const entities: Entity[] = [];
     
-    // Prepare the system prompt for context analysis
-    const systemPrompt = `
-      You are an expert context analyzer. Analyze the following conversation and extract:
-      1. The primary conversation context type (research, project_management, knowledge_graph, mind_map, code_analysis, data_visualization, or general)
-      2. Secondary context types
-      3. Important entities mentioned (with type, value, and confidence)
-      4. Detected command intentions
-      5. Relevant context indicator tokens
+    // Extract potential named entities (people, organizations, locations) with simple pattern matching
+    // This is a simplified approach - in a real system you'd use NER models or APIs
+    
+    // Match potential people names (capitalized words)
+    const nameRegex = /\b[A-Z][a-z]+ (?:[A-Z][a-z]+ )?[A-Z][a-z]+\b/g;
+    const names = message.match(nameRegex) || [];
+    
+    for (const name of names) {
+      entities.push({
+        name,
+        type: 'PERSON',
+        confidence: 0.7,
+        startPosition: message.indexOf(name),
+        endPosition: message.indexOf(name) + name.length
+      });
+    }
+    
+    // Match potential organizations (all caps words)
+    const orgRegex = /\b[A-Z]{2,}\b/g;
+    const orgs = message.match(orgRegex) || [];
+    
+    for (const org of orgs) {
+      entities.push({
+        name: org,
+        type: 'ORGANIZATION',
+        confidence: 0.6,
+        startPosition: message.indexOf(org),
+        endPosition: message.indexOf(org) + org.length
+      });
+    }
+    
+    // Match dates
+    const dateRegex = /\b(0?[1-9]|[12][0-9]|3[01])[\/\-](0?[1-9]|1[012])[\/\-]\d{4}\b/g;
+    const dates = message.match(dateRegex) || [];
+    
+    for (const date of dates) {
+      entities.push({
+        name: date,
+        type: 'DATE',
+        confidence: 0.9,
+        startPosition: message.indexOf(date),
+        endPosition: message.indexOf(date) + date.length
+      });
+    }
+    
+    return entities;
+  } catch (error) {
+    console.error('Error extracting entities:', error);
+    return [];
+  }
+}
+
+/**
+ * Extract keywords from a message
+ * @param message Text to analyze
+ * @returns Array of keywords
+ */
+function extractKeywords(message: string): string[] {
+  // Simple keyword extraction - remove stopwords and keep important terms
+  // In a real implementation, use TF-IDF or similar algorithms
+  
+  const stopwords = new Set([
+    'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were',
+    'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+    'to', 'from', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
+    'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why',
+    'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other',
+    'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so',
+    'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should',
+    'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', 'couldn',
+    'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn', 'ma', 'mightn', 'mustn',
+    'needn', 'shan', 'shouldn', 'wasn', 'weren', 'won', 'wouldn'
+  ]);
+  
+  // Tokenize and filter out stopwords
+  const words = message.toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .split(/\s+/)
+    .filter(word => !stopwords.has(word) && word.length > 2);
+  
+  // Count occurrences of each word
+  const wordCounts = new Map<string, number>();
+  for (const word of words) {
+    wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
+  }
+  
+  // Sort by frequency and take top keywords
+  return Array.from(wordCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([word]) => word);
+}
+
+/**
+ * Analyze sentiment of a message
+ * @param message Text to analyze
+ * @returns Sentiment analysis results
+ */
+function analyzeSentiment(message: string): { score: number; label: 'positive' | 'negative' | 'neutral' } {
+  // Simple rule-based sentiment analysis
+  // In a real implementation, use a proper sentiment analysis model
+  
+  const positiveWords = new Set([
+    'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic',
+    'terrific', 'outstanding', 'exceptional', 'superb', 'perfect',
+    'happy', 'glad', 'pleased', 'delighted', 'satisfied', 'enjoy',
+    'love', 'like', 'appreciate', 'impressive', 'awesome', 'brilliant',
+    'helpful', 'useful', 'valuable', 'beneficial', 'effective', 'efficient'
+  ]);
+  
+  const negativeWords = new Set([
+    'bad', 'poor', 'terrible', 'horrible', 'awful', 'dreadful',
+    'disappointing', 'frustrating', 'annoying', 'irritating', 'unpleasant',
+    'sad', 'unhappy', 'upset', 'angry', 'furious', 'dislike',
+    'hate', 'despise', 'resent', 'useless', 'worthless', 'ineffective',
+    'inefficient', 'problematic', 'difficult', 'challenging', 'confusing'
+  ]);
+  
+  // Count positive and negative words
+  const words = message.toLowerCase().split(/\s+/);
+  let positiveCount = 0;
+  let negativeCount = 0;
+  
+  for (const word of words) {
+    if (positiveWords.has(word)) {
+      positiveCount++;
+    } else if (negativeWords.has(word)) {
+      negativeCount++;
+    }
+  }
+  
+  // Calculate sentiment score (-1 to 1)
+  const totalSentimentWords = positiveCount + negativeCount;
+  const score = totalSentimentWords === 0 
+    ? 0 
+    : (positiveCount - negativeCount) / totalSentimentWords;
+  
+  // Determine sentiment label
+  let label: 'positive' | 'negative' | 'neutral';
+  if (score > 0.2) {
+    label = 'positive';
+  } else if (score < -0.2) {
+    label = 'negative';
+  } else {
+    label = 'neutral';
+  }
+  
+  return { score, label };
+}
+
+/**
+ * Analyze the context of a conversation
+ * @param message Current message
+ * @param history Previous conversation history
+ * @returns Context analysis
+ */
+export async function analyzeContext(message: string, history: ChatMessage[] = []): Promise<ContextAnalysis> {
+  try {
+    // Extract entities from the current message
+    const entities = await extractEntities(message);
+    
+    // Extract keywords from the entire conversation
+    const allText = [
+      ...history.map(msg => msg.content), 
+      message
+    ].join(' ');
+    
+    const keywords = extractKeywords(allText);
+    
+    // Analyze sentiment
+    const sentiment = analyzeSentiment(message);
+    
+    // Attempt to determine the user's intent (simplified approach)
+    // In a production system, use an intent classifier model
+    let intent = 'information_request'; // Default intent
+    
+    if (message.includes('?')) {
+      intent = 'question';
+    } else if (message.toLowerCase().includes('help')) {
+      intent = 'help_request';
+    } else if (message.toLowerCase().includes('thank')) {
+      intent = 'gratitude';
+    } else if (sentiment.label === 'negative') {
+      intent = 'complaint';
+    } else if (message.toLowerCase().match(/^(hi|hello|hey|greetings)/)) {
+      intent = 'greeting';
+    }
+    
+    // Determine the main topic (simplified approach)
+    // In a production system, use topic modeling
+    let topic = keywords.length > 0 ? keywords[0] : 'general';
+    
+    // Generate a summary (simplified approach)
+    // In a production system, use a summarization model
+    const summary = message.length > 100 
+      ? message.substring(0, 100) + '...' 
+      : message;
+    
+    return {
+      topic,
+      intent,
+      entities,
+      sentiment,
+      keywords,
+      summary,
+      confidence: 0.7 // Confidence score for this analysis
+    };
+  } catch (error) {
+    console.error('Error analyzing context:', error);
+    
+    // Return a minimal context analysis on error
+    return {
+      topic: 'general',
+      intent: 'unknown',
+      entities: [],
+      sentiment: { score: 0, label: 'neutral' },
+      keywords: [],
+      summary: message.substring(0, 100),
+      confidence: 0.1
+    };
+  }
+}
+
+/**
+ * Detect context from a message and conversation history
+ * @param message Current message
+ * @param history Previous conversation history
+ * @returns Detected context
+ */
+export async function detectContext(message: string, history: ChatMessage[] = []): Promise<DetectedContext> {
+  try {
+    // First do a lightweight analysis
+    const analysis = await analyzeContext(message, history);
+    
+    // Prepare the context object
+    const context: DetectedContext = {
+      topic: analysis.topic,
+      entities: analysis.entities,
+      recentMessages: history.slice(-5), // Keep only the 5 most recent messages
+      metadata: {}
+    };
+    
+    // For more complex cases, we can use the AI model to analyze the context more deeply
+    if (message.length > 50 || history.length > 3) {
+      // Check API quota before making additional calls
+      const quotaWarning = apiQuotaManager.checkRateLimit('openai');
+      if (quotaWarning) {
+        console.warn(`Skipping deep context analysis due to rate limits: ${quotaWarning}`);
+        return context;
+      }
       
-      Return your analysis as structured JSON with these fields.
+      try {
+        // Use the LLM to analyze the context more deeply
+        const systemPrompt = CONTEXT_ANALYSIS_PROMPT;
+        const contextMessage = `
+        Please analyze this conversation and extract the key information:
+        
+        Conversation history:
+        ${history.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
+        
+        Current message:
+        ${message}
+        `;
+        
+        const response = await processUserMessage(contextMessage, [], {
+          systemPrompt,
+          forceAdvanced: true,
+          useRag: false
+        });
+        
+        // Extract additional context from the response
+        // Note: in a real implementation, have the model return structured JSON
+        // For demo purposes, we'll just extract some simple patterns
+        
+        const topicMatch = response.message.match(/Topic: ([^\n]+)/);
+        const goalMatch = response.message.match(/Goal: ([^\n]+)/);
+        const relatedMatch = response.message.match(/Related topics: ([^\n]+)/);
+        
+        if (topicMatch && topicMatch[1]) {
+          context.topic = topicMatch[1].trim();
+        }
+        
+        if (goalMatch && goalMatch[1]) {
+          context.userGoal = goalMatch[1].trim();
+        }
+        
+        if (relatedMatch && relatedMatch[1]) {
+          context.relatedTopics = relatedMatch[1].split(',').map(t => t.trim());
+        }
+      } catch (error) {
+        console.error('Error in deep context analysis:', error);
+        // Continue with the lightweight analysis results
+      }
+    }
+    
+    return context;
+  } catch (error) {
+    console.error('Error detecting context:', error);
+    
+    // Return a minimal context on error
+    return {
+      topic: 'general',
+      entities: [],
+      recentMessages: history.slice(-3)
+    };
+  }
+}
+
+/**
+ * Build a context-aware prompt for the AI assistant
+ * @param context Detected context
+ * @returns Customized system prompt
+ */
+export function buildContextAwarePrompt(context: DetectedContext): string {
+  let systemPrompt = `
+  You are Xeno AI, an intelligent assistant focused on providing helpful, accurate responses.
+  
+  Current conversation topic: ${context.topic}
+  `;
+  
+  if (context.userGoal) {
+    systemPrompt += `\nUser's goal: ${context.userGoal}`;
+  }
+  
+  if (context.entities.length > 0) {
+    systemPrompt += `\n\nKey entities in the conversation:`;
+    context.entities.slice(0, 5).forEach(entity => {
+      systemPrompt += `\n- ${entity.name} (${entity.type})`;
+    });
+  }
+  
+  if (context.relatedTopics && context.relatedTopics.length > 0) {
+    systemPrompt += `\n\nRelated topics: ${context.relatedTopics.join(', ')}`;
+  }
+  
+  // Add special instructions based on detected context
+  if (context.topic.toLowerCase().includes('research') || 
+      context.topic.toLowerCase().includes('study') ||
+      context.topic.toLowerCase().includes('learn')) {
+    systemPrompt += `
+    \n\nThe user appears to be conducting research or studying. Provide comprehensive, 
+    educational responses that explain concepts clearly. Include relevant facts and 
+    cite sources when possible. Organize information in a structured way that aids learning.
     `;
+  } else if (context.topic.toLowerCase().includes('tech') || 
+             context.topic.toLowerCase().includes('code') ||
+             context.topic.toLowerCase().includes('programming')) {
+    systemPrompt += `
+    \n\nThe user appears to be discussing technology or programming. Provide technically 
+    accurate information, with code examples when relevant. Be precise and thorough in your 
+    explanations, assuming the user has technical background.
+    `;
+  }
+  
+  systemPrompt += `
+  \n\nGeneral guidelines:
+  - Be conversational and friendly, but focused on providing accurate information
+  - Give concise answers unless the user asks for detailed explanations
+  - If you're unsure about something, be transparent about your limitations
+  - When appropriate, suggest related topics the user might be interested in
+  `;
+  
+  return systemPrompt;
+}
+
+/**
+ * Recommend actions based on context
+ * @param context Detected context
+ * @returns Recommended actions
+ */
+export function recommendActions(context: DetectedContext): ActionType[] {
+  const actions: ActionType[] = [];
+  
+  // Recommend actions based on the topic and entities
+  if (context.topic.toLowerCase().includes('research') || 
+      context.entities.some(e => e.type === 'RESEARCH_TOPIC')) {
+    actions.push(ActionType.CREATE_KNOWLEDGE_GRAPH);
+    actions.push(ActionType.EXTRACT_ENTITIES);
+  }
+  
+  if (context.topic.toLowerCase().includes('project') || 
+      context.userGoal?.toLowerCase().includes('plan')) {
+    actions.push(ActionType.CREATE_PROJECT);
+    actions.push(ActionType.CREATE_MIND_MAP);
+  }
+  
+  if (context.topic.toLowerCase().includes('analyze') || 
+      context.topic.toLowerCase().includes('sentiment')) {
+    actions.push(ActionType.ANALYZE_SENTIMENT);
+  }
+  
+  if (context.topic.toLowerCase().includes('search') || 
+      context.topic.toLowerCase().includes('find information')) {
+    actions.push(ActionType.SEARCH_WEB);
+  }
+  
+  // If no specific actions are recommended, suggest general ones
+  if (actions.length === 0) {
+    actions.push(ActionType.EXTRACT_ENTITIES);
+    actions.push(ActionType.GENERATE_SUMMARY);
+  }
+  
+  return actions;
+}
+
+/**
+ * Process a message with context awareness
+ * @param message User message
+ * @param history Conversation history
+ * @param options Processing options
+ * @returns AI response
+ */
+export async function processWithContextAwareness(
+  message: string,
+  history: ChatMessage[] = [],
+  options: any = {}
+) {
+  try {
+    // Detect the context
+    const context = await detectContext(message, history);
     
-    // Prepare a summary of the conversation for analysis
-    const conversationSummary = messages
-      .slice(-5) // Take the most recent 5 messages
-      .map(msg => `${msg.role}: ${msg.content}`)
-      .join('\n');
+    // Build a context-aware system prompt
+    const contextAwarePrompt = buildContextAwarePrompt(context);
     
-    // Process with the AI model
-    const aiResponse = await processUserMessage(
-      `Analyze this conversation context:\n${conversationSummary}`,
-      [],
+    // Get the AI response with the context-aware prompt
+    const response = await processUserMessage(
+      message,
+      history,
       {
-        systemPrompt,
-        temperature: 0.2, // Low temperature for more consistent output
-        useRag: false // No need for RAG for this task
+        ...options,
+        systemPrompt: contextAwarePrompt,
+        useRag: true // Enable RAG for context-aware responses
       }
     );
     
-    // Parse the JSON response
-    let parsedContext: any;
-    try {
-      // The AI response might be wrapped in markdown code blocks - extract just the JSON
-      const jsonMatch = aiResponse.message.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || 
-                        aiResponse.message.match(/{[\s\S]*}/);
-      
-      const jsonContent = jsonMatch ? jsonMatch[1] || jsonMatch[0] : aiResponse.message;
-      parsedContext = JSON.parse(jsonContent);
-    } catch (parseError) {
-      console.error("Error parsing AI context analysis:", parseError);
-      // Fall back to simple analysis on parsing failure
-      return simpleContextAnalysis(messages);
-    }
+    // Recommend actions based on the context
+    const recommendedActions = recommendActions(context);
     
-    // Map the AI output to our ConversationContext structure
+    // Return the enhanced response with context and recommendations
     return {
-      primaryType: parsedContext.primaryType || ContextType.GENERAL,
-      secondaryTypes: parsedContext.secondaryTypes || [],
-      tokens: {
-        contextIndicators: parsedContext.contextIndicators || [],
-        entityIndicators: parsedContext.entityIndicators || [],
-        commandIndicators: parsedContext.commandIndicators || []
-      },
-      entities: parsedContext.entities || [],
-      suggestedCommands: parsedContext.suggestedCommands || [],
-      confidence: parsedContext.confidence || 0.7,
-      recentMessages: messages.slice(-5).length,
-      overallTopic: parsedContext.overallTopic || undefined,
-      recentFocus: parsedContext.recentFocus || undefined,
-      userIntent: parsedContext.userIntent || undefined,
-      timestamp: Date.now()
+      ...response,
+      context,
+      recommendedActions
     };
   } catch (error) {
-    console.error("Error in AI context analysis:", error);
-    // Fall back to simple analysis on any error
-    return simpleContextAnalysis(messages);
-  }
-}
-
-/**
- * Analyze conversation for potential system commands
- * @param messages The conversation messages
- * @param context Optional pre-analyzed context
- * @returns Analysis of potential commands
- */
-export async function analyzeConversationForSystemCommands(
-  messages: ChatMessage[],
-  context?: ConversationContext
-): Promise<DetectedCommand[]> {
-  // Use the provided context or analyze it first
-  const conversationContext = context || await analyzeConversationContext(messages);
-  
-  // Return the suggested commands from the context
-  return conversationContext.suggestedCommands;
-}
-
-/**
- * Get component-specific context for UI components
- * @param context The conversation context
- * @param componentType The type of component requesting context
- * @returns Context-specific data for the component
- */
-export function getComponentContext(
-  context: ConversationContext,
-  componentType: string
-): Record<string, any> {
-  // Default context data
-  const baseContext = {
-    entities: context.entities,
-    userIntent: context.userIntent,
-    overallTopic: context.overallTopic,
-    confidence: context.confidence
-  };
-  
-  // Return component-specific context
-  switch (componentType) {
-    case 'search-bar':
-      return {
-        ...baseContext,
-        suggestedQueries: context.entities
-          .filter(e => e.confidence > 0.7)
-          .map(e => e.value),
-        queryType: context.primaryType,
-        recentFocus: context.recentFocus
-      };
-      
-    case 'suggestion-panel':
-      return {
-        ...baseContext,
-        suggestedCommands: context.suggestedCommands,
-        primaryContext: context.primaryType,
-        secondaryContexts: context.secondaryTypes
-      };
-      
-    case 'knowledge-graph':
-      return {
-        ...baseContext,
-        keyEntities: context.entities
-          .filter(e => e.confidence > 0.6)
-          .sort((a, b) => b.confidence - a.confidence),
-        contextType: context.primaryType === ContextType.KNOWLEDGE_GRAPH ? 
-          'primary' : (context.secondaryTypes.includes(ContextType.KNOWLEDGE_GRAPH) ? 'secondary' : 'unrelated')
-      };
-      
-    case 'mind-map':
-      return {
-        ...baseContext,
-        centralTopic: context.overallTopic,
-        relatedTopics: context.entities
-          .filter(e => e.type === 'topic' || e.type === 'concept')
-          .map(e => e.value),
-        contextType: context.primaryType === ContextType.MIND_MAP ? 
-          'primary' : (context.secondaryTypes.includes(ContextType.MIND_MAP) ? 'secondary' : 'unrelated')
-      };
-      
-    default:
-      return baseContext;
+    console.error('Error in context-aware processing:', error);
+    
+    // Fall back to standard processing without context awareness
+    return processUserMessage(message, history, options);
   }
 }

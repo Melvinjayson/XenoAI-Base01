@@ -1,172 +1,352 @@
 /**
  * Model Selector
  * 
- * This module is responsible for selecting the most appropriate AI model
- * based on message complexity, available models, and performance requirements.
+ * This module handles the selection of the appropriate AI model
+ * based on the task complexity and system constraints.
  */
 
-import { ChatMessage } from './types';
+import { ModelConfig } from './types';
+import { isLocalLLMAvailable } from './local-llm';
+import { apiQuotaManager, ApiService } from './api-quota-manager';
 
-// Define the Model interface for export
-export interface Model {
-  id: string;
-  name: string;
-  provider: 'OpenAI' | 'Anthropic' | 'Local' | 'Perplexity';
-  contextWindow: number;
-  isMultimodal: boolean;
-  tier: 'basic' | 'standard' | 'advanced';
-  specialties: string[];
-}
-
-// Available models
-const availableModels: Model[] = [
+// Define available models with their capabilities
+const availableModels: ModelConfig[] = [
+  // Local models
   {
     id: 'local-basic',
-    name: 'Local Basic',
-    provider: 'Local',
-    contextWindow: 8192,
-    isMultimodal: false,
-    tier: 'basic',
-    specialties: ['simple-chat', 'summarization', 'classification']
+    name: 'Local LLM (Basic)',
+    provider: 'local',
+    contextSize: 2048,
+    inputCostPer1K: 0,
+    outputCostPer1K: 0,
+    capabilities: ['text'],
+    maxTokens: 512,
+    temperature: 0.7,
+    category: 'basic',
+    latency: 'low'
+  },
+  
+  // OpenAI models
+  {
+    id: 'gpt-3.5-turbo',
+    name: 'GPT-3.5 Turbo',
+    provider: 'openai',
+    contextSize: 4096,
+    inputCostPer1K: 0.0015,
+    outputCostPer1K: 0.002,
+    capabilities: ['text'],
+    maxTokens: 1024,
+    temperature: 0.7,
+    category: 'basic',
+    latency: 'medium'
   },
   {
     id: 'gpt-4o',
     name: 'GPT-4o',
-    provider: 'OpenAI',
-    contextWindow: 128000,
-    isMultimodal: true,
-    tier: 'advanced',
-    specialties: ['complex-reasoning', 'code', 'creativity', 'image-analysis']
+    provider: 'openai',
+    contextSize: 128000,
+    inputCostPer1K: 0.01,
+    outputCostPer1K: 0.03,
+    capabilities: ['text', 'vision'],
+    maxTokens: 4096,
+    temperature: 0.7,
+    category: 'advanced',
+    latency: 'high'
+  },
+  
+  // Anthropic models
+  {
+    id: 'claude-3-7-sonnet-20250219',
+    name: 'Claude 3.7 Sonnet',
+    provider: 'anthropic',
+    contextSize: 200000,
+    inputCostPer1K: 0.012,
+    outputCostPer1K: 0.036,
+    capabilities: ['text', 'vision'],
+    maxTokens: 4096,
+    temperature: 0.7,
+    category: 'advanced',
+    latency: 'medium'
+  },
+  
+  // Perplexity models
+  {
+    id: 'llama-3.1-sonar-small-128k-online',
+    name: 'Llama 3.1 Sonar Small',
+    provider: 'perplexity',
+    contextSize: 128000,
+    inputCostPer1K: 0.0025,
+    outputCostPer1K: 0.0075,
+    capabilities: ['text', 'search'],
+    maxTokens: 4096,
+    temperature: 0.7,
+    category: 'basic',
+    latency: 'medium'
+  },
+  
+  // Specialized models
+  {
+    id: 'text-embedding-3-small',
+    name: 'OpenAI Embedding Small',
+    provider: 'openai',
+    contextSize: 8191,
+    inputCostPer1K: 0.0001,
+    outputCostPer1K: 0.0001,
+    capabilities: ['embedding'],
+    maxTokens: 0,
+    temperature: 0,
+    category: 'specialized',
+    latency: 'low'
   },
   {
-    id: 'claude-3-7',
-    name: 'Claude 3.7',
-    provider: 'Anthropic',
-    contextWindow: 200000,
-    isMultimodal: true,
-    tier: 'advanced',
-    specialties: ['detailed-analysis', 'explanations', 'research', 'long-context']
+    id: 'whisper-1',
+    name: 'OpenAI Whisper',
+    provider: 'openai',
+    contextSize: 0,
+    inputCostPer1K: 0.006,
+    outputCostPer1K: 0.006,
+    capabilities: ['audio'],
+    maxTokens: 0,
+    temperature: 0,
+    category: 'specialized',
+    latency: 'medium'
   }
 ];
 
+// Filter active models based on environment
+const activeModels = availableModels.filter(model => {
+  switch (model.provider) {
+    case 'local':
+      return isLocalLLMAvailable();
+    case 'openai':
+      return process.env.OPENAI_API_KEY !== undefined;
+    case 'anthropic':
+      return process.env.ANTHROPIC_API_KEY !== undefined;
+    case 'perplexity':
+      return process.env.PERPLEXITY_API_KEY !== undefined;
+    default:
+      return false;
+  }
+});
+
 /**
- * Analyzes message complexity based on content and indicators
+ * Estimated request complexity score
  * @param message Message to analyze
- * @returns Complexity score (0-100)
+ * @param history Conversation history
+ * @returns Complexity score from 0 (simple) to 1 (complex)
  */
-function analyzeMessageComplexity(message: string): number {
-  const wordCount = message.split(/\s+/).length;
-  
-  // Factor 1: Length of message
-  const lengthScore = Math.min(wordCount / 50, 1) * 30;
-  
-  // Factor 2: Presence of complex indicators
+export function estimateComplexity(message: string, history: any[] = []): number {
+  // Simple heuristics to determine request complexity
+  const messageLength = message.length;
+  const historyLength = history.length;
   const complexityIndicators = [
-    'analyze', 'explain', 'compare', 'contrast', 'evaluate', 
-    'synthesize', 'research', 'detailed', 'comprehensive', 
-    'why', 'how', 'context', 'implications', 'reasoning',
-    'draw a', 'create a', 'design', 'generate', 'code for'
+    'explain', 'analyze', 'compare', 'difference', 'summarize',
+    'reason', 'why', 'how', 'process', 'detailed', 'comprehensive',
+    'technical', 'in-depth', 'step by step', 'elaborate', 'synthesize',
+    'evaluate', 'assess', 'impact', 'implications', 'pros and cons'
   ];
   
-  const indicatorCount = complexityIndicators.reduce((count, indicator) => {
-    return count + (message.toLowerCase().includes(indicator) ? 1 : 0);
+  // Check for complex indicators
+  const lowerMessage = message.toLowerCase();
+  const indicatorMatches = complexityIndicators.reduce((count, indicator) => {
+    return count + (lowerMessage.includes(indicator) ? 1 : 0);
   }, 0);
   
-  const indicatorScore = Math.min(indicatorCount / 5, 1) * 40;
+  // Complexity from message length (1000+ chars is complex)
+  const lengthFactor = Math.min(messageLength / 1000, 1);
   
-  // Factor 3: Sentence structure complexity
-  const sentences = message.split(/[.!?]+/).filter(s => s.trim().length > 0);
-  const avgSentenceLength = sentences.length > 0 
-    ? wordCount / sentences.length 
-    : 0;
+  // Complexity from history (10+ messages is complex)
+  const historyFactor = Math.min(historyLength / 10, 1);
   
-  const sentenceScore = Math.min(avgSentenceLength / 15, 1) * 30;
+  // Complexity from indicators (3+ indicators is complex)
+  const indicatorFactor = Math.min(indicatorMatches / 3, 1);
   
-  // Calculate total complexity score (0-100)
-  return Math.min(Math.round(lengthScore + indicatorScore + sentenceScore), 100);
+  // Calculate weighted score (more weight on indicators)
+  const complexityScore = (
+    lengthFactor * 0.2 +
+    historyFactor * 0.3 +
+    indicatorFactor * 0.5
+  );
+  
+  return Math.min(Math.max(complexityScore, 0), 1);
 }
 
 /**
- * Selects the most appropriate model based on message complexity
- * @param message User's message
- * @param history Previous conversation history
- * @param forceAdvanced Whether to force using an advanced model
- * @returns Selected model
+ * Estimate token count for a message
+ * @param text Text to estimate
+ * @returns Estimated token count
  */
-export async function selectModel(
-  message: string,
-  history: ChatMessage[] = [],
-  forceAdvanced: boolean = false
-): Promise<Model> {
-  // Calculate message complexity
-  const complexityScore = analyzeMessageComplexity(message);
-  console.log(`Message complexity score: ${complexityScore}/100`);
-  
-  // Check for multimedia content (placeholder for image detection)
-  const hasMultimedia = message.includes('data:image') || message.includes('![image]');
-  
-  // Determine minimum required tier
-  let minTier: 'basic' | 'standard' | 'advanced';
-  
-  if (forceAdvanced || hasMultimedia || complexityScore > 70) {
-    minTier = 'advanced';
-  } else if (complexityScore > 40) {
-    minTier = 'standard';
-  } else {
-    minTier = 'basic';
-  }
-  
-  // Filter models by required capabilities
-  const eligibleModels = availableModels.filter(model => {
-    // Filter by minimum tier
-    if (getTierValue(model.tier) < getTierValue(minTier)) {
-      return false;
-    }
-    
-    // Filter by multimodal capability if needed
-    if (hasMultimedia && !model.isMultimodal) {
-      return false;
-    }
-    
-    return true;
+export function estimateTokenCount(text: string): number {
+  // Simple approximation: 1 token ≈ 4 characters
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Determine if a request needs an advanced model
+ * @param message User message
+ * @param history Conversation history
+ * @returns Whether an advanced model is recommended
+ */
+export function shouldUseAdvancedModel(message: string, history: any[] = []): boolean {
+  const complexity = estimateComplexity(message, history);
+  return complexity > 0.6;
+}
+
+/**
+ * Select the best model based on task requirements
+ * @param requiredCapabilities Required capabilities
+ * @param preferredCategory Preferred model category
+ * @param preferLocal Whether to prefer local models
+ * @returns Selected model or null if no suitable model is available
+ */
+export function selectModel(
+  requiredCapabilities: string[] = ['text'],
+  preferredCategory: 'basic' | 'advanced' | 'specialized' = 'basic',
+  preferLocal: boolean = true
+): ModelConfig | null {
+  // Create a list of candidate models
+  let candidates = activeModels.filter(model => {
+    // Filter by capabilities
+    const hasRequiredCapabilities = requiredCapabilities.every(capability => 
+      model.capabilities.includes(capability as any)
+    );
+    return hasRequiredCapabilities;
   });
   
-  if (eligibleModels.length === 0) {
-    // If no models meet criteria, fall back to the most capable model
-    return availableModels.sort((a, b) => 
-      getTierValue(b.tier) - getTierValue(a.tier)
-    )[0];
+  // Sort by preference
+  candidates.sort((a, b) => {
+    // Score each model based on several factors
+    let scoreA = 0;
+    let scoreB = 0;
+    
+    // Preferred category gets a bonus
+    if (a.category === preferredCategory) scoreA += 5;
+    if (b.category === preferredCategory) scoreB += 5;
+    
+    // Local models get a bonus if preferred
+    if (preferLocal && a.provider === 'local') scoreA += 10;
+    if (preferLocal && b.provider === 'local') scoreB += 10;
+    
+    // Lower latency is better
+    if (a.latency === 'low') scoreA += 3;
+    else if (a.latency === 'medium') scoreA += 1;
+    
+    if (b.latency === 'low') scoreB += 3;
+    else if (b.latency === 'medium') scoreB += 1;
+    
+    // Lower cost is better
+    const costA = a.inputCostPer1K + a.outputCostPer1K;
+    const costB = b.inputCostPer1K + b.outputCostPer1K;
+    
+    if (costA < costB) scoreA += 2;
+    else if (costB < costA) scoreB += 2;
+    
+    // Sort by score (descending)
+    return scoreB - scoreA;
+  });
+  
+  // Check if any models are available
+  if (candidates.length === 0) {
+    console.warn('No suitable model found for the requested capabilities');
+    return null;
   }
   
-  // Prioritize models (start with local for efficiency)
-  // If complexity is low and no multimedia, prefer local model
-  if (complexityScore < 30 && !hasMultimedia && !forceAdvanced) {
-    const localModel = eligibleModels.find(m => m.provider === 'Local');
-    if (localModel) return localModel;
+  // Check the quota for the top candidate
+  const topCandidate = candidates[0];
+  const apiService = getApiServiceForModel(topCandidate);
+  
+  if (apiService) {
+    const quotaCheck = apiQuotaManager.checkRateLimit(apiService);
+    if (quotaCheck) {
+      console.warn(`Top candidate model exceeded quota: ${quotaCheck}`);
+      
+      // Try the next best model if available
+      if (candidates.length > 1) {
+        console.log('Falling back to next best model');
+        return candidates[1];
+      }
+    }
   }
   
-  // Otherwise, use the most capable eligible model
-  return eligibleModels.sort((a, b) => 
-    getTierValue(b.tier) - getTierValue(a.tier)
-  )[0];
+  return topCandidate;
+}
+
+/**
+ * Map model provider to API service for quota tracking
+ * @param model Model config
+ * @returns Corresponding API service
+ */
+function getApiServiceForModel(model: ModelConfig): ApiService | null {
+  switch (model.provider) {
+    case 'openai':
+      if (model.capabilities.includes('embedding')) {
+        return ApiService.OPENAI_EMBEDDING;
+      } else if (model.capabilities.includes('audio')) {
+        return ApiService.OPENAI_AUDIO;
+      } else if (model.capabilities.includes('vision')) {
+        return ApiService.OPENAI_IMAGE;
+      } else {
+        return ApiService.OPENAI;
+      }
+    case 'anthropic':
+      return ApiService.ANTHROPIC;
+    case 'perplexity':
+      return ApiService.PERPLEXITY;
+    case 'local':
+      return null; // No quota for local models
+    default:
+      return null;
+  }
 }
 
 /**
  * Get all available models
- * @returns Array of all configured models
+ * @returns List of active models
  */
-export function getAllModels(): Model[] {
-  return [...availableModels];
+export function getAvailableModels(): ModelConfig[] {
+  return [...activeModels];
 }
 
 /**
- * Helper to convert tier to numeric value for sorting
+ * Get a specific model by ID
+ * @param modelId Model ID to find
+ * @returns Model config or null if not found
  */
-function getTierValue(tier: 'basic' | 'standard' | 'advanced'): number {
-  switch (tier) {
-    case 'basic': return 1;
-    case 'standard': return 2;
-    case 'advanced': return 3;
-    default: return 0;
-  }
+export function getModelById(modelId: string): ModelConfig | null {
+  return activeModels.find(model => model.id === modelId) || null;
+}
+
+/**
+ * Find a fallback model if the requested model is unavailable
+ * @param modelId Original model ID
+ * @returns Fallback model or null if no suitable fallback
+ */
+export function findFallbackModel(modelId: string): ModelConfig | null {
+  const originalModel = getModelById(modelId);
+  if (!originalModel) return null;
+  
+  // Look for models with the same capabilities
+  const fallbackCandidates = activeModels.filter(model => 
+    model.id !== modelId &&
+    model.capabilities.every(cap => originalModel.capabilities.includes(cap))
+  );
+  
+  if (fallbackCandidates.length === 0) return null;
+  
+  // Sort by preference (similar category, then cost)
+  fallbackCandidates.sort((a, b) => {
+    if (a.category === originalModel.category && b.category !== originalModel.category) {
+      return -1;
+    }
+    if (b.category === originalModel.category && a.category !== originalModel.category) {
+      return 1;
+    }
+    
+    // If same category or both different, prefer cheaper model
+    const costA = a.inputCostPer1K + a.outputCostPer1K;
+    const costB = b.inputCostPer1K + b.outputCostPer1K;
+    return costA - costB;
+  });
+  
+  return fallbackCandidates[0];
 }

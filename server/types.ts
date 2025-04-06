@@ -1,52 +1,87 @@
 /**
- * Type Definitions
+ * Core Type Definitions
  * 
- * This file contains type definitions used throughout the application.
+ * This module defines the core types and interfaces used throughout
+ * the application for AI processing and data management.
  */
 
 /**
- * Chat message type
+ * Chat message in a conversation
  */
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp?: number;  // Optional timestamp for when message was created
 }
 
 /**
- * Chat response type
+ * Response from an AI processor
  */
-export interface ChatResponse {
+export interface ProcessorResponse {
   message: string;
-  modelInfo: string;
+  model: string;
   tokens: {
     prompt: number;
     completion: number;
     total: number;
   };
-  sources?: {
-    title: string;
-    url: string;
-    content: string;
-    relevance: number;
-  }[];  // Optional sources for RAG responses
-  error?: string;  // Optional error message if processing failed
+  timing: {
+    start: number;
+    end: number;
+    total: number;
+  };
+  references?: Reference[];
 }
 
 /**
- * Processing options for model requests
+ * Reference to external information
+ */
+export interface Reference {
+  title: string;
+  url: string;
+  content: string;
+  relevance: number;
+}
+
+/**
+ * Options for processing a message
  */
 export interface ProcessOptions {
-  systemPrompt?: string;  // Custom system prompt to use
-  maxTokens?: number;  // Maximum tokens to generate
-  temperature?: number;  // Temperature (randomness)
-  forceAdvanced?: boolean;  // Force using an advanced model
-  useRag?: boolean;  // Whether to use RAG for this request
-  maxRagResults?: number;  // Maximum number of RAG results to include
+  systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  useRag?: boolean;
 }
 
 /**
- * Local LLM configuration
+ * Extended options for chat processing
+ */
+export interface ChatOptions extends ProcessOptions {
+  forceAdvanced?: boolean | string;
+  useLocalLLM?: boolean;
+}
+
+/**
+ * Document with vector embedding
+ */
+export interface VectorDocument {
+  id: string;
+  text: string;
+  embedding?: number[];
+  metadata: {
+    source: string;
+    date?: string;
+    url?: string;
+    author?: string;
+    category?: string;
+    [key: string]: any;
+  };
+}
+
+/**
+ * Configuration for local LLM
  */
 export interface LocalLLMConfig {
   modelPath: string;
@@ -57,205 +92,223 @@ export interface LocalLLMConfig {
 }
 
 /**
- * Vector embedding type
+ * Model configuration
  */
-export type Embedding = number[];
-
-/**
- * Search result type
- */
-export interface SearchResult {
-  query: string;
-  results: SearchResultItem[];
-  relatedQueries: string[];
-  timeTaken: number;
-  sourceCount: number;
-}
-
-/**
- * Search result item type
- */
-export interface SearchResultItem {
-  title: string;
-  url: string;
-  snippet: string;
-  content?: string;
-  source?: string;
-  publishDate?: string;
-  relevanceScore?: number;
-  thumbnail?: string;
-  categories?: string[];
-  entities?: Entity[];
-}
-
-/**
- * Entity type for named entity recognition
- */
-export interface Entity {
+export interface ModelConfig {
+  id: string;
   name: string;
-  type: string;
-  confidence: number;
-  startPosition?: number;
-  endPosition?: number;
-  metadata?: Record<string, any>;
+  provider: 'openai' | 'anthropic' | 'perplexity' | 'local';
+  contextSize: number;
+  inputCostPer1K: number;
+  outputCostPer1K: number;
+  capabilities: Array<'text' | 'vision' | 'audio' | 'embedding' | 'search'>;
+  maxTokens: number;
+  temperature: number;
+  category: 'basic' | 'advanced' | 'specialized';
+  latency: 'low' | 'medium' | 'high';
 }
 
 /**
- * Knowledge graph node type
+ * Detected conversation context
  */
-export interface KnowledgeGraphNode {
+export interface DetectedContext {
+  topic: string;
+  entities: string[];
+  recentMessages: ChatMessage[];
+  metadata: Record<string, any>;
+}
+
+/**
+ * Types of context actions
+ */
+export enum ActionType {
+  SEARCH = 'search',
+  RETRIEVE_CONTEXT = 'retrieveContext',
+  LEARN = 'learn',
+  CLARIFY = 'clarify',
+  SUMMARIZE = 'summarize'
+}
+
+/**
+ * Action to take based on context
+ */
+export interface ContextAction {
+  type: ActionType;
+  reason: string;
+  parameters?: Record<string, any>;
+}
+
+/**
+ * Node in a knowledge graph
+ */
+export interface KnowledgeNode {
   id: string;
   label: string;
-  type: string;
-  properties?: Record<string, any>;
+  type: 'concept' | 'entity' | 'fact' | 'resource' | 'topic';
+  properties: Record<string, any>;
 }
 
 /**
- * Knowledge graph relationship type
+ * Edge in a knowledge graph
  */
-export interface KnowledgeGraphRelationship {
+export interface KnowledgeEdge {
   id: string;
   source: string;
   target: string;
   label: string;
-  weight?: number;
-  properties?: Record<string, any>;
+  weight: number;
+  properties: Record<string, any>;
 }
 
 /**
- * Knowledge graph type
+ * Complete knowledge graph
  */
 export interface KnowledgeGraph {
-  id: string;
-  name: string;
-  description?: string;
-  nodes: KnowledgeGraphNode[];
-  relationships: KnowledgeGraphRelationship[];
-  metadata?: Record<string, any>;
-  createdAt: number;
-  updatedAt: number;
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
 }
 
 /**
- * Mind map node type
+ * Research insight
  */
-export interface MindMapNode {
+export interface ResearchInsight {
   id: string;
+  title: string;
   content: string;
-  parentId?: string;
-  children?: MindMapNode[];
-  style?: Record<string, any>;
-  position?: { x: number; y: number };
-  expanded?: boolean;
+  sources: string[];
+  relevance: number;
+  confidence: number;
+  timestamp: number;
 }
 
 /**
- * Mind map type
+ * Visualization options
  */
-export interface MindMap {
-  id: string;
-  name: string;
+export interface VisualizationOptions {
+  type: 'graph' | 'tree' | 'timeline' | 'table';
+  title: string;
   description?: string;
-  rootNode: MindMapNode;
-  nodes: MindMapNode[];
-  createdAt: number;
-  updatedAt: number;
+  data: any;
+  config: Record<string, any>;
+}
+
+/**
+ * User preferences
+ */
+export interface UserPreferences {
+  theme: 'light' | 'dark' | 'system';
+  modelPreferences: {
+    defaultModel: string;
+    preferLocalLLM: boolean;
+    searchProvider: string;
+    voiceSettings: {
+      ttsVoice: string;
+      ttsSpeed: number;
+      sttLanguage: string;
+    };
+  };
+  privacySettings: {
+    storeConversations: boolean;
+    allowTelemetry: boolean;
+    allowContentAnalysis: boolean;
+  };
+  accessibilitySettings: {
+    fontSize: 'small' | 'medium' | 'large';
+    highContrast: boolean;
+    reducedMotion: boolean;
+    textToSpeech: boolean;
+  };
+  interfaceSettings: {
+    showContextPanel: boolean;
+    showReferences: boolean;
+    showTokenCount: boolean;
+    codeBlockTheme: string;
+  };
+}
+
+/**
+ * Memory entry for conversation memory
+ */
+export interface MemoryEntry {
+  id: string;
+  type: 'fact' | 'preference' | 'interaction';
+  content: string;
+  timestamp: number;
+  importance: number;
+  lastAccessed?: number;
+  accessCount: number;
+  metadata: Record<string, any>;
+}
+
+/**
+ * Conversation memory
+ */
+export interface ConversationMemory {
+  recentMessages: ChatMessage[];
+  entities: Record<string, any>;
+  topics: Record<string, number>;
+  facts: MemoryEntry[];
+  preferences: MemoryEntry[];
+}
+
+/**
+ * Search result
+ */
+export interface SearchResult {
+  query: string;
+  refinedQuery?: string;
+  results: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    source: string;
+    date?: string;
+    imageUrl?: string;
+  }>;
+  relatedQueries?: string[];
+  analyzedTopics?: Array<{ topic: string; relevance: number }>;
+  timing: {
+    start: number;
+    end: number;
+    total: number;
+  };
+}
+
+/**
+ * Canvas item for visual workspace
+ */
+export interface CanvasItem {
+  id: string;
+  type: 'text' | 'image' | 'mindmap' | 'codeblock' | 'chart';
+  content: string | Record<string, any>;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  style: Record<string, any>;
+  connections: string[];
+}
+
+/**
+ * Entity for named entity recognition
+ */
+export interface Entity {
+  name: string;
+  type: string;
+  aliases?: string[];
   metadata?: Record<string, any>;
 }
 
 /**
- * Context analysis type
+ * Context analysis result
  */
 export interface ContextAnalysis {
   topic: string;
-  intent: string;
+  userGoal?: string;
   entities: Entity[];
-  sentiment: {
+  relatedTopics?: string[];
+  suggestedActions: ContextAction[];
+  sentiment?: {
     score: number;
     label: 'positive' | 'negative' | 'neutral';
   };
-  keywords: string[];
-  summary: string;
-  confidence: number;
-}
-
-/**
- * Speech recognition result type
- */
-export interface SpeechRecognitionResult {
-  text: string;
-  confidence: number;
-  language?: string;
-  words?: Array<{
-    word: string;
-    startTime: number;
-    endTime: number;
-    confidence: number;
-  }>;
-}
-
-/**
- * Text-to-speech options type
- */
-export interface TextToSpeechOptions {
-  voice?: string;
-  speed?: number;
-  pitch?: number;
-  format?: 'mp3' | 'wav' | 'ogg';
-  quality?: 'low' | 'medium' | 'high';
-}
-
-/**
- * Text-to-speech result type
- */
-export interface TextToSpeechResult {
-  audioData: Uint8Array | string; // Base64 string or binary data
-  duration: number;
-  format: string;
-  metadata?: Record<string, any>;
-}
-
-/**
- * User preferences type
- */
-export interface UserPreferences {
-  speechEnabled: boolean;
-  preferredVoice?: string;
-  darkMode: boolean;
-  fontSize: 'small' | 'medium' | 'large';
-  preferredLanguage?: string;
-  searchFilters?: Record<string, any>;
-  savedSearches?: string[];
-  recentSearches?: string[];
-  notificationsEnabled: boolean;
-}
-
-/**
- * Action types for the research agent
- */
-export enum ActionType {
-  CREATE_KNOWLEDGE_GRAPH = 'create_knowledge_graph',
-  UPDATE_KNOWLEDGE_GRAPH = 'update_knowledge_graph',
-  CREATE_MIND_MAP = 'create_mind_map',
-  UPDATE_MIND_MAP = 'update_mind_map',
-  CREATE_PROJECT = 'create_project',
-  UPDATE_PROJECT = 'update_project',
-  ADD_RESEARCH_INSIGHT = 'add_research_insight',
-  GENERATE_SUMMARY = 'generate_summary',
-  EXTRACT_ENTITIES = 'extract_entities',
-  ANALYZE_SENTIMENT = 'analyze_sentiment',
-  SEARCH_WEB = 'search_web',
-  ANALYZE_DOCUMENT = 'analyze_document'
-}
-
-/**
- * Detected context type for contextual AI responses
- */
-export interface DetectedContext {
-  topic: string;
-  entities: Entity[];
-  recentMessages: ChatMessage[];
-  relatedTopics?: string[];
-  userGoal?: string;
-  metadata?: Record<string, any>;
+  metadata: Record<string, any>;
 }
