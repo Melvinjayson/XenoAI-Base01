@@ -23,7 +23,7 @@ import {
 } from './context-integration';
 import { memoryManager } from './memory-manager';
 import { enhancedMemoryManager } from './enhanced-memory-manager';
-import { isLocalLLMAvailable } from './local-llm';
+import { isLocalLLMAvailable, getLocalLLMStatus } from './local-llm';
 
 // Define API Service type for quota manager
 type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
@@ -41,6 +41,25 @@ function setupApiRoutes(app: Express): void {
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', timestamp: Date.now() });
+  });
+  
+  // Model status endpoint
+  app.get('/api/model-status', (req: Request, res: Response) => {
+    try {
+      const models = getAvailableModels();
+      const localStatus = getLocalLLMStatus();
+      const quotaStatus = apiQuotaManager.getUsageSummary();
+      
+      res.status(200).json({
+        localModel: localStatus,
+        availableModels: models,
+        quotaStatus: quotaStatus,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Error fetching model status:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
   });
 
   // Get available models
@@ -539,6 +558,42 @@ export function setupRoutes(app: Express, httpServer?: HTTPServer): WebSocketSer
             case 'ping':
               // Respond with pong to keep connection alive
               ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+              break;
+              
+            case 'command':
+              // Handle client commands
+              console.log('Client command:', data.command);
+              
+              // Process different commands
+              switch (data.command) {
+                case 'get_model_status':
+                  // Fetch model status
+                  const models = getAvailableModels();
+                  const localStatus = getLocalLLMStatus();
+                  const quotaStatus = apiQuotaManager.getUsageSummary();
+                  
+                  // Send model status response
+                  ws.send(JSON.stringify({
+                    type: 'model_status',
+                    data: {
+                      localModel: localStatus,
+                      availableModels: models,
+                      quotaStatus: quotaStatus,
+                      timestamp: Date.now()
+                    },
+                    timestamp: Date.now()
+                  }));
+                  break;
+                
+                default:
+                  // Unknown command
+                  ws.send(JSON.stringify({
+                    type: 'error',
+                    error: `Unknown command: ${data.command}`,
+                    timestamp: Date.now()
+                  }));
+                  break;
+              }
               break;
               
             case 'event':

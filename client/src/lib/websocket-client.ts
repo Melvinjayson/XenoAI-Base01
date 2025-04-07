@@ -359,6 +359,16 @@ export class WebSocketClient {
       ...options
     });
   }
+  
+  /**
+   * Request model status information from the server
+   * @returns true if the request was sent successfully, false otherwise
+   */
+  public requestModelStatus() {
+    return this.sendMessage('command', {
+      command: 'get_model_status'
+    });
+  }
 
   public getState(): WebSocketState {
     return { ...this.state };

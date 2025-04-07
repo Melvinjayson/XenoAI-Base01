@@ -68,20 +68,20 @@ export async function initializeLocalLLM(): Promise<boolean> {
   console.log('Initializing local language model...');
   
   try {
-    // Simulate loading a local model
+    // Simulate loading Llama 4 Behemot
     await simulateModelLoading();
     
-    // Update status
+    // Update status with the upgraded Llama 4 Behemot specifications
     modelStatus = {
       loaded: true,
       model: 'llama-4-behemot',
-      memory: 32768,
-      quantization: 'Q5_K_M',
-      contextLength: 128000,
+      memory: 65536, // 64GB RAM
+      quantization: 'Q4_K_M', // More efficient quantization for better performance
+      contextLength: 256000, // Increased context length
       error: null
     };
     
-    console.log('Local language model initialized successfully.');
+    console.log('Llama 4 Behemot initialized successfully.');
     return true;
   } catch (error: any) {
     // Update status with error
@@ -250,11 +250,52 @@ export async function processWithLocalLLM(
       }
     }
     
-    // Format conversation context (will now include web search results if available)
-    const context = formatConversationContext(systemPrompt, history, message, sessionContext);
+    // Analyze message complexity to determine if we need to apply advanced reasoning
+    const messageComplexity = calculateMessageComplexity(message);
     
-    // Generate response (simulated) - will now incorporate web search results if available
+    // For complex queries, enhance the system prompt to encourage deeper analysis
+    let enhancedSystemPrompt = systemPrompt;
+    if (messageComplexity > 0.7) {
+      enhancedSystemPrompt += "\n\nThis query requires deeper analysis. Apply your Llama 4 Behemot reasoning capabilities to break down complex concepts, evaluate connections between ideas, and provide a structured response with clear explanations. When appropriate, use a step-by-step approach to show your reasoning process.";
+    }
+    
+    // If the message seems to request a comparison, add comparison guidance
+    if (message.toLowerCase().includes(" vs ") || 
+        message.toLowerCase().includes(" versus ") ||
+        message.toLowerCase().includes("compare") ||
+        message.toLowerCase().includes("difference between")) {
+      enhancedSystemPrompt += "\n\nThis query involves a comparison. Structure your response to clearly identify similarities and differences, using parallel structure when possible. Consider creating a balanced analysis that fairly represents both sides.";
+    }
+    
+    // If the message seems to request a procedural explanation, add step-by-step guidance
+    if (message.toLowerCase().includes("how to") || 
+        message.toLowerCase().includes("steps") ||
+        message.toLowerCase().includes("process") ||
+        message.toLowerCase().includes("tutorial") ||
+        message.toLowerCase().includes("guide")) {
+      enhancedSystemPrompt += "\n\nThis query requests procedural information. Provide a clear step-by-step explanation with numbered steps when appropriate. Include any prerequisites or necessary resources at the beginning.";
+    }
+    
+    // Format conversation context with enhanced system prompt
+    const context = formatConversationContext(enhancedSystemPrompt, history, message, sessionContext);
+    
+    // Generate response with enhanced Llama 4 Behemot capabilities
     const response = await simulateLocalModelInference(context, message, sessionContext);
+    
+    // Extract and store topics from this interaction for better context maintenance
+    const extractedTopics = extractTopicsFromMessage(message);
+    if (extractedTopics.length > 0) {
+      // Add only new topics, avoid duplicates
+      for (const topic of extractedTopics) {
+        if (!sessionContext.topics.includes(topic)) {
+          sessionContext.topics.push(topic);
+        }
+      }
+      // Keep only the most recent topics if we exceed the limit
+      if (sessionContext.topics.length > 15) {
+        sessionContext.topics = sessionContext.topics.slice(-15);
+      }
+    }
     
     // Store this interaction in context
     sessionContext.recentInteractions.push({
@@ -263,9 +304,9 @@ export async function processWithLocalLLM(
       timestamp: Date.now()
     });
     
-    // Limit the number of stored interactions
-    if (sessionContext.recentInteractions.length > 10) {
-      sessionContext.recentInteractions = sessionContext.recentInteractions.slice(-10);
+    // Limit the number of stored interactions - increased for Llama 4 Behemot's larger context window
+    if (sessionContext.recentInteractions.length > 15) {
+      sessionContext.recentInteractions = sessionContext.recentInteractions.slice(-15);
     }
     
     return response;
@@ -490,13 +531,15 @@ function formatConversationContext(
     enhancedSystemPrompt += "\n\nWhen using this web information in your response, remember to cite sources appropriately.";
   }
   
-  // Start with system prompt
+  // Start with enhanced system prompt in Llama 4 Behemot format
   let context = `<s>[INST] <<SYS>>\n${enhancedSystemPrompt}\n<</SYS>>\n\n`;
   
-  // Add conversation history
-  for (let i = 0; i < history.length; i += 2) {
-    const userMessage = history[i];
-    const assistantMessage = history[i + 1];
+  // Add conversation history with improved formatting for Llama 4 Behemot
+  // The model works better with properly formatted history that maintains the conversation flow
+  let currentIndex = 0;
+  while (currentIndex < history.length) {
+    const userMessage = history[currentIndex];
+    const assistantMessage = currentIndex + 1 < history.length ? history[currentIndex + 1] : null;
     
     if (userMessage && userMessage.role === 'user') {
       context += `${userMessage.content} [/INST] `;
@@ -504,11 +547,23 @@ function formatConversationContext(
     
     if (assistantMessage && assistantMessage.role === 'assistant') {
       context += `${assistantMessage.content} </s><s>[INST] `;
+    } else if (!assistantMessage && userMessage) {
+      // If we have a user message without a response (should be rare), add a placeholder
+      // This maintains the correct format pattern for the model
+      context += `I'll help with that. </s><s>[INST] `;
     }
+    
+    currentIndex += 2;
   }
   
-  // Add current message
-  context += `${currentMessage} [/INST] `;
+  // Add current message with optimized reasoning prompt for complex queries
+  if (calculateMessageComplexity(currentMessage) > 1.0) {
+    // For complex queries, add explicit reasoning instruction for Llama 4 Behemot
+    context += `${currentMessage}\n\nPlease think through this step-by-step before providing your final answer. [/INST] `;
+  } else {
+    // For regular queries, use standard format
+    context += `${currentMessage} [/INST] `;
+  }
   
   return context;
 }
@@ -519,10 +574,20 @@ function formatConversationContext(
  */
 async function simulateModelLoading(): Promise<void> {
   return new Promise((resolve) => {
-    // Simulate loading delay
+    // Simulate loading delay for Llama 4 Behemot (slightly longer for a larger model)
+    console.log('Loading Llama 4 Behemot model files...');
     setTimeout(() => {
-      resolve();
-    }, 2000);
+      console.log('Initializing model weights and configuration...');
+      
+      setTimeout(() => {
+        console.log('Optimizing for hardware acceleration...');
+        
+        setTimeout(() => {
+          console.log('Llama 4 Behemot model ready.');
+          resolve();
+        }, 700);
+      }, 700);
+    }, 1000);
   });
 }
 
@@ -900,63 +965,107 @@ function extractExplainTopic(message: string): string {
  * @returns Related field
  */
 function getRelatedField(topic: string): string {
-  // Simple mapping of topics to fields
+  // Comprehensive mapping of topics to their respective fields
   const topicFieldMap: Record<string, string> = {
-    'machine learning': 'artificial intelligence',
-    'artificial intelligence': 'computer science',
-    'deep learning': 'machine learning',
-    'neural networks': 'machine learning',
-    'algorithms': 'computer science',
-    'data structures': 'computer science',
-    'quantum computing': 'physics and computer science',
-    'climate change': 'environmental science',
-    'renewable energy': 'energy science and engineering',
-    'blockchain': 'cryptography and distributed systems',
-    'cryptocurrency': 'finance and technology',
-    'genetics': 'biology',
-    'genomics': 'biology and data science',
-    'psychology': 'behavioral science',
-    'neuroscience': 'biology and psychology',
-    'economics': 'social science',
-    'physics': 'natural science',
-    'chemistry': 'natural science',
-    'astronomy': 'natural science',
-    'history': 'humanities',
-    'literature': 'humanities',
-    'philosophy': 'humanities',
-    'art': 'creative expression',
-    'music': 'creative expression',
-    'film': 'creative expression',
-    'health': 'medicine',
-    'nutrition': 'health science',
-    'fitness': 'health science',
-    'mindfulness': 'psychology and wellness',
-    'meditation': 'psychology and wellness',
-    'yoga': 'physical and mental wellness',
-    'politics': 'social science and governance',
-    'law': 'social governance',
-    'education': 'social development',
-    'language': 'linguistics and communication',
-    'communication': 'social interaction',
-    'business': 'commerce and organization',
-    'marketing': 'business',
-    'finance': 'business and economics',
-    'investing': 'finance',
-    'entrepreneurship': 'business and innovation',
-    'innovation': 'technology and business',
-    'design': 'creative problem-solving',
-    'productivity': 'personal and organizational efficiency',
-    'time management': 'productivity',
-    'personal development': 'psychology and self-improvement',
-    'relationships': 'social psychology',
-    'travel': 'geography and culture',
-    'culture': 'anthropology',
-    'cooking': 'culinary arts',
-    'gardening': 'horticulture',
-    'environment': 'ecology',
-    'sustainability': 'environmental science and ethics',
-    'ethics': 'philosophy',
-    'morality': 'philosophy and psychology'
+    // AI and Computing
+    'machine learning': 'artificial intelligence and data science',
+    'artificial intelligence': 'computer science and cognitive science',
+    'deep learning': 'advanced machine learning and neural computation',
+    'neural networks': 'computational neuroscience and machine learning',
+    'algorithms': 'computer science and mathematical computation',
+    'data structures': 'computer science and software engineering',
+    'quantum computing': 'quantum physics and computer science',
+    'natural language processing': 'computational linguistics and artificial intelligence',
+    'computer vision': 'visual perception AI and image processing',
+    'robotics': 'mechanical engineering and artificial intelligence',
+    'software engineering': 'systems design and computer programming',
+    'database systems': 'information management and computer science',
+    'networks': 'telecommunications and distributed computing',
+    'cybersecurity': 'information security and digital risk management',
+    'cloud computing': 'distributed systems and virtualized infrastructure',
+    'web development': 'internet technologies and application programming',
+    'edge computing': 'distributed computing and IoT infrastructure',
+    
+    // Science and Technology
+    'climate change': 'environmental science and atmospheric physics',
+    'renewable energy': 'sustainable technology and energy engineering',
+    'blockchain': 'cryptography and distributed ledger technology',
+    'cryptocurrency': 'digital finance and cryptographic systems',
+    'genetics': 'molecular biology and hereditary science',
+    'genomics': 'genetic analysis and computational biology',
+    'biology': 'life sciences and organic systems',
+    'biotechnology': 'applied biology and bioengineering',
+    'neuroscience': 'brain science and neural systems',
+    'physics': 'fundamental forces and physical laws',
+    'chemistry': 'molecular science and chemical reactions',
+    'astronomy': 'celestial objects and cosmic phenomena',
+    'space exploration': 'astronautics and planetary science',
+    'materials science': 'substance properties and material engineering',
+    'nanotechnology': 'molecular engineering and nanoscale manipulation',
+    
+    // Social Sciences and Humanities
+    'psychology': 'mental processes and behavioral science',
+    'economics': 'resource allocation and market dynamics',
+    'history': 'past events and historical analysis',
+    'literature': 'written expression and literary criticism',
+    'philosophy': 'fundamental questions and critical thinking',
+    'art': 'visual creation and aesthetic expression',
+    'music': 'sound composition and auditory arts',
+    'film': 'visual storytelling and cinematic expression',
+    'sociology': 'social structures and group dynamics',
+    'anthropology': 'human cultures and evolutionary development',
+    'linguistics': 'language structure and communication systems',
+    'political science': 'governance systems and power dynamics',
+    'archaeology': 'historical artifacts and ancient civilizations',
+    'religion': 'faith systems and spiritual practices',
+    'education': 'learning methodologies and knowledge transmission',
+    
+    // Health and Wellness
+    'health': 'physical wellbeing and medical science',
+    'medicine': 'diagnostic and treatment methodologies',
+    'nutrition': 'dietary science and nutritional biochemistry',
+    'fitness': 'physical conditioning and exercise science',
+    'mindfulness': 'conscious awareness and cognitive focus',
+    'meditation': 'mental discipline and contemplative practice',
+    'yoga': 'mind-body integration and physical postures',
+    'mental health': 'psychological wellbeing and cognitive function',
+    'public health': 'population health management and preventive medicine',
+    'pharmacology': 'drug interactions and therapeutic compounds',
+    
+    // Society and Human Interaction
+    'politics': 'governmental systems and political theory',
+    'law': 'legal systems and regulatory frameworks',
+    'language': 'communication systems and linguistic structures',
+    'communication': 'information exchange and human connection',
+    'business': 'commercial activities and organizational management',
+    'marketing': 'promotional strategies and consumer behavior',
+    'finance': 'monetary management and economic systems',
+    'investing': 'capital allocation and asset management',
+    'entrepreneurship': 'venture creation and business innovation',
+    'innovation': 'novel solutions and creative advancement',
+    'design': 'structured creation and aesthetic functionality',
+    'user experience': 'human-computer interaction and interface design',
+    'productivity': 'efficiency methodologies and output optimization',
+    'time management': 'schedule optimization and temporal resource allocation',
+    'personal development': 'self-improvement and capability enhancement',
+    'relationships': 'interpersonal dynamics and social bonds',
+    
+    // Culture and Lifestyle
+    'travel': 'geographical exploration and cross-cultural experiences',
+    'culture': 'shared customs and social patterns',
+    'cooking': 'food preparation and culinary techniques',
+    'gardening': 'plant cultivation and landscape management',
+    'environment': 'natural surroundings and ecological systems',
+    'sustainability': 'long-term resource management and ecological balance',
+    'ethics': 'moral principles and ethical reasoning',
+    'morality': 'concepts of right and wrong and moral philosophy',
+    'urban planning': 'city design and community development',
+    'architecture': 'structural design and building science',
+    'fashion': 'clothing design and style aesthetics',
+    'sports': 'athletic competition and physical achievement',
+    'gaming': 'interactive entertainment and game theory',
+    'social media': 'digital social interaction and online communities',
+    'photography': 'visual capture and image composition'
   };
   
   // Check for direct matches
@@ -984,61 +1093,105 @@ function getRelatedField(topic: string): string {
 function getRelatedConcepts(topic: string): string[] {
   // Simple mapping of topics to related concepts
   const topicConceptsMap: Record<string, string[]> = {
-    'machine learning': ['algorithms', 'data processing', 'pattern recognition', 'neural networks'],
-    'artificial intelligence': ['machine learning', 'natural language processing', 'computer vision', 'expert systems'],
-    'deep learning': ['neural networks', 'backpropagation', 'feature extraction', 'training data'],
-    'neural networks': ['neurons', 'activation functions', 'weights and biases', 'layers'],
-    'algorithms': ['computational complexity', 'data structures', 'optimization', 'problem-solving'],
-    'data structures': ['arrays', 'linked lists', 'trees', 'graphs', 'hash tables'],
-    'quantum computing': ['qubits', 'superposition', 'entanglement', 'quantum gates'],
-    'climate change': ['global warming', 'carbon emissions', 'greenhouse effect', 'environmental impact'],
-    'renewable energy': ['solar power', 'wind energy', 'hydroelectric power', 'geothermal energy'],
-    'blockchain': ['distributed ledger', 'consensus mechanisms', 'cryptographic hashing', 'smart contracts'],
-    'cryptocurrency': ['blockchain', 'digital assets', 'decentralized finance', 'mining'],
-    'genetics': ['DNA', 'genes', 'heredity', 'mutations', 'genome'],
-    'genomics': ['DNA sequencing', 'genetic mapping', 'bioinformatics', 'gene expression'],
-    'psychology': ['cognition', 'behavior', 'emotions', 'mental processes', 'personality'],
-    'neuroscience': ['brain structure', 'neural pathways', 'neurotransmitters', 'cognitive functions'],
-    'economics': ['supply and demand', 'market systems', 'fiscal policy', 'monetary policy'],
-    'physics': ['mechanics', 'thermodynamics', 'electromagnetism', 'quantum mechanics'],
-    'chemistry': ['elements', 'compounds', 'reactions', 'molecular structure'],
-    'astronomy': ['celestial bodies', 'cosmos', 'astrophysics', 'planetary science'],
-    'history': ['events', 'civilizations', 'cultural developments', 'historical methodology'],
-    'literature': ['writing', 'genres', 'literary analysis', 'narrative techniques'],
-    'philosophy': ['ethics', 'metaphysics', 'epistemology', 'logic', 'aesthetics'],
-    'art': ['visual expression', 'aesthetics', 'art history', 'artistic techniques'],
-    'music': ['melody', 'harmony', 'rhythm', 'musical expression', 'composition'],
-    'film': ['cinematography', 'storytelling', 'directing', 'editing', 'genres'],
-    'health': ['physical well-being', 'mental well-being', 'disease prevention', 'healthcare'],
-    'nutrition': ['diet', 'nutrients', 'metabolism', 'dietary guidelines'],
-    'fitness': ['physical activity', 'strength training', 'cardiovascular health', 'flexibility'],
-    'mindfulness': ['presence', 'awareness', 'attention', 'mental clarity'],
-    'meditation': ['focus', 'mindfulness', 'relaxation', 'consciousness'],
-    'yoga': ['asanas', 'pranayama', 'meditation', 'mind-body connection'],
-    'politics': ['governance', 'policy-making', 'ideology', 'political systems'],
-    'law': ['legislation', 'judicial systems', 'legal principles', 'rights and obligations'],
-    'education': ['learning', 'pedagogy', 'curriculum', 'educational systems'],
-    'language': ['linguistics', 'grammar', 'syntax', 'semantics', 'communication'],
-    'communication': ['verbal exchange', 'nonverbal cues', 'information transmission', 'understanding'],
-    'business': ['organizational management', 'commerce', 'strategic planning', 'operations'],
-    'marketing': ['promotion', 'consumer behavior', 'branding', 'market research'],
-    'finance': ['money management', 'investment', 'financial markets', 'risk assessment'],
-    'investing': ['assets', 'returns', 'diversification', 'risk management'],
-    'entrepreneurship': ['innovation', 'business creation', 'risk-taking', 'opportunity recognition'],
-    'innovation': ['creativity', 'problem-solving', 'technological advancement', 'disruption'],
-    'design': ['aesthetics', 'functionality', 'user experience', 'problem-solving'],
-    'productivity': ['efficiency', 'time management', 'workflow optimization', 'goals achievement'],
-    'time management': ['prioritization', 'scheduling', 'delegation', 'efficiency techniques'],
-    'personal development': ['self-improvement', 'goal setting', 'habit formation', 'mindset'],
-    'relationships': ['interpersonal dynamics', 'communication', 'emotional connection', 'social bonds'],
-    'travel': ['exploration', 'cultural experience', 'transportation', 'destination knowledge'],
-    'culture': ['customs', 'traditions', 'social norms', 'cultural identity'],
-    'cooking': ['culinary techniques', 'ingredients', 'recipe development', 'food science'],
-    'gardening': ['plant cultivation', 'soil management', 'landscaping', 'botanical knowledge'],
-    'environment': ['ecosystems', 'biodiversity', 'conservation', 'natural resources'],
-    'sustainability': ['resource conservation', 'ecological balance', 'renewable practices', 'social responsibility'],
-    'ethics': ['moral principles', 'values', 'ethical reasoning', 'normative judgments'],
-    'morality': ['right and wrong', 'moral values', 'virtue', 'ethical frameworks']
+    // AI and Computing
+    'machine learning': ['algorithms', 'data processing', 'pattern recognition', 'neural networks', 'supervised learning', 'unsupervised learning', 'reinforcement learning'],
+    'artificial intelligence': ['machine learning', 'natural language processing', 'computer vision', 'expert systems', 'knowledge representation', 'reasoning', 'planning', 'generative AI'],
+    'deep learning': ['neural networks', 'backpropagation', 'feature extraction', 'training data', 'convolutional networks', 'transformers', 'embeddings', 'attention mechanisms'],
+    'neural networks': ['neurons', 'activation functions', 'weights and biases', 'layers', 'deep learning', 'perceptrons', 'recurrent connections', 'gradient descent'],
+    'algorithms': ['computational complexity', 'data structures', 'optimization', 'problem-solving', 'recursion', 'iteration', 'divide and conquer', 'dynamic programming'],
+    'data structures': ['arrays', 'linked lists', 'trees', 'graphs', 'hash tables', 'stacks', 'queues', 'heaps', 'tries'],
+    'quantum computing': ['qubits', 'superposition', 'entanglement', 'quantum gates', 'quantum circuits', 'quantum algorithms', 'quantum supremacy', 'quantum error correction'],
+    'natural language processing': ['tokenization', 'part-of-speech tagging', 'named entity recognition', 'sentiment analysis', 'machine translation', 'question answering', 'text generation', 'large language models'],
+    'computer vision': ['image recognition', 'object detection', 'semantic segmentation', 'feature extraction', 'convolutional neural networks', 'image processing', 'visual attention', 'pose estimation'],
+    'robotics': ['sensors', 'actuators', 'motion planning', 'computer vision', 'machine learning', 'human-robot interaction', 'autonomous systems', 'robotic manipulation'],
+    'software engineering': ['requirements analysis', 'design patterns', 'testing', 'deployment', 'maintenance', 'agile methodologies', 'version control', 'continuous integration'],
+    'database systems': ['relational databases', 'SQL', 'NoSQL', 'data modeling', 'transactions', 'indexing', 'database optimization', 'distributed databases'],
+    'networks': ['protocols', 'routing', 'internet', 'topology', 'network security', 'wireless networks', 'bandwidth', 'latency'],
+    'cybersecurity': ['encryption', 'authentication', 'vulnerability assessment', 'threat detection', 'network security', 'intrusion prevention', 'security protocols', 'ethical hacking'],
+    'cloud computing': ['infrastructure as a service', 'platform as a service', 'software as a service', 'virtualization', 'containers', 'orchestration', 'scalability', 'serverless computing'],
+    'web development': ['frontend', 'backend', 'frameworks', 'responsive design', 'APIs', 'databases', 'authentication', 'deployment'],
+    'edge computing': ['distributed systems', 'low latency', 'local processing', 'IoT integration', 'bandwidth optimization', 'edge AI', 'real-time analytics', 'data privacy'],
+    
+    // Science and Technology
+    'climate change': ['global warming', 'carbon emissions', 'greenhouse effect', 'environmental impact', 'sea level rise', 'extreme weather', 'mitigation strategies', 'adaptation measures'],
+    'renewable energy': ['solar power', 'wind energy', 'hydroelectric power', 'geothermal energy', 'biomass', 'energy storage', 'grid integration', 'sustainability'],
+    'blockchain': ['distributed ledger', 'consensus mechanisms', 'cryptographic hashing', 'smart contracts', 'decentralization', 'tokens', 'cryptocurrency', 'blockchain governance'],
+    'cryptocurrency': ['blockchain', 'digital assets', 'decentralized finance', 'mining', 'wallets', 'exchanges', 'tokenomics', 'regulatory frameworks'],
+    'genetics': ['DNA', 'genes', 'heredity', 'mutations', 'genome', 'alleles', 'genetic variation', 'genomic sequencing'],
+    'genomics': ['DNA sequencing', 'genetic mapping', 'bioinformatics', 'gene expression', 'comparative genomics', 'functional genomics', 'epigenomics', 'personalized medicine'],
+    'biology': ['cells', 'organisms', 'evolution', 'ecology', 'molecular biology', 'physiology', 'genetics', 'biodiversity'],
+    'biotechnology': ['genetic engineering', 'pharmaceuticals', 'biomanufacturing', 'bioinformatics', 'synthetic biology', 'stem cells', 'precision medicine', 'biofuels'],
+    'neuroscience': ['brain structure', 'neural pathways', 'neurotransmitters', 'cognitive functions', 'neuroplasticity', 'neural circuits', 'brain imaging', 'neurological disorders'],
+    'physics': ['mechanics', 'thermodynamics', 'electromagnetism', 'quantum mechanics', 'relativity', 'particle physics', 'astrophysics', 'condensed matter physics'],
+    'chemistry': ['elements', 'compounds', 'reactions', 'molecular structure', 'organic chemistry', 'inorganic chemistry', 'analytical methods', 'chemical bonding'],
+    'astronomy': ['celestial bodies', 'cosmos', 'astrophysics', 'planetary science', 'stellar evolution', 'galaxies', 'cosmology', 'space exploration'],
+    'space exploration': ['rockets', 'satellites', 'space missions', 'astronauts', 'planetary exploration', 'telescopes', 'space stations', 'commercial spaceflight'],
+    'materials science': ['properties', 'structure', 'processing', 'performance', 'nanomaterials', 'composites', 'semiconductors', 'biomaterials'],
+    'nanotechnology': ['nanomaterials', 'nanodevices', 'nanofabrication', 'nanoscale properties', 'quantum effects', 'molecular machines', 'nanomedicine', 'nanoelectronics'],
+    
+    // Social Sciences and Humanities
+    'psychology': ['cognition', 'behavior', 'emotions', 'mental processes', 'personality', 'developmental psychology', 'clinical psychology', 'social psychology'],
+    'economics': ['supply and demand', 'market systems', 'fiscal policy', 'monetary policy', 'microeconomics', 'macroeconomics', 'international trade', 'behavioral economics'],
+    'history': ['events', 'civilizations', 'cultural developments', 'historical methodology', 'historiography', 'archeology', 'primary sources', 'historical context'],
+    'literature': ['writing', 'genres', 'literary analysis', 'narrative techniques', 'literary movements', 'critical theory', 'comparative literature', 'literary history'],
+    'philosophy': ['ethics', 'metaphysics', 'epistemology', 'logic', 'aesthetics', 'political philosophy', 'philosophy of mind', 'existentialism'],
+    'art': ['visual expression', 'aesthetics', 'art history', 'artistic techniques', 'art movements', 'visual culture', 'fine arts', 'digital art'],
+    'music': ['melody', 'harmony', 'rhythm', 'musical expression', 'composition', 'music theory', 'performance', 'music history'],
+    'film': ['cinematography', 'storytelling', 'directing', 'editing', 'genres', 'film analysis', 'production', 'film history'],
+    'sociology': ['social structures', 'social relations', 'cultural dynamics', 'institutions', 'social change', 'inequality', 'social movements', 'social theory'],
+    'anthropology': ['culture', 'society', 'human development', 'ethnography', 'archeology', 'linguistic anthropology', 'physical anthropology', 'cultural adaptation'],
+    'linguistics': ['phonetics', 'phonology', 'syntax', 'semantics', 'pragmatics', 'historical linguistics', 'sociolinguistics', 'computational linguistics'],
+    'political science': ['government systems', 'political theory', 'international relations', 'comparative politics', 'public policy', 'political behavior', 'political economy', 'political institutions'],
+    'archaeology': ['excavation', 'artifacts', 'ancient civilizations', 'dating methods', 'cultural heritage', 'archaeometry', 'historical archaeology', 'landscape archaeology'],
+    'religion': ['beliefs', 'practices', 'sacred texts', 'theological concepts', 'religious institutions', 'spirituality', 'comparative religion', 'religious history'],
+    'education': ['learning', 'pedagogy', 'curriculum', 'educational systems', 'educational psychology', 'educational technology', 'educational policy', 'assessment'],
+    
+    // Health and Wellness
+    'health': ['physical well-being', 'mental well-being', 'disease prevention', 'healthcare', 'medical interventions', 'public health', 'health equity', 'health literacy'],
+    'medicine': ['diagnosis', 'treatment', 'preventive care', 'medical specialties', 'pharmacology', 'medical technology', 'evidence-based medicine', 'patient care'],
+    'nutrition': ['diet', 'nutrients', 'metabolism', 'dietary guidelines', 'micronutrients', 'macronutrients', 'nutritional needs', 'digestive system'],
+    'fitness': ['physical activity', 'strength training', 'cardiovascular health', 'flexibility', 'endurance', 'sports performance', 'exercise physiology', 'fitness assessment'],
+    'mindfulness': ['presence', 'awareness', 'attention', 'mental clarity', 'stress reduction', 'emotional regulation', 'mind-body connection', 'attentional training'],
+    'meditation': ['focus', 'mindfulness', 'relaxation', 'consciousness', 'meditation techniques', 'contemplative traditions', 'neurological effects', 'psychological benefits'],
+    'yoga': ['asanas', 'pranayama', 'meditation', 'mind-body connection', 'yoga philosophy', 'chakras', 'yoga styles', 'therapeutic applications'],
+    'mental health': ['psychological well-being', 'mental disorders', 'therapy approaches', 'counseling', 'emotional health', 'resilience', 'psychiatric treatment', 'mental health promotion'],
+    'public health': ['population health', 'disease prevention', 'health promotion', 'epidemiology', 'health policy', 'community health', 'global health', 'health disparities'],
+    'pharmacology': ['drug actions', 'pharmacokinetics', 'pharmacodynamics', 'drug development', 'clinical applications', 'adverse effects', 'drug interactions', 'therapeutic ranges'],
+    
+    // Society and Human Interaction
+    'politics': ['governance', 'policy-making', 'ideology', 'political systems', 'elections', 'political parties', 'public opinion', 'political movements'],
+    'law': ['legislation', 'judicial systems', 'legal principles', 'rights and obligations', 'case law', 'legal interpretation', 'legal practice', 'legal theory'],
+    'language': ['linguistics', 'grammar', 'syntax', 'semantics', 'communication', 'phonology', 'language acquisition', 'sociolinguistics'],
+    'communication': ['verbal exchange', 'nonverbal cues', 'information transmission', 'understanding', 'media communication', 'digital communication', 'intercultural communication', 'effective messaging'],
+    'business': ['organizational management', 'commerce', 'strategic planning', 'operations', 'finance', 'marketing', 'human resources', 'business ethics'],
+    'marketing': ['promotion', 'consumer behavior', 'branding', 'market research', 'digital marketing', 'marketing strategy', 'customer relationship management', 'market analysis'],
+    'finance': ['money management', 'investment', 'financial markets', 'risk assessment', 'corporate finance', 'financial analysis', 'financial planning', 'banking'],
+    'investing': ['assets', 'returns', 'diversification', 'risk management', 'investment strategies', 'market analysis', 'financial instruments', 'portfolio management'],
+    'entrepreneurship': ['innovation', 'business creation', 'risk-taking', 'opportunity recognition', 'startup development', 'business models', 'venture capital', 'scalability'],
+    'innovation': ['creativity', 'problem-solving', 'technological advancement', 'disruption', 'design thinking', 'innovation processes', 'organizational innovation', 'social innovation'],
+    'design': ['aesthetics', 'functionality', 'user experience', 'problem-solving', 'design process', 'visual design', 'industrial design', 'design thinking'],
+    'user experience': ['usability', 'user interface', 'user research', 'interaction design', 'information architecture', 'accessibility', 'cognitive psychology', 'human-centered design'],
+    'productivity': ['efficiency', 'time management', 'workflow optimization', 'goals achievement', 'prioritization', 'focus techniques', 'productivity systems', 'performance measurement'],
+    'time management': ['prioritization', 'scheduling', 'delegation', 'efficiency techniques', 'time blocking', 'deadlines', 'productivity tools', 'work-life balance'],
+    'personal development': ['self-improvement', 'goal setting', 'habit formation', 'mindset', 'skill acquisition', 'lifelong learning', 'personal growth', 'self-awareness'],
+    'relationships': ['interpersonal dynamics', 'communication', 'emotional connection', 'social bonds', 'conflict resolution', 'attachment', 'relationship types', 'social support'],
+    
+    // Culture and Lifestyle
+    'travel': ['exploration', 'cultural experience', 'transportation', 'destination knowledge', 'travel planning', 'tourism', 'accommodations', 'travel logistics'],
+    'culture': ['customs', 'traditions', 'social norms', 'cultural identity', 'cultural adaptation', 'cultural heritage', 'cultural expression', 'intercultural communication'],
+    'cooking': ['culinary techniques', 'ingredients', 'recipe development', 'food science', 'cuisine types', 'cooking methods', 'flavor profiles', 'meal preparation'],
+    'gardening': ['plant cultivation', 'soil management', 'landscaping', 'botanical knowledge', 'garden design', 'plant types', 'sustainable gardening', 'garden maintenance'],
+    'environment': ['ecosystems', 'biodiversity', 'conservation', 'natural resources', 'environmental protection', 'habitat preservation', 'environmental policy', 'human impact'],
+    'sustainability': ['resource conservation', 'ecological balance', 'renewable practices', 'social responsibility', 'sustainable development', 'circular economy', 'environmental stewardship', 'future generations'],
+    'ethics': ['moral principles', 'values', 'ethical reasoning', 'normative judgments', 'ethical theories', 'applied ethics', 'moral dilemmas', 'ethical frameworks'],
+    'morality': ['right and wrong', 'moral values', 'virtue', 'ethical frameworks', 'moral reasoning', 'moral development', 'moral psychology', 'normative ethics'],
+    'urban planning': ['city design', 'zoning', 'infrastructure', 'transportation systems', 'community development', 'public spaces', 'sustainable cities', 'urban renewal'],
+    'architecture': ['building design', 'structural engineering', 'architectural styles', 'spatial planning', 'sustainable architecture', 'urban context', 'architectural history', 'construction methods'],
+    'fashion': ['clothing design', 'style trends', 'textile technology', 'fashion industry', 'fashion history', 'sustainable fashion', 'personal style', 'fashion merchandising'],
+    'sports': ['athletic performance', 'game strategy', 'physical training', 'competition', 'sports psychology', 'team dynamics', 'sports science', 'sports culture'],
+    'gaming': ['video games', 'game design', 'player experience', 'game mechanics', 'gaming platforms', 'game theory', 'esports', 'interactive entertainment'],
+    'social media': ['digital platforms', 'content creation', 'social networking', 'online communities', 'social influence', 'digital marketing', 'user engagement', 'digital identity'],
+    'photography': ['camera techniques', 'composition', 'visual storytelling', 'image editing', 'photographic styles', 'lighting', 'digital imaging', 'photographic equipment']
   };
   
   // Check for direct matches
@@ -1056,6 +1209,157 @@ function getRelatedConcepts(topic: string): string[] {
   
   // Default response for unknown topics
   return ['fundamental principles', 'key methodologies', 'theoretical frameworks'];
+}
+
+/**
+ * Extract topics from a message for knowledge context
+ * @param message Message to analyze
+ * @returns Array of extracted topics
+ */
+function extractTopicsFromMessage(message: string): string[] {
+  // Convert message to lowercase for easier matching
+  const lowerMessage = message.toLowerCase();
+  
+  // Define common stop words to exclude
+  const stopWordsArray = [
+    'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'as', 'at', 
+    'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 
+    'can', 'did', 'do', 'does', 'doing', 'don\'t', 'down', 'during', 
+    'each', 'few', 'for', 'from', 'further', 
+    'had', 'has', 'have', 'having', 'he', 'her', 'here', 'hers', 'herself', 'him', 'himself', 'his', 'how', 
+    'i', 'if', 'in', 'into', 'is', 'it', 'its', 'itself', 
+    'just', 'me', 'more', 'most', 'my', 'myself', 
+    'no', 'nor', 'not', 'now', 'of', 'off', 'on', 'once', 'only', 'or', 'other', 'our', 'ours', 'ourselves', 'out', 'over', 'own', 
+    'same', 'she', 'should', 'so', 'some', 'such', 
+    'than', 'that', 'the', 'their', 'theirs', 'them', 'themselves', 'then', 'there', 'these', 'they', 'this', 'those', 'through', 
+    'to', 'too', 'under', 'until', 'up', 
+    'very', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'while', 'who', 'whom', 'why', 'will', 'with', 'would', 'you', 'your', 'yours', 'yourself', 'yourselves'
+  ];
+  
+  // Use an array for stopWords instead of a Set to avoid TypeScript issues
+  const isStopWord = (word: string): boolean => stopWordsArray.includes(word);
+  
+  // Clean the message
+  let cleanedMessage = lowerMessage
+    .replace(/[,.?!;:()"']/g, ' ') // Replace punctuation with spaces
+    .replace(/\s+/g, ' ')          // Replace multiple spaces with a single space
+    .trim();
+  
+  // Extract words and remove stop words
+  const words = cleanedMessage.split(' ')
+    .filter(word => word.length > 2)             // Only words longer than 2 chars
+    .filter(word => !isStopWord(word));          // Remove stop words
+  
+  // Extract potential topic phrases
+  const potentialTopics: string[] = [];
+  
+  // Extract 1-word topics (significant nouns)
+  const significantWords = words.filter(word => 
+    !word.match(/^(get|want|need|tell|show|explain|find|search|look|see|make|think|know|like|help)$/)
+  );
+  potentialTopics.push(...significantWords);
+  
+  // Extract 2-word topics (bigrams)
+  for (let i = 0; i < words.length - 1; i++) {
+    if (!isStopWord(words[i]) && !isStopWord(words[i+1])) {
+      potentialTopics.push(`${words[i]} ${words[i+1]}`);
+    }
+  }
+  
+  // Specific topic patterns to look for
+  const topicPatterns = [
+    /(?:tell me about|explain|what is|how does) ([\w\s]+?) (?:work|mean|refer to|stand for)/i,
+    /(?:information|details|facts) (?:about|on|regarding) ([\w\s]+)/i,
+    /(?:interested in|learning about|studying) ([\w\s]+)/i,
+    /(?:difference between) ([\w\s]+?) (?:and) ([\w\s]+)/i
+  ];
+  
+  // Extract topics from patterns
+  for (const pattern of topicPatterns) {
+    const matches = message.match(pattern);
+    if (matches && matches.length > 1) {
+      // Get capturing groups
+      for (let i = 1; i < matches.length; i++) {
+        const topic = matches[i]?.trim().toLowerCase();
+        if (topic && topic.length > 2) {
+          potentialTopics.push(topic);
+        }
+      }
+    }
+  }
+  
+  // Extract explicit topic mentions
+  const topicIndicators = [
+    "about", "regarding", "concerning", "on the subject of", "on the topic of",
+    "related to", "in relation to", "with respect to", "in regards to"
+  ];
+  
+  for (const indicator of topicIndicators) {
+    const indexOfIndicator = lowerMessage.indexOf(indicator + " ");
+    if (indexOfIndicator !== -1) {
+      const afterIndicator = lowerMessage.substring(indexOfIndicator + indicator.length + 1);
+      const topicEndIndex = Math.min(
+        ...[" is", " are", " was", " were", ",", ".", "?", "!", ";"].map(end => {
+          const index = afterIndicator.indexOf(end);
+          return index === -1 ? Infinity : index;
+        })
+      );
+      
+      const topic = topicEndIndex === Infinity 
+        ? afterIndicator 
+        : afterIndicator.substring(0, topicEndIndex);
+      
+      if (topic.trim().length > 2) {
+        potentialTopics.push(topic.trim());
+      }
+    }
+  }
+  
+  // Use the getRelatedConcepts function to check for topics
+  const identifiedTopics: string[] = [];
+  
+  // Check for topics related to our message content
+  for (const word of words) {
+    if (word.length > 3) { // Only consider longer words for mapping to topics
+      // Try to get related field for this word - if successful, it's likely a topic
+      const field = getRelatedField(word);
+      if (field && field !== "various fields") {
+        identifiedTopics.push(word);
+      }
+    }
+  }
+  
+  // Check message for more specific topics
+  const commonTopics = [
+    'machine learning', 'artificial intelligence', 'deep learning', 'neural networks',
+    'algorithms', 'data structures', 'quantum computing', 'climate change', 
+    'renewable energy', 'blockchain', 'cryptocurrency', 'genetics', 'genomics',
+    'psychology', 'neuroscience', 'economics', 'physics', 'chemistry', 'astronomy',
+    'history', 'literature', 'philosophy', 'art', 'music', 'film', 'health',
+    'nutrition', 'fitness', 'mindfulness', 'meditation', 'yoga', 'politics',
+    'law', 'education', 'language', 'communication', 'business', 'marketing',
+    'finance', 'investing', 'entrepreneurship', 'innovation', 'design',
+    'productivity', 'time management', 'personal development', 'relationships'
+  ];
+  
+  for (const topic of commonTopics) {
+    if (lowerMessage.includes(topic)) {
+      identifiedTopics.push(topic);
+    }
+  }
+  
+  // Remove duplicates from potential topics and identified topics using array filter for compatibility
+  const uniquePotentialTopics = potentialTopics.filter((topic, index) => 
+    potentialTopics.indexOf(topic) === index
+  );
+  const uniqueIdentifiedTopics = identifiedTopics.filter((topic, index) => 
+    identifiedTopics.indexOf(topic) === index
+  );
+  
+  // Fall back to potential topics if we haven't identified any known topics
+  return uniqueIdentifiedTopics.length > 0 
+    ? uniqueIdentifiedTopics.slice(0, 3) // Remove duplicates and limit to 3
+    : uniquePotentialTopics.slice(0, 3); // Remove duplicates and limit to 3
 }
 
 /**

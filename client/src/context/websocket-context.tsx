@@ -11,6 +11,7 @@ interface WebSocketContextType {
   disconnect: () => void;
   sendMessage: (type: string, data: any) => boolean;
   sendChatMessage: (message: string, history?: any[], isVoiceResponse?: boolean, options?: any) => boolean;
+  requestModelStatus: () => boolean;
   addMessageHandler: (type: string, callback: (data: any) => void) => () => void;
 }
 
@@ -55,6 +56,7 @@ export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children 
     sendMessage: (type, data) => wsClient.sendMessage(type, data),
     sendChatMessage: (message, history, isVoiceResponse, options) => 
       wsClient.sendChatMessage(message, history, isVoiceResponse, options),
+    requestModelStatus: () => wsClient.requestModelStatus(),
     addMessageHandler: (type, callback) => wsClient.addMessageHandler(type, callback)
   };
 

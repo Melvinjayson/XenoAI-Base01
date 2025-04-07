@@ -19,7 +19,7 @@ export interface ModelConfig {
   contextSize: number;
   inputCostPer1K: number;
   outputCostPer1K: number;
-  capabilities: ('text' | 'vision' | 'embedding' | 'audio' | 'search')[];
+  capabilities: ('text' | 'vision' | 'embedding' | 'audio' | 'search' | 'reasoning')[];
   maxTokens: number;
   temperature: number;
   category: 'basic' | 'advanced' | 'specialized';

@@ -14,13 +14,13 @@ const availableModels: ModelConfig[] = [
   // Local models
   {
     id: 'llama4-behemot',
-    name: 'LLama 4 Behemot',
+    name: 'Llama 4 Behemot',
     provider: 'local',
-    contextSize: 128000,
+    contextSize: 256000, // Upgraded to 256K context window
     inputCostPer1K: 0,
     outputCostPer1K: 0,
-    capabilities: ['text', 'embedding'],
-    maxTokens: 4096,
+    capabilities: ['text', 'embedding', 'reasoning'], // Added reasoning capability
+    maxTokens: 8192, // Increased maximum output tokens
     temperature: 0.7,
     category: 'advanced',
     latency: 'medium'
