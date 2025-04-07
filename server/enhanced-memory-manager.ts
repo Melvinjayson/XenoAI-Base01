@@ -1763,10 +1763,7 @@ export class EnhancedMemoryManager {
       return undefined;
     }
   }
-}
 
-// Export singleton instance
-export const enhancedMemoryManager = EnhancedMemoryManager.getInstance();
   /**
    * Get context specifically optimized for model transitions
    * This function provides a more streamlined approach when switching between
@@ -1809,14 +1806,7 @@ export const enhancedMemoryManager = EnhancedMemoryManager.getInstance();
     // Rough token estimation: ~4 characters per token on average for English
     return Math.ceil(text.length / 4);
   }
-  
-  /**
-   * Truncate text to a specific length
-   * @param text Text to truncate
-   * @param maxLength Maximum length to keep
-   * @returns Truncated text
-   */
-  private truncateText(text: string, maxLength: number): string {
-    if (!text || text.length <= maxLength) return text;
-    return text.substring(0, maxLength - 3) + "...";
-  }
+}
+
+// Export singleton instance
+export const enhancedMemoryManager = EnhancedMemoryManager.getInstance();

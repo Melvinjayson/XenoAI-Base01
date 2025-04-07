@@ -34,7 +34,7 @@ async function httpRequest(url, method = 'GET', body = null) {
 async function testGetSettings(sessionId) {
   console.log(`\n📊 Testing GET settings for session "${sessionId}"...`);
   try {
-    const settings = await httpRequest(`http://localhost:3000/api/model/transition?sessionId=${sessionId}`);
+    const settings = await httpRequest(`http://localhost:5000/api/model/transition?sessionId=${sessionId}`);
     console.log("✅ Current settings:", JSON.stringify(settings, null, 2));
     return settings;
   } catch (error) {
@@ -46,7 +46,7 @@ async function testGetSettings(sessionId) {
 async function testUpdateThreshold(sessionId, threshold) {
   console.log(`\n🔧 Testing UPDATE threshold to ${threshold} for session "${sessionId}"...`);
   try {
-    const settings = await httpRequest(`http://localhost:3000/api/model/transition`, 'POST', {
+    const settings = await httpRequest(`http://localhost:5000/api/model/transition`, 'POST', {
       sessionId,
       threshold
     });
@@ -61,7 +61,7 @@ async function testUpdateThreshold(sessionId, threshold) {
 async function testForceModel(sessionId, modelType) {
   console.log(`\n🔄 Testing FORCE model to "${modelType}" for session "${sessionId}"...`);
   try {
-    const settings = await httpRequest(`http://localhost:3000/api/model/transition`, 'POST', {
+    const settings = await httpRequest(`http://localhost:5000/api/model/transition`, 'POST', {
       sessionId,
       forceModel: modelType
     });
@@ -76,7 +76,7 @@ async function testForceModel(sessionId, modelType) {
 async function testOptimalChat(sessionId, message) {
   console.log(`\n💬 Testing OPTIMAL CHAT for session "${sessionId}" with message: "${message}"...`);
   try {
-    const response = await httpRequest(`http://localhost:3000/api/chat/optimal`, 'POST', {
+    const response = await httpRequest(`http://localhost:5000/api/chat/optimal`, 'POST', {
       message,
       sessionId,
       options: {
