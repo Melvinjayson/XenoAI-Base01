@@ -212,6 +212,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
               </div>
               
               <div className="flex items-center gap-2">
+                <ModelStatusWidget />
                 {/* Feedback system */}
                 {!hasFeedback && (
                   <div className="flex items-center gap-1">
