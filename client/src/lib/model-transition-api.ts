@@ -40,7 +40,7 @@ export interface OptimalChatOptions {
  */
 export async function getModelTransitionSettings(sessionId: string = 'default-session'): Promise<ModelTransitionSettings> {
   try {
-    const res = await apiRequest(`/api/model/transition?sessionId=${sessionId}`, 'GET');
+    const res = await apiRequest(`/api/model/transition?sessionId=${sessionId}`);
     const data = await res.json();
     return data as ModelTransitionSettings;
   } catch (error) {
