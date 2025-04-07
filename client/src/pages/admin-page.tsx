@@ -1,22 +1,21 @@
 import { ApiQuotaMonitor } from '@/components/admin/api-quota-monitor';
+import { ModelSettingsPanel } from '@/components/admin/model-settings-panel';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'; // Added imports for Card components
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ChevronLeft, 
   BarChart3, 
   Settings, 
   Users, 
-  Database 
+  Database,
+  Cpu 
 } from 'lucide-react';
 import { Link } from 'wouter';
-// Placeholder for ModelStatusWidget - replace with actual implementation
-const ModelStatusWidget = ({ sessionId }) => <p>Model Status for session: {sessionId}</p>;
-
+import { useState } from 'react';
 
 export default function AdminPage() {
-  //const [activeTab, setActiveTab] = useState('models'); //Removed as not needed and causes error.
-  //const [sessionId] = useState('default-session'); //Removed as not needed and causes error.
+  const [sessionId] = useState('default-session');
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -31,8 +30,12 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="api" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 mb-8">
+      <Tabs defaultValue="models" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsTrigger value="models" className="flex items-center gap-2">
+            <Cpu className="h-4 w-4" />
+            <span className="hidden sm:inline">Models</span>
+          </TabsTrigger>
           <TabsTrigger value="api" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">API Quotas</span>
@@ -49,11 +52,25 @@ export default function AdminPage() {
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Settings</span>
           </TabsTrigger>
-          <TabsTrigger value="models" className="flex items-center gap-2"> {/* Added Models tab */}
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Models</span>
-          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="models" className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            <ModelSettingsPanel sessionId={sessionId} />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Local Model Management</CardTitle>
+                <CardDescription>Manage and configure local LLM models</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-center h-32 border rounded-md bg-muted/20">
+                  <p className="text-muted-foreground">Local model management coming soon</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="api" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -103,24 +120,6 @@ export default function AdminPage() {
             <h2 className="text-lg font-medium mb-4">System Settings</h2>
             <p className="text-muted-foreground">Settings configuration coming soon.</p>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="models" className="space-y-4"> {/* Added Models tab content */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <ApiQuotaMonitor />
-            </div>
-
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Model Transition Settings</CardTitle>
-                <CardDescription>Configure how the system transitions between local and cloud models</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ModelStatusWidget sessionId={'default-session'} /> {/* Added default session ID */}
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
       </Tabs>
     </div>
