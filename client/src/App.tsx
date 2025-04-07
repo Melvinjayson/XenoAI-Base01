@@ -13,6 +13,7 @@ import CanvasPage from "@/pages/canvas-page";
 import AdminPage from "@/pages/admin-page";
 import ProjectManagementPage from "@/pages/project-management-new";
 import ColorPaletteGeneratorPage from "@/pages/color-palette-generator";
+import SettingsPage from "@/pages/settings-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -99,7 +100,7 @@ function Router() {
         {/* Only show on main pages */}
         {location !== "/splash" && location !== "/onboarding" && (
           <div className="flex-shrink-0 bg-background/80 backdrop-blur-sm shadow-sm border-b p-1 flex items-center">
-            <ModelStatusWidget />
+            <ModelStatusWidget compact={true} />
           </div>
         )}
       </div>
@@ -120,6 +121,7 @@ function Router() {
           <Route path="/project-management" component={ProjectManagementPage} />
           <Route path="/color-palette" component={ColorPaletteGeneratorPage} />
           <Route path="/workbench" component={EnhancedKnowledgeGraphPage} />
+          <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />
         </Switch>
         

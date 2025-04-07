@@ -139,47 +139,165 @@ export function estimateComplexity(message: string, history: any[] = []): number
   // Simple heuristics to determine request complexity
   const messageLength = message.length;
   const historyLength = history.length;
-  const complexityIndicators = [
-    'explain', 'analyze', 'compare', 'difference', 'summarize',
-    'reason', 'why', 'how', 'process', 'detailed', 'comprehensive',
-    'technical', 'in-depth', 'step by step', 'elaborate', 'synthesize',
-    'evaluate', 'assess', 'impact', 'implications', 'pros and cons'
-  ];
+  
+  // Enhanced complexity indicators with categories for better analysis
+  const complexityIndicators = {
+    reasoning: [
+      'explain', 'analyze', 'why', 'reason', 'because', 'therefore',
+      'understand', 'elaborate', 'clarify', 'insight', 'conclusion'
+    ],
+    comparison: [
+      'compare', 'difference', 'similar', 'versus', 'vs', 'contrast',
+      'better', 'worse', 'pros and cons', 'advantage', 'disadvantage',
+      'tradeoff', 'distinguish', 'differentiate'
+    ],
+    synthesis: [
+      'summarize', 'synthesize', 'combine', 'integrate', 'incorporate',
+      'merge', 'unify', 'blend', 'aggregate', 'consolidate'
+    ],
+    detailed: [
+      'detailed', 'comprehensive', 'thorough', 'in-depth', 'extensive',
+      'exhaustive', 'complete', 'full', 'step by step', 'precise',
+      'technical', 'specific', 'granular'
+    ],
+    creative: [
+      'generate', 'create', 'design', 'invent', 'imagine', 'novel',
+      'original', 'innovative', 'story', 'write', 'compose'
+    ],
+    evaluation: [
+      'evaluate', 'assess', 'judge', 'critique', 'review', 'appraise',
+      'rate', 'rank', 'score', 'grade', 'measure', 'estimate',
+      'impact', 'implications', 'effects', 'consequences'
+    ]
+  };
   
   // Check for complex indicators
   const lowerMessage = message.toLowerCase();
-  const indicatorMatches = complexityIndicators.reduce((count, indicator) => {
-    return count + (lowerMessage.includes(indicator) ? 1 : 0);
-  }, 0);
+  
+  // Calculate match score for each category
+  const categoryScores = Object.entries(complexityIndicators).map(([category, indicators]) => {
+    const matches = indicators.filter(indicator => lowerMessage.includes(indicator)).length;
+    const categoryScore = Math.min(matches / 3, 1); // Cap at 1.0
+    
+    if (matches > 0) {
+      console.log(`Complexity category ${category}: ${matches} matches, score ${categoryScore.toFixed(2)}`);
+    }
+    
+    return categoryScore;
+  });
+  
+  // Get the average of the top 2 category scores to encourage specialization
+  const topCategoryScores = [...categoryScores].sort((a, b) => b - a).slice(0, 2);
+  const categoryFactor = topCategoryScores.length > 0 
+    ? topCategoryScores.reduce((sum, score) => sum + score, 0) / topCategoryScores.length
+    : 0;
   
   // Complexity from message length (1000+ chars is complex)
   const lengthFactor = Math.min(messageLength / 1000, 1);
   
-  // Complexity from history (10+ messages is complex)
-  const historyFactor = Math.min(historyLength / 10, 1);
+  // Complexity from history (10+ messages is complex, but with a higher weight for long conversations)
+  const historyComplexityFactor = historyLength > 0 
+    ? Math.min(historyLength / 10, 1) * (1 + Math.min(calculateHistoryComplexity(history) / 10, 0.5))
+    : 0;
   
-  // Complexity from indicators (3+ indicators is complex)
-  const indicatorFactor = Math.min(indicatorMatches / 3, 1);
-  
-  // Calculate weighted score (more weight on indicators)
+  // Calculate weighted score with new weights
   const complexityScore = (
-    lengthFactor * 0.2 +
-    historyFactor * 0.3 +
-    indicatorFactor * 0.5
+    lengthFactor * 0.15 +              // 15% weight on message length
+    historyComplexityFactor * 0.25 +   // 25% weight on conversation history
+    categoryFactor * 0.6               // 60% weight on complexity indicators
   );
   
-  return Math.min(Math.max(complexityScore, 0), 1);
+  // Apply a logarithmic curve to better distribute scores
+  // This makes easy tasks stay easier and difficult tasks more obviously complex
+  const adjustedScore = complexityScore === 0 
+    ? 0 
+    : Math.min(Math.max(Math.log10(1 + 9 * complexityScore), 0), 1);
+  
+  console.log(`Complexity analysis: raw=${complexityScore.toFixed(3)}, adjusted=${adjustedScore.toFixed(3)}`);
+  
+  return adjustedScore;
 }
 
 /**
- * Estimate token count for a message
+ * Calculate a history complexity factor based on conversation history
+ * @param history Conversation history array
+ * @returns History complexity factor between 0 and 1
+ */
+function calculateHistoryComplexity(history: any[]): number {
+  // No history, no complexity
+  if (!history || history.length === 0) return 0;
+  
+  // Calculate average message length in history
+  const avgMessageLength = history.reduce((sum, msg) => {
+    const content = typeof msg === 'string' ? msg : (msg.content || '');
+    return sum + content.length;
+  }, 0) / history.length;
+  
+  // Calculate message count
+  const messageCount = history.length;
+  
+  // Calculate a topic coherence score - how similar are the messages?
+  // For simplicity, we'll just use adjacent message similarity as a proxy
+  let topicCoherence = 0;
+  if (history.length > 1) {
+    let similarityPairs = 0;
+    for (let i = 1; i < history.length; i++) {
+      const prevContent = typeof history[i-1] === 'string' ? history[i-1] : (history[i-1].content || '');
+      const currContent = typeof history[i] === 'string' ? history[i] : (history[i].content || '');
+      
+      // Very simple similarity heuristic - count shared words of 5+ characters
+      const prevWords = new Set(prevContent.toLowerCase().split(/\s+/).filter((w: string) => w.length >= 5));
+      const currWords = currContent.toLowerCase().split(/\s+/).filter((w: string) => w.length >= 5);
+      let sharedWords = 0;
+      for (const word of currWords) {
+        if (prevWords.has(word)) sharedWords++;
+      }
+      
+      const similarity = currWords.length > 0 ? sharedWords / currWords.length : 0;
+      topicCoherence += similarity;
+      similarityPairs++;
+    }
+    
+    topicCoherence = similarityPairs > 0 ? topicCoherence / similarityPairs : 0;
+  }
+  
+  // Higher score for:
+  // 1. More messages
+  // 2. Longer average message length
+  // 3. Higher topic coherence
+  return (
+    Math.min(messageCount / 20, 1) * 0.5 +
+    Math.min(avgMessageLength / 500, 1) * 0.3 +
+    topicCoherence * 0.2
+  );
+}
+
+/**
+ * Estimate token count for a message with more accurate heuristics
  * @param text Text to estimate
  * @returns Estimated token count
  */
 export function estimateTokenCount(text?: string | null): number {
   if (!text) return 0;
-  // Simple approximation: 1 token ≈ 4 characters
-  return Math.ceil(text.length / 4);
+  
+  // More detailed heuristics for token counting
+  // 1. Count words (approx 0.75 tokens per word for English)
+  const wordCount = text.split(/\s+/).length;
+  
+  // 2. Count numbers, special characters, and punctuation (often 1 token each)
+  const specialCharCount = (text.match(/[0-9.,?!;:()\[\]{}@#$%^&*+\-=<>~/\\|"'`]/g) || []).length;
+  
+  // 3. Count potential subword tokens (esp. for long or technical words)
+  const longWordCount = text.split(/\s+/).filter(word => word.length > 10).length;
+  
+  // Combine into final estimate with weight adjustments
+  const tokenEstimate = (wordCount * 0.75) + (specialCharCount * 0.6) + (longWordCount * 0.5);
+  
+  // Ensure minimum value of text.length / 5 and maximum of text.length / 2
+  return Math.max(
+    Math.min(Math.ceil(tokenEstimate), Math.ceil(text.length / 2)),
+    Math.ceil(text.length / 5)
+  );
 }
 
 /**
@@ -190,7 +308,35 @@ export function estimateTokenCount(text?: string | null): number {
  */
 export function shouldUseAdvancedModel(message: string, history: any[] = []): boolean {
   const complexity = estimateComplexity(message, history);
-  return complexity > 0.75; // Increased from 0.6 to 0.75 to favor local models for more tasks
+  
+  // Check for specific keywords that strongly indicate need for advanced model
+  const advancedKeywords = [
+    'ethical implications',
+    'philosophical',
+    'complex reasoning',
+    'multi-step analysis',
+    'detailed comparison',
+    'synthesize research',
+    'review literature',
+    'critical analysis',
+    'case study',
+    'systems thinking',
+    'interdisciplinary'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  const hasAdvancedKeyword = advancedKeywords.some(keyword => lowerMessage.includes(keyword));
+  
+  // Override complexity threshold if advanced keywords are present
+  if (hasAdvancedKeyword) {
+    console.log('Advanced model triggered by keyword match');
+    return true;
+  }
+  
+  // Use complexity threshold with memory of conversation complexity
+  const threshold = complexity > 0.9 ? 0.6 : 0.75; // Lower threshold for very complex follow-ups
+  
+  return complexity > threshold;
 }
 
 /**

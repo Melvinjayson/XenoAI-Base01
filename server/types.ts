@@ -67,6 +67,10 @@ export interface ProcessorResponse {
     total: number;
   };
   sources?: Reference[];
+  // Fields for model transition tracking
+  modelType?: 'local' | 'cloud';
+  transitioned?: boolean;
+  previousModelType?: 'local' | 'cloud';
 }
 
 // Reference to a source

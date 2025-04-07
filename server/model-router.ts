@@ -19,7 +19,8 @@ import {
   shouldUseAdvancedModel,
   estimateComplexity,
   estimateTokenCount,
-  getModelById
+  getModelById,
+  getAvailableModels
 } from './model-selector';
 import { apiQuotaManager, ApiService } from './api-quota-manager';
 
@@ -47,6 +48,14 @@ export async function processMessage(
   
   // Estimate message complexity
   const complexity = estimateComplexity(message, history);
+  
+  // If we've imported the model transition manager, log its existence
+  try {
+    const { modelTransitionManager } = require('./model-transition-manager');
+    console.log('Model transition manager is available');
+  } catch (error) {
+    console.log('Model transition manager not available yet, using default routing');
+  }
   console.log(`Message complexity: ${complexity.toFixed(2)}`);
   
   // Determine if we should use an advanced model
@@ -67,7 +76,23 @@ export async function processMessage(
   // Select model based on needs if not explicitly set
   if (!selectedModel) {
     const preferredCategory = needsAdvancedModel ? 'advanced' : 'basic';
-    const preferLocal = options.useLocalLLM ?? true;
+    
+    // Check API quota status to influence our preference for local model
+    const openaiQuota = apiQuotaManager.getRemainingQuota(ApiService.OPENAI);
+    const openaiQuotaLow = openaiQuota < 2000; // Consider quota low if less than 2000 tokens remaining
+    
+    // Dynamically adjust local model preference based on quota and complexity
+    let preferLocal = options.useLocalLLM;
+    
+    // If preference wasn't explicitly set, use heuristics
+    if (preferLocal === undefined) {
+      // Prefer local model when:
+      // 1. API quota is low, or
+      // 2. For basic requests when complexity is under 0.5
+      preferLocal = openaiQuotaLow || (!needsAdvancedModel && complexity < 0.5);
+    }
+    
+    console.log(`Model preference: preferLocal=${preferLocal}, openaiQuota=${openaiQuota}`);
     
     selectedModel = selectModel(['text'], preferredCategory, preferLocal);
     
@@ -75,6 +100,15 @@ export async function processMessage(
     if (!selectedModel && preferredCategory === 'advanced') {
       console.log('No advanced model available, falling back to basic');
       selectedModel = selectModel(['text'], 'basic', preferLocal);
+    }
+    
+    // If the quota is very low, force local model regardless of preference
+    if (openaiQuota < 500 && selectedModel?.provider === 'openai') {
+      console.log('API quota very low, forcing local model');
+      const localModel = getAvailableModels().find((m: any) => m.provider === 'local');
+      if (localModel) {
+        selectedModel = localModel;
+      }
     }
   }
   
@@ -98,9 +132,19 @@ export async function processMessage(
   const topics = options.topics || [];
   const sessionId = options.sessionId || 'default-session';
   
-  // Prepare system prompt
-  const systemPrompt = options.systemPrompt || 
+  // Prepare system prompt with adaptive context
+  const baseSystemPrompt = options.systemPrompt || 
     (useLocalModel ? DEFAULT_PROMPTS.local : DEFAULT_PROMPTS.generic);
+    
+  // Enhanced system prompt with adaptive capabilities reference
+  let systemPrompt = baseSystemPrompt;
+  if (!options.systemPrompt) {
+    // Add adaptive context for seamless model switching
+    systemPrompt += "\n\nYou are part of a tiered model system that combines local processing power with cloud APIs. " +
+      "Your responses should be consistent regardless of which model is processing this request. " +
+      "The system can automatically transition between local and cloud processing based on task complexity, " +
+      "API quota availability, and user preferences, all transparently to the user.";
+  }
   
   try {
     // Route to appropriate processor based on provider
@@ -159,6 +203,15 @@ export async function processMessage(
         initializeLocalLLM().catch(err => console.warn('Preemptive local LLM init failed:', err));
         
         response = await processWithOpenAI(message, history, selectedModel.id, processingOptions);
+        
+        // Track successful API usage to improve future model selection
+        apiQuotaManager.trackUsage(ApiService.OPENAI, {
+          requests: 1,
+          tokens: response.tokens.total,
+          model: selectedModel.id,
+          promptTokens: response.tokens.prompt,
+          completionTokens: response.tokens.completion
+        });
       } catch (openaiError: any) {
         console.error('OpenAI error, falling back to local model:', openaiError.message || openaiError);
         
@@ -178,6 +231,12 @@ export async function processMessage(
         console.log('Falling back to local model due to OpenAI error');
         return await fallbackToLocalModel(message, history, options);
       }
+    } else if (selectedModel.provider === 'perplexity') {
+      // Implementation for Perplexity models would go here
+      throw new Error(`Provider ${selectedModel.provider} support coming soon`);
+    } else if (selectedModel.provider === 'anthropic') {
+      // Implementation for Anthropic models would go here
+      throw new Error(`Provider ${selectedModel.provider} support coming soon`);
     } else {
       // Unsupported provider
       throw new Error(`Provider ${selectedModel.provider} not supported yet`);

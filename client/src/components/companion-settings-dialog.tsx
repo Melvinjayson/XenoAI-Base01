@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'wouter';
 import { 
   Dialog, 
   DialogContent, 
@@ -13,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Bot, Brain, Sparkles } from 'lucide-react';
+import { Bot, Brain, Sparkles, Settings } from 'lucide-react';
 import { useCompanion } from '@/context/companion-context';
 
 interface CompanionSettingsDialogProps {
@@ -39,6 +40,9 @@ export function CompanionSettingsDialog({
     speechEnabled,
     setSpeechEnabled
   } = useCompanion();
+  
+  // For navigation to the settings page
+  const [, setLocation] = useLocation();
 
   // Local state to avoid immediate UI updates during dialog interaction
   const [localPosition, setLocalPosition] = useState(position);
@@ -179,6 +183,21 @@ export function CompanionSettingsDialog({
               />
             </div>
           </div>
+        </div>
+
+        <div className="my-3 flex justify-center">
+          <Button
+            variant="link"
+            size="sm"
+            className="text-xs text-muted-foreground flex items-center gap-1"
+            onClick={() => {
+              if (onOpenChange) onOpenChange(false);
+              setLocation('/settings');
+            }}
+          >
+            <Settings className="h-3 w-3" />
+            Advanced Settings
+          </Button>
         </div>
 
         <DialogFooter>

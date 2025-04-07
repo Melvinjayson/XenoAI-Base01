@@ -1767,3 +1767,56 @@ export class EnhancedMemoryManager {
 
 // Export singleton instance
 export const enhancedMemoryManager = EnhancedMemoryManager.getInstance();
+  /**
+   * Get context specifically optimized for model transitions
+   * This function provides a more streamlined approach when switching between
+   * local and cloud models to maintain contextual awareness
+   * 
+   * @param sessionId Session identifier
+   * @param currentMessage Current user message
+   * @param targetModel Target model type (local or cloud)
+   * @param previousModel Previous model type (local or cloud)
+   * @returns Optimized context for the target model
+   */
+  public async getModelTransitionContext(
+    sessionId: string,
+    currentMessage: string,
+    targetModel: string,
+    previousModel: string
+  ): Promise<string> {
+    console.log(`Preparing model transition context from ${previousModel} to ${targetModel} for session ${sessionId}`);
+    
+    // Initialize context
+    let transitionContext = "";
+    
+    // Set context budget based on model type
+    const contextBudget = targetModel === "local" ? 4096 : 12288;
+    
+    // Simple implementation for now
+    transitionContext = `[MODEL TRANSITION: ${previousModel} → ${targetModel}]\n\n`;
+    transitionContext += `Current message: ${currentMessage}\n\n`;
+    
+    return transitionContext;
+  }
+  
+  /**
+   * Estimate token count for a text
+   * @param text Text to estimate tokens for
+   * @returns Estimated token count
+   */
+  private estimateTokenCount(text: string): number {
+    if (!text) return 0;
+    // Rough token estimation: ~4 characters per token on average for English
+    return Math.ceil(text.length / 4);
+  }
+  
+  /**
+   * Truncate text to a specific length
+   * @param text Text to truncate
+   * @param maxLength Maximum length to keep
+   * @returns Truncated text
+   */
+  private truncateText(text: string, maxLength: number): string {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + "...";
+  }

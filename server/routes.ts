@@ -24,6 +24,7 @@ import {
 import { memoryManager } from './memory-manager';
 import { enhancedMemoryManager } from './enhanced-memory-manager';
 import { isLocalLLMAvailable, getLocalLLMStatus } from './local-llm';
+import { modelTransitionManager, ModelType } from './model-transition-manager';
 
 // Define API Service type for quota manager
 type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
@@ -198,6 +199,97 @@ function setupApiRoutes(app: Express): void {
   app.get('/api/stats/costs', (req: Request, res: Response) => {
     const costs = apiQuotaManager.getEstimatedCosts();
     res.status(200).json(costs);
+  });
+  
+  // Model transition settings
+  app.get('/api/model/transition', (req: Request, res: Response) => {
+    try {
+      // Get the session ID from query params or default to 'default-session'
+      const sessionId = req.query.sessionId as string || 'default-session';
+      
+      // Get current settings
+      const threshold = modelTransitionManager.getComplexityThreshold(sessionId);
+      const currentModelType = modelTransitionManager.getLastUsedModelType(sessionId);
+      
+      res.status(200).json({
+        sessionId,
+        complexityThreshold: threshold,
+        currentModelType: currentModelType === ModelType.LOCAL ? 'local' : 'cloud',
+        cloudModelsAvailable: !modelTransitionManager.shouldAvoidCloudModels(),
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Error getting model transition settings:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+  
+  // Update model transition settings
+  app.post('/api/model/transition', (req: Request, res: Response) => {
+    try {
+      const { sessionId = 'default-session', threshold, forceModel } = req.body;
+      
+      // Update threshold if provided
+      if (typeof threshold === 'number') {
+        modelTransitionManager.setComplexityThreshold(sessionId, threshold);
+      }
+      
+      // Force a specific model type if provided
+      if (forceModel === 'local' || forceModel === 'cloud') {
+        const modelType = forceModel === 'local' ? ModelType.LOCAL : ModelType.CLOUD;
+        modelTransitionManager.recordModelUsage(sessionId, modelType);
+      }
+      
+      // Return updated settings
+      const updatedThreshold = modelTransitionManager.getComplexityThreshold(sessionId);
+      const currentModelType = modelTransitionManager.getLastUsedModelType(sessionId);
+      
+      res.status(200).json({
+        sessionId,
+        complexityThreshold: updatedThreshold,
+        currentModelType: currentModelType === ModelType.LOCAL ? 'local' : 'cloud',
+        updated: true,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Error updating model transition settings:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+  
+  // Process a message with automatic model selection for optimal processing
+  app.post('/api/chat/optimal', async (req: Request, res: Response) => {
+    try {
+      const { 
+        message, 
+        history = [], 
+        options = {}, 
+        sessionId = 'anonymous-session'
+      } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+      
+      console.log(`Processing optimal chat for session ${sessionId}`);
+      
+      // Use the model transition manager to process with optimal model
+      const response = await modelTransitionManager.processWithOptimalModel(
+        message,
+        history as ChatMessage[],
+        {
+          sessionId,
+          contextLevel: options.contextLevel || 'standard',
+          preserveContext: options.preserveContext !== false,
+          forceModel: options.forceModel as 'local' | 'cloud' | undefined
+        }
+      );
+      
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error processing optimal chat:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
   });
 
   // Text-to-speech endpoint
