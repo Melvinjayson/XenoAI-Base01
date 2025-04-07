@@ -350,20 +350,21 @@ export default function Home() {
                     <span>Knowledge Graph</span>
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/workbench" className="flex items-center gap-2">
+                    <Layout className="w-4 h-4" />
+                    <span>Workbench</span>
+                  </Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Link href="/workbench">
-              <Button variant="ghost" size="icon" className="rounded-full relative h-9 w-9" aria-label="Workbench">
-                <Network className="w-5 h-5 text-primary" />
+            <Link href="/project-management">
+              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 relative" aria-label="Projects">
+                <Kanban className="w-5 h-5" />
                 <span className="absolute top-1 right-1 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
-              </Button>
-            </Link>
-            <Link href="/project-management">
-              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Projects">
-                <Kanban className="w-5 h-5" />
               </Button>
             </Link>
             <Link href="/admin">

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTheme, ThemeMode, ConservationMode, FontSize, ReducedMotion } from '@/context/theme-context';
 import { Sun, Moon, MonitorSmartphone, Battery, BatteryLow, BatteryMedium, 
          Volume2, VolumeX, VolumeIcon, UserIcon, Settings as SettingsIcon,
-         Type, ZoomIn, ZoomOut, MousePointer, Contrast } from 'lucide-react';
+         Type, ZoomIn, ZoomOut, MousePointer, Contrast, Accessibility } from 'lucide-react';
 import { 
   Sheet, 
   SheetContent, 
@@ -87,14 +87,17 @@ export function SettingsPanel({
           variant="ghost" 
           size="icon" 
           className="rounded-full" 
-          aria-label="Settings"
+          aria-label="Accessibility and Settings"
         >
-          <SettingsIcon className="h-5 w-5" />
+          <Accessibility className="h-5 w-5 text-primary" />
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-[300px] sm:w-[400px] overflow-y-auto">
         <SheetHeader className="text-left">
-          <SheetTitle>Settings</SheetTitle>
+          <SheetTitle className="flex items-center gap-2">
+            <Accessibility className="h-5 w-5 text-primary" />
+            <span>Accessibility & Settings</span>
+          </SheetTitle>
         </SheetHeader>
         
         <Tabs defaultValue="appearance" className="mt-4">
