@@ -101,13 +101,13 @@ export async function apiRequest<T = any>(
     offlineEnabled?: boolean;
     forceNetwork?: boolean;
   } = {}
-): Promise<T> {
+): Promise<Response> {
   const { offlineEnabled = true, forceNetwork = false } = options;
   
   // If we're offline and this is a mutation (non-GET request)
   if (!isOnline() && method !== 'GET' && offlineEnabled) {
     // Save the mutation for later sync
-    return saveOfflineMutation<T>(endpoint, method, data);
+    return saveOfflineMutation<Response>(endpoint, method, data);
   }
   
   try {
@@ -119,25 +119,48 @@ export async function apiRequest<T = any>(
     });
 
     await throwIfResNotOk(res);
-    const responseData = await res.json();
     
     // Cache successful GET responses for offline use
     if (method === 'GET' && offlineEnabled) {
+      // Clone the response because it will be consumed by json()
+      const clonedRes = res.clone();
+      const responseData = await clonedRes.json();
       await saveToOfflineCache(endpoint, method, responseData);
     }
     
-    return responseData;
+    return res;
   } catch (error) {
     // If network request fails and we're offline, try to get from cache for GET requests
     if (!isOnline() && method === 'GET' && offlineEnabled) {
       const cachedData = await getFromOfflineCache<T>(endpoint, method);
       if (cachedData) {
-        return cachedData;
+        // Create a mock Response object
+        const mockResponse = new Response(JSON.stringify(cachedData), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+        return mockResponse;
       }
     }
     
     throw error;
   }
+}
+
+/**
+ * Helper function to make an API request and return the JSON data
+ */
+export async function apiRequestJson<T = any>(
+  endpoint: string, 
+  method: string = 'GET',
+  data?: unknown | undefined,
+  options: {
+    offlineEnabled?: boolean;
+    forceNetwork?: boolean;
+  } = {}
+): Promise<T> {
+  const response = await apiRequest<T>(endpoint, method, data, options);
+  return await response.json() as T;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -259,7 +282,7 @@ export async function analyzeConversationForCommands(messages: any[]): Promise<{
   confidence: number;
 }> {
   try {
-    const response = await apiRequest('/api/context/analyze-commands', 'POST', { messages });
+    const response = await apiRequestJson<{ analysis: any }>('/api/context/analyze-commands', 'POST', { messages });
     return response.analysis;
   } catch (error) {
     console.error('Error analyzing conversation for commands:', error);
@@ -288,7 +311,7 @@ export async function executeSystemCommand(
   commandType: 'file_management' | 'project_creation' | 'knowledge_graph' | 'mind_map' | 'workbench' | 'other';
 }> {
   try {
-    const response = await apiRequest('/api/context/execute-command', 'POST', { command, context });
+    const response = await apiRequestJson<{ result: any }>('/api/context/execute-command', 'POST', { command, context });
     return response.result;
   } catch (error) {
     console.error('Error executing system command:', error);
@@ -323,7 +346,7 @@ export async function analyzeWorkbench(
   focusAreas: string[];
 }> {
   try {
-    const response = await apiRequest('/api/context/analyze-workbench', 'POST', { context });
+    const response = await apiRequestJson<{ analysis: any }>('/api/context/analyze-workbench', 'POST', { context });
     return response.analysis;
   } catch (error) {
     console.error('Error analyzing workbench:', error);
@@ -364,7 +387,7 @@ export async function generateTaskList(
   }[];
 }> {
   try {
-    const response = await apiRequest('/api/context/generate-tasks', 'POST', { context, messages });
+    const response = await apiRequestJson<{ taskList: any }>('/api/context/generate-tasks', 'POST', { context, messages });
     return response.taskList;
   } catch (error) {
     console.error('Error generating task list:', error);

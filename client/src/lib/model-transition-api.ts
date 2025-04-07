@@ -6,7 +6,7 @@
  * and adjusting settings for complexity thresholds.
  */
 
-import { apiRequest, queryClient } from './queryClient';
+import { apiRequest, apiRequestJson, queryClient } from './queryClient';
 import { ProcessorResponse, type ChatMessage } from '../../../server/types';
 
 // Model type enum
@@ -40,9 +40,7 @@ export interface OptimalChatOptions {
  */
 export async function getModelTransitionSettings(sessionId: string = 'default-session'): Promise<ModelTransitionSettings> {
   try {
-    const res = await apiRequest(`/api/model/transition?sessionId=${sessionId}`);
-    const data = await res.json();
-    return data as ModelTransitionSettings;
+    return await apiRequestJson<ModelTransitionSettings>(`/api/model/transition?sessionId=${sessionId}`);
   } catch (error) {
     console.error('Error fetching model transition settings:', error);
     throw error;
@@ -62,9 +60,7 @@ export async function updateModelTransitionSettings(
   }
 ): Promise<ModelTransitionSettings> {
   try {
-    const res = await apiRequest('/api/model/transition', 'POST', settings);
-    const data = await res.json();
-    return data as ModelTransitionSettings;
+    return await apiRequestJson<ModelTransitionSettings>('/api/model/transition', 'POST', settings);
   } catch (error) {
     console.error('Error updating model transition settings:', error);
     throw error;
@@ -84,13 +80,11 @@ export async function processWithOptimalModel(
   options: OptimalChatOptions = {}
 ): Promise<ProcessorResponse> {
   try {
-    const res = await apiRequest('/api/chat/optimal', 'POST', {
+    return await apiRequestJson<ProcessorResponse>('/api/chat/optimal', 'POST', {
       message,
       history,
       options
     });
-    const data = await res.json();
-    return data as ProcessorResponse;
   } catch (error) {
     console.error('Error processing with optimal model:', error);
     throw error;
