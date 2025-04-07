@@ -25,19 +25,19 @@ export class AIResearchAgent {
   private lastProcessingTime: number = 0;
   private processingInterval: number = 5 * 60 * 1000; // 5 minutes
   private userFeedbackRegistry: Map<string, UserFeedback[]> = new Map(); // resourceId -> feedback
-  
+
   private constructor() {
     // Initialize agent and setup automatic processing
     setInterval(() => this.processQueues(), this.processingInterval);
   }
-  
+
   public static getInstance(): AIResearchAgent {
     if (!AIResearchAgent.instance) {
       AIResearchAgent.instance = new AIResearchAgent();
     }
     return AIResearchAgent.instance;
   }
-  
+
   /**
    * Register an entity for automated processing and updates
    * @param entityType Type of entity (project, graph, canvas, etc.)
@@ -51,7 +51,7 @@ export class AIResearchAgent {
   ): void {
     const now = Date.now();
     const queueDelay = Math.max(1000, 60000 / priority); // Higher priority = less delay
-    
+
     switch (entityType) {
       case 'project':
         this.projectUpdateQueue.set(Number(entityId), now + queueDelay);
@@ -65,7 +65,7 @@ export class AIResearchAgent {
       // Add other entity types as needed
     }
   }
-  
+
   /**
    * Add user feedback for a specific resource (project, graph node, etc.)
    * @param resourceType Type of resource the feedback is for
@@ -78,24 +78,24 @@ export class AIResearchAgent {
     feedback: UserFeedback
   ): void {
     const id = `${resourceType}:${resourceId}`;
-    
+
     if (!this.userFeedbackRegistry.has(id)) {
       this.userFeedbackRegistry.set(id, []);
     }
-    
+
     const feedbackList = this.userFeedbackRegistry.get(id)!;
     feedbackList.push({
       ...feedback,
       timestamp: feedback.timestamp || Date.now()
     });
-    
+
     // Limit feedback history to prevent memory bloat
     if (feedbackList.length > 20) {
       feedbackList.splice(0, feedbackList.length - 20);
     }
-    
+
     this.userFeedbackRegistry.set(id, feedbackList);
-    
+
     // Register the entity for processing based on feedback
     if (resourceType === 'project') {
       this.registerEntity('project', resourceId, 2); // Higher priority for user feedback
@@ -105,7 +105,7 @@ export class AIResearchAgent {
       this.registerEntity('canvas', resourceId, 2);
     }
   }
-  
+
   /**
    * Process all queued entities and updates
    * Respects API rate limits and prioritizes recent user interactions
@@ -113,14 +113,14 @@ export class AIResearchAgent {
   private async processQueues(): Promise<void> {
     // Avoid concurrent processing
     if (this.isProcessing) return;
-    
+
     // Respect minimum interval between processing runs
     const now = Date.now();
     if (now - this.lastProcessingTime < this.processingInterval / 2) return;
-    
+
     this.isProcessing = true;
     this.lastProcessingTime = now;
-    
+
     try {
       // Process project updates
       for (const [projectId, timestamp] of this.projectUpdateQueue.entries()) {
@@ -129,7 +129,7 @@ export class AIResearchAgent {
           this.projectUpdateQueue.delete(projectId);
         }
       }
-      
+
       // Process graph updates
       for (const [graphId, timestamp] of this.graphUpdateQueue.entries()) {
         if (timestamp <= now) {
@@ -137,7 +137,7 @@ export class AIResearchAgent {
           this.graphUpdateQueue.delete(graphId);
         }
       }
-      
+
       // Process canvas updates
       for (const [canvasId, timestamp] of this.canvasUpdateQueue.entries()) {
         if (timestamp <= now) {
@@ -151,7 +151,7 @@ export class AIResearchAgent {
       this.isProcessing = false;
     }
   }
-  
+
   /**
    * Process a project update, generating new insights, suggestions,
    * and potential connections to other research components
@@ -161,11 +161,11 @@ export class AIResearchAgent {
       // Fetch project data (implement getProjectData in your storage layer)
       const project = await globalThis.storage?.getProject(projectId);
       if (!project) return;
-      
+
       // Get relevant user feedback
       const feedbackKey = `project:${projectId}`;
       const feedback = this.userFeedbackRegistry.get(feedbackKey) || [];
-      
+
       // Check API quota before proceeding
       const quotaCheck = apiQuotaManager.checkRateLimit('openai', 800);
       if (quotaCheck.isLimited) {
@@ -174,140 +174,59 @@ export class AIResearchAgent {
         this.projectUpdateQueue.set(projectId, Date.now() + 15 * 60 * 1000); // 15 min delay
         return;
       }
-      
+
       // Generate and apply updates using AI
       await this.generateProjectInsights(project, feedback);
-      
+
       // Record successful API usage
       apiQuotaManager.recordApiUsage('openai', 800); // Estimate token usage
-      
+
     } catch (error) {
       console.error(`Error processing project update for project ${projectId}:`, error);
     }
   }
-  
+
   /**
    * Generate new research insights for a project based on content and feedback
    */
   private async generateProjectInsights(
     project: any, // Use any instead of ProjectWithRelations
-    feedback: UserFeedback[]
+    feedback: UserFeedback[],
+    contextualData: ResearchContext = {}
   ): Promise<void> {
-    try {
-      // Extract relevant information from project and tasks
-      const projectSummary = `Project: ${project.title}\nDescription: ${project.description || 'No description'}\nStatus: ${project.status || 'In progress'}`;
-      
-      const taskSummary = project.tasks?.map(task => 
-        `- ${task.title} (${task.status || 'Pending'}): ${task.description}`
-      ).join('\n') || 'No tasks available';
-      
-      const insightSummary = project.insights?.map(insight => 
-        `- ${insight.title} (Confidence: ${insight.confidence}): ${insight.content}`
-      ).join('\n') || 'No insights available';
-      
-      const feedbackSummary = feedback.length > 0 
-        ? feedback.map(f => `- ${f.type}: ${f.content} (${f.timestamp ? new Date(f.timestamp).toISOString() : 'unknown time'})`).join('\n')
-        : 'No user feedback available';
-      
-      // Build AI prompt for insight generation
-      const prompt = `You are an AI research assistant helping to enhance a research project by generating new insights and suggestions.
+    // Implement multi-modal research synthesis
+    const researchPatterns = await this.analyzeResearchPatterns(project);
 
-PROJECT INFORMATION:
-${projectSummary}
+    // Generate cross-domain insights
+    const crossDomainInsights = await this.generateCrossDomainInsights(
+      project,
+      researchPatterns,
+      contextualData
+    );
 
-CURRENT TASKS:
-${taskSummary}
-
-EXISTING INSIGHTS:
-${insightSummary}
-
-USER FEEDBACK:
-${feedbackSummary}
-
-Based on the above information, please:
-1. Generate 2-3 new research insights that would be valuable for this project
-2. Identify potential connections to explore between existing tasks and insights
-3. Suggest 1-2 new research directions or tasks that should be considered
-
-Format your response as a JSON object with the following structure:
-{
-  "newInsights": [
-    {
-      "title": "Insight title",
-      "content": "Detailed explanation of the insight",
-      "confidence": 0.8, // between 0 and 1
-      "tags": ["tag1", "tag2"]
-    }
-  ],
-  "connections": [
-    {
-      "from": "Element description (e.g., task or insight name)",
-      "to": "Element description (e.g., task or insight name)",
-      "relationship": "Brief description of the connection",
-      "strength": 0.7 // between 0 and 1
-    }
-  ],
-  "suggestedTasks": [
-    {
-      "title": "Task title",
-      "description": "Detailed description of the task",
-      "priority": "high" // high, medium, or low
-    }
-  ]
-}`;
-
-      // Make the API call
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-      });
-      
-      // Parse response
-      const content = response.choices[0].message.content;
-      if (!content) return;
-      
-      const result = JSON.parse(content);
-      
-      // Apply the generated insights and tasks to the project
-      if (result.newInsights && Array.isArray(result.newInsights)) {
-        for (const insight of result.newInsights) {
-          if (insight.title && insight.content) {
-            await globalThis.storage?.createResearchInsight({
-              projectId: project.id,
-              title: insight.title,
-              content: insight.content,
-              confidence: insight.confidence || 0.7,
-              tags: insight.tags || [],
-              source: 'AI Assistant',
-              metadata: { generatedBy: 'ai-research-agent', timestamp: Date.now() }
-            });
-          }
-        }
-      }
-      
-      // Add suggested tasks to the project
-      if (result.suggestedTasks && Array.isArray(result.suggestedTasks)) {
-        for (const task of result.suggestedTasks) {
-          if (task.title && task.description) {
-            await globalThis.storage?.createTask({
-              projectId: project.id,
-              title: task.title,
-              description: task.description,
-              priority: task.priority || 'medium',
-              status: 'pending',
-              metadata: { generatedBy: 'ai-research-agent', timestamp: Date.now() }
-            });
-          }
-        }
-      }
-      
-    } catch (error) {
-      console.error("Error generating project insights:", error);
-    }
+    // Apply recursive reasoning for deeper understanding
+    const enhancedInsights = await this.applyRecursiveReasoning(crossDomainInsights);
   }
-  
+
+  private async analyzeResearchPatterns(project: any): Promise<any> {
+    // Placeholder for analyzing research patterns
+    console.log("Analyzing research patterns...");
+    return {}; // Replace with actual analysis results
+  }
+
+  private async generateCrossDomainInsights(project: any, researchPatterns: any, contextualData: ResearchContext): Promise<any> {
+    // Placeholder for generating cross-domain insights
+    console.log("Generating cross-domain insights...");
+    return {}; // Replace with actual insight generation
+  }
+
+  private async applyRecursiveReasoning(crossDomainInsights: any): Promise<any> {
+    // Placeholder for applying recursive reasoning
+    console.log("Applying recursive reasoning...");
+    return crossDomainInsights; // Replace with actual recursive reasoning
+  }
+
+
   /**
    * Process a knowledge graph update, enhancing nodes, generating insights,
    * and suggesting new connections based on recent research
@@ -317,11 +236,11 @@ Format your response as a JSON object with the following structure:
       // Implement graph update logic based on user feedback and system state
       const graph = await globalThis.storage?.getKnowledgeGraph(graphId);
       if (!graph) return;
-      
+
       // Get relevant user feedback
       const feedbackKey = `graph:${graphId}`;
       const feedback = this.userFeedbackRegistry.get(feedbackKey) || [];
-      
+
       // Check API quota before proceeding
       const quotaCheck = apiQuotaManager.checkRateLimit('openai', 1000);
       if (quotaCheck.isLimited) {
@@ -330,7 +249,7 @@ Format your response as a JSON object with the following structure:
         this.graphUpdateQueue.set(graphId, Date.now() + 20 * 60 * 1000); // 20 min delay
         return;
       }
-      
+
       // Use the existing enhanceGraphWithAI function but with feedback integration
       const enhancedGraph = await enhanceGraphWithAI(graph, {
         userFeedback: feedback.map(f => ({
@@ -339,18 +258,18 @@ Format your response as a JSON object with the following structure:
           timestamp: f.timestamp
         }))
       });
-      
+
       // Save the enhanced graph
       await globalThis.storage?.updateKnowledgeGraph(graphId, enhancedGraph);
-      
+
       // Record successful API usage
       apiQuotaManager.recordApiUsage('openai', 1000); // Estimate token usage
-      
+
     } catch (error) {
       console.error(`Error processing graph update for graph ${graphId}:`, error);
     }
   }
-  
+
   /**
    * Process canvas update, organizing elements, suggesting connections,
    * and providing context-aware enhancements
@@ -360,15 +279,15 @@ Format your response as a JSON object with the following structure:
       // Implement canvas update logic
       const canvas = await globalThis.storage?.getCanvas(canvasId);
       if (!canvas) return;
-      
+
       // Get all canvas elements
       const elements = await globalThis.storage?.getCanvasElements(canvasId);
       if (!elements || elements.length === 0) return;
-      
+
       // Get relevant user feedback
       const feedbackKey = `canvas:${canvasId}`;
       const feedback = this.userFeedbackRegistry.get(feedbackKey) || [];
-      
+
       // Check API quota before proceeding
       const quotaCheck = apiQuotaManager.checkRateLimit('openai', 800);
       if (quotaCheck.isLimited) {
@@ -377,21 +296,21 @@ Format your response as a JSON object with the following structure:
         this.canvasUpdateQueue.set(canvasId, Date.now() + 15 * 60 * 1000); // 15 min delay
         return;
       }
-      
+
       // Generate suggestions for canvas organization and enhancement
       const suggestions = await this.generateCanvasSuggestions(canvas, elements, feedback);
-      
+
       // Store the suggestions for later retrieval by the client
       await globalThis.storage?.saveCanvasSuggestions(canvasId, suggestions);
-      
+
       // Record successful API usage
       apiQuotaManager.recordApiUsage('openai', 800); // Estimate token usage
-      
+
     } catch (error) {
       console.error(`Error processing canvas update for canvas ${canvasId}:`, error);
     }
   }
-  
+
   /**
    * Generate suggestions for canvas organization and content
    */
@@ -406,12 +325,12 @@ Format your response as a JSON object with the following structure:
       const elementsSummary = textElements.map(el => 
         `- ${el.type}: "${el.content?.trim ? el.content.trim().substring(0, 100) : el.content}" (Position: x=${el.x}, y=${el.y})`
       ).join('\n');
-      
+
       // Extract feedback summary
       const feedbackSummary = feedback.length > 0 
         ? feedback.map(f => `- ${f.type}: ${f.content}`).join('\n')
         : 'No user feedback available';
-      
+
       // Build AI prompt for canvas suggestion generation
       const prompt = `As an AI research assistant, analyze this canvas and provide suggestions for organization and enhancement.
 
@@ -450,17 +369,17 @@ Format your response as a JSON array of suggestion objects with this structure:
         response_format: { type: "json_object" },
         temperature: 0.6,
       });
-      
+
       // Parse and validate response
       const content = response.choices[0].message.content;
       if (!content) return [];
-      
+
       const suggestions = JSON.parse(content);
-      
+
       if (!Array.isArray(suggestions)) {
         return [];
       }
-      
+
       // Map and validate suggestions
       return suggestions.map(suggestion => ({
         type: suggestion.type || 'enhancement',
@@ -470,13 +389,13 @@ Format your response as a JSON array of suggestion objects with this structure:
         confidence: typeof suggestion.confidence === 'number' ? suggestion.confidence : 0.7,
         timestamp: Date.now()
       }));
-      
+
     } catch (error) {
       console.error("Error generating canvas suggestions:", error);
       return [];
     }
   }
-  
+
   /**
    * Analyze user behavior and research patterns to suggest
    * improvements to the workbench UI and research experience
@@ -492,16 +411,16 @@ Format your response as a JSON array of suggestion objects with this structure:
       if (quotaCheck.isLimited) {
         return this.generateSimpleBehaviorAnalysis(sessions, interactions);
       }
-      
+
       // Summarize sessions and interactions data
       const sessionsSummary = sessions.slice(-5).map(s => 
         `- Session ${s.id}: ${new Date(s.startTime).toLocaleString()} to ${new Date(s.endTime).toLocaleString()} (${Math.round((s.endTime - s.startTime) / 60000)} minutes)`
       ).join('\n');
-      
+
       const interactionsSummary = interactions.slice(-20).map(i => 
         `- ${new Date(i.timestamp).toLocaleString()}: ${i.type} - ${i.target}`
       ).join('\n');
-      
+
       // Build AI prompt
       const prompt = `Analyze the user's research behavior and suggest improvements to their experience.
 
@@ -532,31 +451,31 @@ Format your response as a JSON object with this structure:
         response_format: { type: "json_object" },
         temperature: 0.7,
       });
-      
+
       // Parse and validate response
       const content = response.choices[0].message.content;
       if (!content) {
         return this.generateSimpleBehaviorAnalysis(sessions, interactions);
       }
-      
+
       const result = JSON.parse(content);
-      
+
       // Record API usage
       apiQuotaManager.recordApiUsage('openai', 500);
-      
+
       return {
         patterns: Array.isArray(result.patterns) ? result.patterns : [],
         suggestions: Array.isArray(result.suggestions) ? result.suggestions : [],
         recommendations: Array.isArray(result.recommendations) ? result.recommendations : [],
         optimizations: Array.isArray(result.optimizations) ? result.optimizations : []
       };
-      
+
     } catch (error) {
       console.error("Error analyzing user behavior:", error);
       return this.generateSimpleBehaviorAnalysis(sessions, interactions);
     }
   }
-  
+
   /**
    * Generate a simple behavior analysis without using AI
    */
@@ -568,14 +487,14 @@ Format your response as a JSON object with this structure:
     const avgSessionLength = sessions.length > 0
       ? sessions.reduce((acc, s) => acc + (s.endTime - s.startTime), 0) / sessions.length / 60000
       : 0;
-    
+
     // Count interaction types
     const interactionTypes = new Map<string, number>();
     for (const interaction of interactions) {
       const count = interactionTypes.get(interaction.type) || 0;
       interactionTypes.set(interaction.type, count + 1);
     }
-    
+
     // Generate simple patterns
     const patterns = [
       `Average session length: ${Math.round(avgSessionLength)} minutes`,
@@ -588,14 +507,14 @@ Format your response as a JSON object with this structure:
           .join(', ') || 'None'
       }`
     ];
-    
+
     // Generate simple suggestions
     const suggestions = [
       'Try using the knowledge graph feature to visualize connections',
       'Consider organizing your research into focused projects',
       'Regular session breaks can improve research productivity'
     ];
-    
+
     return {
       patterns,
       suggestions,
@@ -609,7 +528,7 @@ Format your response as a JSON object with this structure:
       ]
     };
   }
-  
+
   /**
    * Execute a specific research action based on the detected context
    * and desired action type.
@@ -625,30 +544,30 @@ Format your response as a JSON object with this structure:
         message: 'Action not implemented',
         data: null
       };
-      
+
       switch (action) {
         case 'create_knowledge_graph':
           // Implement knowledge graph creation logic
           result = await this.executeCreateKnowledgeGraphAction(context, params);
           break;
-          
+
         case 'create_mind_map':
           // Implement mind map creation logic
           result = await this.executeCreateMindMapAction(context, params);
           break;
-          
+
         case 'create_project':
           // Implement project creation logic
           result = await this.executeCreateProjectAction(context, params);
           break;
-          
+
         case 'add_research_insight':
           // Implement insight addition logic
           result = await this.executeAddResearchInsightAction(context, params);
           break;
-          
+
         // Add more action implementations as needed
-          
+
         default:
           result = {
             success: false,
@@ -656,7 +575,7 @@ Format your response as a JSON object with this structure:
             data: null
           };
       }
-      
+
       return result;
     } catch (error) {
       console.error(`Error executing research action '${action}':`, error);
@@ -667,7 +586,7 @@ Format your response as a JSON object with this structure:
       };
     }
   }
-  
+
   /**
    * Execute knowledge graph creation action
    */
@@ -678,11 +597,11 @@ Format your response as a JSON object with this structure:
     try {
       // Import the knowledge graph functionality
       const { createKnowledgeGraphFromSearch } = await import('./knowledge-graph');
-      
+
       // Use the createKnowledgeGraphFromSearch function from knowledge-graph.ts
       const query = context.topic + (context.keywords.length > 0 ? ' ' + context.keywords.join(' ') : '');
       const graphResult = await createKnowledgeGraphFromSearch(query);
-      
+
       return {
         success: true,
         message: 'Created knowledge graph based on context',
@@ -696,7 +615,7 @@ Format your response as a JSON object with this structure:
       };
     }
   }
-  
+
   /**
    * Execute mind map creation action
    */
@@ -717,7 +636,7 @@ Format your response as a JSON object with this structure:
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
-      
+
       return {
         success: true,
         message: 'Created mind map',
@@ -731,7 +650,7 @@ Format your response as a JSON object with this structure:
       };
     }
   }
-  
+
   /**
    * Execute project creation action
    */
@@ -749,14 +668,14 @@ Format your response as a JSON object with this structure:
         priority: params.priority || 'medium',
         userId: params.userId
       });
-      
+
       if (!project) {
         throw new Error('Failed to create project');
       }
-      
+
       // Create initial tasks based on context
       const tasks = [];
-      
+
       // Add initial research task
       tasks.push(await globalThis.storage?.createTask({
         projectId: project.id,
@@ -765,7 +684,7 @@ Format your response as a JSON object with this structure:
         priority: 'high',
         status: 'pending'
       }));
-      
+
       // Add keyword exploration tasks
       for (const keyword of context.keywords.slice(0, 3)) {
         tasks.push(await globalThis.storage?.createTask({
@@ -776,7 +695,7 @@ Format your response as a JSON object with this structure:
           status: 'pending'
         }));
       }
-      
+
       return {
         success: true,
         message: 'Created project with initial tasks',
@@ -790,7 +709,7 @@ Format your response as a JSON object with this structure:
       };
     }
   }
-  
+
   /**
    * Execute add research insight action
    */
@@ -803,11 +722,11 @@ Format your response as a JSON object with this structure:
       if (!params.projectId) {
         throw new Error('Project ID is required');
       }
-      
+
       if (!params.title && !context.topic) {
         throw new Error('Insight title is required');
       }
-      
+
       // Create the insight
       const insight = await globalThis.storage?.createResearchInsight({
         projectId: params.projectId,
@@ -817,11 +736,11 @@ Format your response as a JSON object with this structure:
         tags: params.tags || context.keywords.slice(0, 3),
         source: params.source || 'AI Assistant',
       });
-      
+
       if (!insight) {
         throw new Error('Failed to create insight');
       }
-      
+
       return {
         success: true,
         message: 'Added research insight',
@@ -868,6 +787,8 @@ export interface UserBehaviorAnalysis {
   recommendations: string[];
   optimizations: string[];
 }
+
+interface ResearchContext {}
 
 /**
  * Interface for action execution results

@@ -435,11 +435,23 @@ export function deleteGraph(graphId: string): boolean {
  * @param description Graph description
  * @returns Created knowledge graph
  */
-export function createGraphFromText(
+export async function createGraphFromText(
   text: string,
   name: string,
-  description: string
-): KnowledgeGraph {
+  description: string,
+  contextHistory: string[] = []
+): Promise<KnowledgeGraph> {
+  // Initialize graph with historical context
+  let graph = initializeGraph(name, description);
+  
+  // Add temporal knowledge layers
+  const contextualLayers = await Promise.all(contextHistory.map(async (context) => {
+    const layer = await analyzeContextualLayer(context);
+    return layer;
+  }));
+  
+  // Merge layers with current knowledge
+  graph = mergeKnowledgeLayers(graph, contextualLayers);
   // Initialize a new graph
   let graph = initializeGraph(name, description);
   

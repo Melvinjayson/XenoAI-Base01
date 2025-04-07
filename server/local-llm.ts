@@ -66,11 +66,11 @@ const localContextStore: Map<string, LocalContext> = new Map();
  */
 export async function initializeLocalLLM(): Promise<boolean> {
   console.log('Initializing local language model...');
-  
+
   try {
     // Simulate loading Llama 4 Behemot
     await simulateModelLoading();
-    
+
     // Update status with the upgraded Llama 4 Behemot specifications
     modelStatus = {
       loaded: true,
@@ -80,7 +80,7 @@ export async function initializeLocalLLM(): Promise<boolean> {
       contextLength: 256000, // Increased context length
       error: null
     };
-    
+
     console.log('Llama 4 Behemot initialized successfully.');
     return true;
   } catch (error: any) {
@@ -90,7 +90,7 @@ export async function initializeLocalLLM(): Promise<boolean> {
       loaded: false,
       error: error.message
     };
-    
+
     console.error('Failed to initialize local language model:', error.message);
     return false;
   }
@@ -134,9 +134,9 @@ export async function processWithLocalLLM(
   if (!modelStatus.loaded) {
     throw new Error('Local language model is not loaded. Please initialize it first.');
   }
-  
+
   console.log('Processing message with local LLM...');
-  
+
   try {
     // Get or initialize context for this session
     let sessionContext = localContextStore.get(sessionId);
@@ -150,7 +150,7 @@ export async function processWithLocalLLM(
       };
       localContextStore.set(sessionId, sessionContext);
     }
-    
+
     // Update context with new entities and topics
     if (entities.length > 0) {
       // Add new entities, avoid duplicates
@@ -161,7 +161,7 @@ export async function processWithLocalLLM(
         }
       }
     }
-    
+
     if (topics.length > 0) {
       // Add new topics, avoid duplicates
       for (const topic of topics) {
@@ -170,7 +170,7 @@ export async function processWithLocalLLM(
         }
       }
     }
-    
+
     // Attempt to extract user preferences from the message
     const preferenceKeywords = {
       'prefer': true,
@@ -186,51 +186,51 @@ export async function processWithLocalLLM(
       'hate': false,
       'avoid': false
     };
-    
+
     // Simple preference extraction based on keywords
     for (const [keyword, isPositive] of Object.entries(preferenceKeywords)) {
       if (message.toLowerCase().includes(keyword)) {
         // Look for what comes after the preference keyword
         const index = message.toLowerCase().indexOf(keyword) + keyword.length;
         let restOfSentence = message.slice(index).split('.')[0].split('!')[0].split('?')[0].trim();
-        
+
         // Extract preference if the pattern makes sense
         if (restOfSentence.length > 0 && restOfSentence.length < 100) {
           // Clean up the preference text
           if (restOfSentence.startsWith('to ')) {
             restOfSentence = restOfSentence.substring(3);
           }
-          
+
           // Store the preference with positive or negative sentiment
           const preferenceKey = restOfSentence.length > 30 ? 
             restOfSentence.substring(0, 30) + '...' : restOfSentence;
-          
+
           sessionContext.userPreferences[preferenceKey] = isPositive ? 
             'positive' : 'negative';
         }
       }
     }
-    
+
     // Limit the number of stored entities and topics
     if (sessionContext.entities.length > 20) {
       sessionContext.entities = sessionContext.entities.slice(-20);
     }
-    
+
     if (sessionContext.topics.length > 10) {
       sessionContext.topics = sessionContext.topics.slice(-10);
     }
-    
+
     // Check if this query needs web browsing
     const { shouldSearch, searchQuery, confidence } = await shouldUseWebSearch(message, sessionContext);
-    
+
     // If web search is needed and we don't have recent cached results, perform search
     if (shouldSearch) {
       console.log(`Web search triggered for query: "${searchQuery}" (confidence: ${confidence.toFixed(2)})`);
-      
+
       try {
         // Perform the search
         const searchResult = await enhancedSearch(searchQuery);
-        
+
         // Store search results in session context
         sessionContext.webSearchResults = {
           query: searchQuery,
@@ -242,23 +242,23 @@ export async function processWithLocalLLM(
           })),
           timestamp: Date.now()
         };
-        
+
         console.log(`Web search completed with ${sessionContext.webSearchResults.results.length} results`);
       } catch (error) {
         console.error('Error performing web search:', error);
         // Don't fail the entire request if search fails
       }
     }
-    
+
     // Analyze message complexity to determine if we need to apply advanced reasoning
     const messageComplexity = calculateMessageComplexity(message);
-    
+
     // For complex queries, enhance the system prompt to encourage deeper analysis
     let enhancedSystemPrompt = systemPrompt;
     if (messageComplexity > 0.7) {
       enhancedSystemPrompt += "\n\nThis query requires deeper analysis. Apply your Llama 4 Behemot reasoning capabilities to break down complex concepts, evaluate connections between ideas, and provide a structured response with clear explanations. When appropriate, use a step-by-step approach to show your reasoning process.";
     }
-    
+
     // If the message seems to request a comparison, add comparison guidance
     if (message.toLowerCase().includes(" vs ") || 
         message.toLowerCase().includes(" versus ") ||
@@ -266,7 +266,7 @@ export async function processWithLocalLLM(
         message.toLowerCase().includes("difference between")) {
       enhancedSystemPrompt += "\n\nThis query involves a comparison. Structure your response to clearly identify similarities and differences, using parallel structure when possible. Consider creating a balanced analysis that fairly represents both sides.";
     }
-    
+
     // If the message seems to request a procedural explanation, add step-by-step guidance
     if (message.toLowerCase().includes("how to") || 
         message.toLowerCase().includes("steps") ||
@@ -275,13 +275,13 @@ export async function processWithLocalLLM(
         message.toLowerCase().includes("guide")) {
       enhancedSystemPrompt += "\n\nThis query requests procedural information. Provide a clear step-by-step explanation with numbered steps when appropriate. Include any prerequisites or necessary resources at the beginning.";
     }
-    
+
     // Format conversation context with enhanced system prompt
     const context = formatConversationContext(enhancedSystemPrompt, history, message, sessionContext);
-    
+
     // Generate response with enhanced Llama 4 Behemot capabilities
     const response = await simulateLocalModelInference(context, message, sessionContext);
-    
+
     // Extract and store topics from this interaction for better context maintenance
     const extractedTopics = extractTopicsFromMessage(message);
     if (extractedTopics.length > 0) {
@@ -296,19 +296,19 @@ export async function processWithLocalLLM(
         sessionContext.topics = sessionContext.topics.slice(-15);
       }
     }
-    
+
     // Store this interaction in context
     sessionContext.recentInteractions.push({
       message,
       response,
       timestamp: Date.now()
     });
-    
+
     // Limit the number of stored interactions - increased for Llama 4 Behemot's larger context window
     if (sessionContext.recentInteractions.length > 15) {
       sessionContext.recentInteractions = sessionContext.recentInteractions.slice(-15);
     }
-    
+
     return response;
   } catch (error: any) {
     console.error('Error processing with local LLM:', error.message);
@@ -330,7 +330,7 @@ async function shouldUseWebSearch(
   let shouldSearch = false;
   let searchQuery = query.trim();
   let confidence = 0;
-  
+
   // Check if the query has explicit web search intent
   const hasExplicitSearchIntent = 
     queryLower.startsWith('search for') || 
@@ -340,7 +340,7 @@ async function shouldUseWebSearch(
     queryLower.includes('can you search for') ||
     queryLower.includes('can you find information about') ||
     queryLower.includes('search the web for');
-  
+
   if (hasExplicitSearchIntent) {
     // Extract the actual search query from the request
     const searchTerms = [
@@ -352,7 +352,7 @@ async function shouldUseWebSearch(
       'can you find information about',
       'search the web for'
     ];
-    
+
     for (const term of searchTerms) {
       if (queryLower.includes(term)) {
         searchQuery = query.substring(queryLower.indexOf(term) + term.length).trim();
@@ -361,7 +361,7 @@ async function shouldUseWebSearch(
         break;
       }
     }
-    
+
     shouldSearch = true;
     confidence = 0.95; // Very high confidence for explicit search requests
   } 
@@ -371,21 +371,21 @@ async function shouldUseWebSearch(
     const hasCurrencyTerms = WEB_SEARCH_CONFIG.currentInfoTerms.some(term => 
       queryLower.includes(term)
     );
-    
+
     // Check for online-related terms
     const hasOnlineTerms = WEB_SEARCH_CONFIG.onlineInfoTerms.some(term => 
       queryLower.includes(term)
     );
-    
+
     // Check if it's a question (starts with what, how, why, when, who, where, is, are, can, could, etc.)
     const isQuestion = /^(what|how|why|when|who|where|is|are|can|could|would|should|will|has|have|do|does|did|was|were|am)[^a-z]/.test(queryLower);
-    
+
     // Calculate confidence score
     let searchConfidence = 0;
     if (hasCurrencyTerms) searchConfidence += 0.4;
     if (hasOnlineTerms) searchConfidence += 0.3;
     if (isQuestion) searchConfidence += 0.2;
-    
+
     // Check if the question is about recent events, news, or technology
     const isAboutRecentEvents = 
       queryLower.includes('news') || 
@@ -393,19 +393,19 @@ async function shouldUseWebSearch(
       queryLower.includes('latest development') ||
       queryLower.includes('what happened') ||
       queryLower.includes('current state of');
-    
+
     if (isAboutRecentEvents) searchConfidence += 0.3;
-    
+
     // Limit max confidence to 0.9 for implicit searches
     confidence = Math.min(0.9, searchConfidence);
     shouldSearch = confidence >= WEB_SEARCH_CONFIG.searchConfidenceThreshold;
   }
-  
+
   // If web search is needed, but search query is too short or vague, use the full query
   if (shouldSearch && searchQuery.split(' ').length < 2) {
     searchQuery = query.trim();
   }
-  
+
   // Extra check for basic conversational queries that don't need web search
   const basicConversationalQueries = [
     'how are you',
@@ -423,14 +423,14 @@ async function shouldUseWebSearch(
     'thanks',
     'thank you'
   ];
-  
+
   if (basicConversationalQueries.some(basicQuery => 
     queryLower.includes(basicQuery) && queryLower.split(' ').length < 7
   )) {
     shouldSearch = false;
     confidence = 0;
   }
-  
+
   // Check for cached results that are still fresh
   if (shouldSearch && 
       sessionContext.webSearchResults && 
@@ -440,7 +440,7 @@ async function shouldUseWebSearch(
     // We won't search again since we have fresh results
     shouldSearch = false;
   }
-  
+
   return { shouldSearch, searchQuery, confidence };
 }
 
@@ -460,33 +460,33 @@ function formatConversationContext(
 ): string {
   // Add context awareness to system prompt
   let enhancedSystemPrompt = systemPrompt;
-  
+
   // Add entity information if available
   if (sessionContext.entities.length > 0) {
     enhancedSystemPrompt += "\n\nImportant entities from conversation: " + 
       sessionContext.entities.map(e => `${e.value} (${e.type})`).join(', ');
   }
-  
+
   // Add topic information if available
   if (sessionContext.topics.length > 0) {
     enhancedSystemPrompt += "\n\nMain conversation topics: " + sessionContext.topics.join(', ');
   }
-  
+
   // Add recent interactions summary if available
   if (sessionContext.recentInteractions.length > 0) {
     // Create a more structured and detailed summary
     enhancedSystemPrompt += "\n\nRecent conversation summary:";
-    
+
     // Add topics
     if (sessionContext.topics.length > 0) {
       enhancedSystemPrompt += "\n- Topics discussed: " + sessionContext.topics.slice(0, 5).join(', ');
     }
-    
+
     // Add entities
     if (sessionContext.entities.length > 0) {
       enhancedSystemPrompt += "\n- Important entities: " + sessionContext.entities.slice(0, 7).map(e => `${e.value} (${e.type})`).join(', ');
     }
-    
+
     // Add user preferences if any have been detected
     if (Object.keys(sessionContext.userPreferences).length > 0) {
       enhancedSystemPrompt += "\n- User preferences: ";
@@ -496,11 +496,11 @@ function formatConversationContext(
       // Remove trailing comma and space
       enhancedSystemPrompt = enhancedSystemPrompt.slice(0, -2);
     }
-    
+
     // Add brief interaction timeline
     if (sessionContext.recentInteractions.length >= 2) {
       enhancedSystemPrompt += "\n- Recent interaction pattern: ";
-      
+
       // Get the last 3 interactions
       const recentInteractions = sessionContext.recentInteractions.slice(-3);
       for (const interaction of recentInteractions) {
@@ -513,38 +513,38 @@ function formatConversationContext(
       enhancedSystemPrompt = enhancedSystemPrompt.slice(0, -2);
     }
   }
-  
+
   // Add web search results if available
   if (sessionContext.webSearchResults) {
     // Calculate how recent the results are
     const ageInMinutes = Math.floor(
       (Date.now() - sessionContext.webSearchResults.timestamp) / (60 * 1000)
     );
-    
+
     enhancedSystemPrompt += `\n\nWeb search results for query "${sessionContext.webSearchResults.query}" (${ageInMinutes} minutes ago):`;
-    
+
     // Add each search result
     sessionContext.webSearchResults.results.forEach((result, index) => {
       enhancedSystemPrompt += `\n\nResult ${index + 1}: ${result.title}\nSource: ${result.link}\n${result.content || result.snippet}`;
     });
-    
+
     enhancedSystemPrompt += "\n\nWhen using this web information in your response, remember to cite sources appropriately.";
   }
-  
+
   // Start with enhanced system prompt in Llama 4 Behemot format
   let context = `<s>[INST] <<SYS>>\n${enhancedSystemPrompt}\n<</SYS>>\n\n`;
-  
+
   // Add conversation history with improved formatting for Llama 4 Behemot
   // The model works better with properly formatted history that maintains the conversation flow
   let currentIndex = 0;
   while (currentIndex < history.length) {
     const userMessage = history[currentIndex];
     const assistantMessage = currentIndex + 1 < history.length ? history[currentIndex + 1] : null;
-    
+
     if (userMessage && userMessage.role === 'user') {
       context += `${userMessage.content} [/INST] `;
     }
-    
+
     if (assistantMessage && assistantMessage.role === 'assistant') {
       context += `${assistantMessage.content} </s><s>[INST] `;
     } else if (!assistantMessage && userMessage) {
@@ -552,10 +552,10 @@ function formatConversationContext(
       // This maintains the correct format pattern for the model
       context += `I'll help with that. </s><s>[INST] `;
     }
-    
+
     currentIndex += 2;
   }
-  
+
   // Add current message with optimized reasoning prompt for complex queries
   if (calculateMessageComplexity(currentMessage) > 1.0) {
     // For complex queries, add explicit reasoning instruction for Llama 4 Behemot
@@ -564,7 +564,7 @@ function formatConversationContext(
     // For regular queries, use standard format
     context += `${currentMessage} [/INST] `;
   }
-  
+
   return context;
 }
 
@@ -578,10 +578,10 @@ async function simulateModelLoading(): Promise<void> {
     console.log('Loading Llama 4 Behemot model files...');
     setTimeout(() => {
       console.log('Initializing model weights and configuration...');
-      
+
       setTimeout(() => {
         console.log('Optimizing for hardware acceleration...');
-        
+
         setTimeout(() => {
           console.log('Llama 4 Behemot model ready.');
           resolve();
@@ -606,24 +606,24 @@ async function simulateLocalModelInference(
   return new Promise((resolve) => {
     // Extract the last user message for context
     const lastMessage = userMessage.trim();
-    
+
     // Extract topics and entities for better contextualization
     const topics = sessionContext.topics;
     const entities = sessionContext.entities.map(e => e.value.toLowerCase());
-    
+
     // Get recent interactions for context continuity
     const recentInteractions = sessionContext.recentInteractions;
     const hasRecentContext = recentInteractions.length > 0;
-    
+
     // Extract the most recent user message and response
     const lastInteraction = recentInteractions.length > 0 ? recentInteractions[recentInteractions.length - 1] : null;
-    
+
     // Parse the message for intent
     const messageIntent = parseMessageIntent(lastMessage);
-    
+
     // Enhanced responses based on detected intent and context
     let response = "I'll help you with that."; // Default initialization to avoid 'used before being assigned' errors
-    
+
     // Greeting responses
     if (messageIntent === 'greeting') {
       if (hasRecentContext) {
@@ -636,33 +636,33 @@ async function simulateLocalModelInference(
     else if (messageIntent === 'question') {
       // Check if we have web search results
       const hasWebResults = !!sessionContext.webSearchResults;
-      
+
       // Check if we have context related to the question
       const relatedTopics = topics.filter(topic => 
         lastMessage.toLowerCase().includes(topic.toLowerCase())
       );
-      
+
       const relatedEntities = entities.filter(entity => 
         lastMessage.toLowerCase().includes(entity)
       );
-      
+
       if (hasWebResults) {
         // Use web search results to provide a more informed response
         const results = sessionContext.webSearchResults!.results;
         const query = sessionContext.webSearchResults!.query;
-        
+
         // Create a response that incorporates web search data
         response = `Based on the web search results for "${query}", I can provide you with some information:`;
-        
+
         // Add brief summary of each result
         results.forEach((result, index) => {
           const snippet = result.content || result.snippet;
           response += `\n\n${index + 1}. According to ${result.title}, ${snippet.substring(0, 150)}${snippet.length > 150 ? '...' : ''}`;
         });
-        
+
         // Add a conclusion and source attribution
         response += `\n\nThis information comes from the web search results. Would you like me to elaborate on any specific aspect of these findings?`;
-        
+
         // Add citation note
         if (results.length > 0) {
           response += `\n\nSources: ${results.map((r, i) => `[${i+1}] ${r.title}`).join(', ')}`;
@@ -670,12 +670,12 @@ async function simulateLocalModelInference(
       }
       else if (relatedTopics.length > 0 || relatedEntities.length > 0) {
         response = `Based on our previous conversation about ${relatedTopics.join(', ') || relatedEntities.join(', ')}, I can tell you that this is a complex topic. I'll provide a concise summary using my local knowledge, though for more detailed information, we might need to use online resources.`;
-        
+
         // Add some simulated specific information if we have topics
         if (relatedTopics.length > 0) {
           response += `\n\nRegarding ${relatedTopics[0]}, the key points to understand are: (1) it's an important concept in ${getRelatedField(relatedTopics[0])}, (2) it involves ${getRelatedConcepts(relatedTopics[0]).join(', ')}, and (3) it's commonly used for ${getCommonApplications(relatedTopics[0])}.`;
         }
-        
+
         response += `\n\nWould you like me to elaborate on any specific aspect of this topic?`;
       } else {
         response = `That's an interesting question. While I'm running in local mode with limited information, I can provide a basic response.\n\nThe topic you're asking about involves several key concepts that are interconnected. To give you the most accurate and comprehensive answer, I'd need to access the most up-to-date information.\n\nWould you like me to focus on a specific aspect of your question?`;
@@ -742,7 +742,7 @@ The Moon influences Earth's tides, stabilizes our planet's axial tilt, and conti
 
 Would you like me to elaborate on any specific aspect of the Moon?`,
       };
-      
+
       // Check for keyword matches
       let foundKeywordMatch = false;
       for (const [keyword, keywordResponse] of Object.entries(keywordResponses)) {
@@ -752,22 +752,22 @@ Would you like me to elaborate on any specific aspect of the Moon?`,
           break;
         }
       }
-      
+
       // Default response if no keywords matched
       if (!foundKeywordMatch) {
         response = `I understand you're interested in this topic. While I'm running primarily in local mode to minimize external API usage, I can still assist with many tasks. I'll use my local capabilities to help with your request, and only connect to cloud services if we encounter a particularly complex question that requires additional computational resources.`;
       }
     }
-    
+
     // Add contextual awareness to response if we have sufficient context
     if (topics.length > 1 && !response.includes(topics[0])) {
       response += `\n\nBy the way, since we were previously discussing ${topics[0]}, would you like me to relate this to our earlier conversation?`;
     }
-    
+
     // Simulate processing delay based on message complexity and length
     const messageComplexity = calculateMessageComplexity(lastMessage);
     const delay = Math.min(1500, 500 + lastMessage.length * 5 * messageComplexity);
-    
+
     setTimeout(() => {
       resolve(response);
     }, delay);
@@ -781,7 +781,7 @@ Would you like me to elaborate on any specific aspect of the Moon?`,
  */
 function parseMessageIntent(message: string): string {
   const lowerMessage = message.toLowerCase();
-  
+
   // Greeting detection
   if (
     lowerMessage.includes('hello') || 
@@ -791,7 +791,7 @@ function parseMessageIntent(message: string): string {
   ) {
     return 'greeting';
   }
-  
+
   // Question detection
   if (
     lowerMessage.includes('?') || 
@@ -807,7 +807,7 @@ function parseMessageIntent(message: string): string {
   ) {
     return 'question';
   }
-  
+
   // Command detection
   if (
     lowerMessage.startsWith('find') ||
@@ -823,7 +823,7 @@ function parseMessageIntent(message: string): string {
   ) {
     return 'command';
   }
-  
+
   // Gratitude detection
   if (
     lowerMessage.includes('thank') ||
@@ -833,7 +833,7 @@ function parseMessageIntent(message: string): string {
   ) {
     return 'gratitude';
   }
-  
+
   // Continuation detection
   if (
     lowerMessage.startsWith('and') ||
@@ -846,7 +846,7 @@ function parseMessageIntent(message: string): string {
   ) {
     return 'continuation';
   }
-  
+
   // Farewell detection
   if (
     lowerMessage.includes('bye') ||
@@ -858,7 +858,7 @@ function parseMessageIntent(message: string): string {
   ) {
     return 'farewell';
   }
-  
+
   // Default to "other" if intent not recognized
   return 'other';
 }
@@ -877,17 +877,17 @@ function calculateMessageComplexity(message: string): number {
     'technical', 'in-depth', 'step by step', 'elaborate', 'synthesize',
     'evaluate', 'assess', 'impact', 'implications', 'pros and cons'
   ];
-  
+
   let complexityScore = 0;
-  
+
   // Basic length contribution
   if (length > 100) complexityScore += 0.5;
   if (length > 300) complexityScore += 0.5;
-  
+
   // Word count contribution
   if (wordCount > 20) complexityScore += 0.3;
   if (wordCount > 50) complexityScore += 0.3;
-  
+
   // Complexity indicators contribution
   const lowerMessage = message.toLowerCase();
   for (const indicator of complexityIndicators) {
@@ -895,7 +895,7 @@ function calculateMessageComplexity(message: string): number {
       complexityScore += 0.1;
     }
   }
-  
+
   return Math.min(2, complexityScore);
 }
 
@@ -906,10 +906,10 @@ function calculateMessageComplexity(message: string): number {
  */
 function extractSearchTopic(message: string): string {
   const lowerMessage = message.toLowerCase();
-  
+
   // Extract after search-related keywords
   const searchPhrases = ['search for', 'search about', 'find information on', 'look up', 'find'];
-  
+
   for (const phrase of searchPhrases) {
     if (lowerMessage.includes(phrase)) {
       const afterPhrase = message.substring(message.toLowerCase().indexOf(phrase) + phrase.length).trim();
@@ -919,13 +919,13 @@ function extractSearchTopic(message: string): string {
       }
     }
   }
-  
+
   // If no specific pattern found, use the latter part of the message
   const words = message.split(' ');
   if (words.length > 3) {
     return words.slice(Math.floor(words.length / 2)).join(' ').replace(/[.!?]+$/, '');
   }
-  
+
   return 'this topic';
 }
 
@@ -936,10 +936,10 @@ function extractSearchTopic(message: string): string {
  */
 function extractExplainTopic(message: string): string {
   const lowerMessage = message.toLowerCase();
-  
+
   // Extract after explanation-related keywords
   const explainPhrases = ['explain', 'tell me about', 'describe', 'what is', 'how does'];
-  
+
   for (const phrase of explainPhrases) {
     if (lowerMessage.includes(phrase)) {
       const afterPhrase = message.substring(message.toLowerCase().indexOf(phrase) + phrase.length).trim();
@@ -949,13 +949,13 @@ function extractExplainTopic(message: string): string {
       }
     }
   }
-  
+
   // If no specific pattern found, use the latter part of the message
   const words = message.split(' ');
   if (words.length > 3) {
     return words.slice(Math.floor(words.length / 2)).join(' ').replace(/[.!?]+$/, '');
   }
-  
+
   return 'this topic';
 }
 
@@ -985,7 +985,7 @@ function getRelatedField(topic: string): string {
     'cloud computing': 'distributed systems and virtualized infrastructure',
     'web development': 'internet technologies and application programming',
     'edge computing': 'distributed computing and IoT infrastructure',
-    
+
     // Science and Technology
     'climate change': 'environmental science and atmospheric physics',
     'renewable energy': 'sustainable technology and energy engineering',
@@ -1002,7 +1002,7 @@ function getRelatedField(topic: string): string {
     'space exploration': 'astronautics and planetary science',
     'materials science': 'substance properties and material engineering',
     'nanotechnology': 'molecular engineering and nanoscale manipulation',
-    
+
     // Social Sciences and Humanities
     'psychology': 'mental processes and behavioral science',
     'economics': 'resource allocation and market dynamics',
@@ -1019,7 +1019,7 @@ function getRelatedField(topic: string): string {
     'archaeology': 'historical artifacts and ancient civilizations',
     'religion': 'faith systems and spiritual practices',
     'education': 'learning methodologies and knowledge transmission',
-    
+
     // Health and Wellness
     'health': 'physical wellbeing and medical science',
     'medicine': 'diagnostic and treatment methodologies',
@@ -1031,7 +1031,7 @@ function getRelatedField(topic: string): string {
     'mental health': 'psychological wellbeing and cognitive function',
     'public health': 'population health management and preventive medicine',
     'pharmacology': 'drug interactions and therapeutic compounds',
-    
+
     // Society and Human Interaction
     'politics': 'governmental systems and political theory',
     'law': 'legal systems and regulatory frameworks',
@@ -1049,7 +1049,7 @@ function getRelatedField(topic: string): string {
     'time management': 'schedule optimization and temporal resource allocation',
     'personal development': 'self-improvement and capability enhancement',
     'relationships': 'interpersonal dynamics and social bonds',
-    
+
     // Culture and Lifestyle
     'travel': 'geographical exploration and cross-cultural experiences',
     'culture': 'shared customs and social patterns',
@@ -1067,20 +1067,20 @@ function getRelatedField(topic: string): string {
     'social media': 'digital social interaction and online communities',
     'photography': 'visual capture and image composition'
   };
-  
+
   // Check for direct matches
   const lowerTopic = topic.toLowerCase();
   if (topicFieldMap[lowerTopic]) {
     return topicFieldMap[lowerTopic];
   }
-  
+
   // Check for partial matches
   for (const [key, value] of Object.entries(topicFieldMap)) {
     if (lowerTopic.includes(key)) {
       return value;
     }
   }
-  
+
   // Default response for unknown topics
   return 'interdisciplinary studies';
 }
@@ -1111,7 +1111,7 @@ function getRelatedConcepts(topic: string): string[] {
     'cloud computing': ['infrastructure as a service', 'platform as a service', 'software as a service', 'virtualization', 'containers', 'orchestration', 'scalability', 'serverless computing'],
     'web development': ['frontend', 'backend', 'frameworks', 'responsive design', 'APIs', 'databases', 'authentication', 'deployment'],
     'edge computing': ['distributed systems', 'low latency', 'local processing', 'IoT integration', 'bandwidth optimization', 'edge AI', 'real-time analytics', 'data privacy'],
-    
+
     // Science and Technology
     'climate change': ['global warming', 'carbon emissions', 'greenhouse effect', 'environmental impact', 'sea level rise', 'extreme weather', 'mitigation strategies', 'adaptation measures'],
     'renewable energy': ['solar power', 'wind energy', 'hydroelectric power', 'geothermal energy', 'biomass', 'energy storage', 'grid integration', 'sustainability'],
@@ -1128,7 +1128,7 @@ function getRelatedConcepts(topic: string): string[] {
     'space exploration': ['rockets', 'satellites', 'space missions', 'astronauts', 'planetary exploration', 'telescopes', 'space stations', 'commercial spaceflight'],
     'materials science': ['properties', 'structure', 'processing', 'performance', 'nanomaterials', 'composites', 'semiconductors', 'biomaterials'],
     'nanotechnology': ['nanomaterials', 'nanodevices', 'nanofabrication', 'nanoscale properties', 'quantum effects', 'molecular machines', 'nanomedicine', 'nanoelectronics'],
-    
+
     // Social Sciences and Humanities
     'psychology': ['cognition', 'behavior', 'emotions', 'mental processes', 'personality', 'developmental psychology', 'clinical psychology', 'social psychology'],
     'economics': ['supply and demand', 'market systems', 'fiscal policy', 'monetary policy', 'microeconomics', 'macroeconomics', 'international trade', 'behavioral economics'],
@@ -1145,7 +1145,7 @@ function getRelatedConcepts(topic: string): string[] {
     'archaeology': ['excavation', 'artifacts', 'ancient civilizations', 'dating methods', 'cultural heritage', 'archaeometry', 'historical archaeology', 'landscape archaeology'],
     'religion': ['beliefs', 'practices', 'sacred texts', 'theological concepts', 'religious institutions', 'spirituality', 'comparative religion', 'religious history'],
     'education': ['learning', 'pedagogy', 'curriculum', 'educational systems', 'educational psychology', 'educational technology', 'educational policy', 'assessment'],
-    
+
     // Health and Wellness
     'health': ['physical well-being', 'mental well-being', 'disease prevention', 'healthcare', 'medical interventions', 'public health', 'health equity', 'health literacy'],
     'medicine': ['diagnosis', 'treatment', 'preventive care', 'medical specialties', 'pharmacology', 'medical technology', 'evidence-based medicine', 'patient care'],
@@ -1157,7 +1157,7 @@ function getRelatedConcepts(topic: string): string[] {
     'mental health': ['psychological well-being', 'mental disorders', 'therapy approaches', 'counseling', 'emotional health', 'resilience', 'psychiatric treatment', 'mental health promotion'],
     'public health': ['population health', 'disease prevention', 'health promotion', 'epidemiology', 'health policy', 'community health', 'global health', 'health disparities'],
     'pharmacology': ['drug actions', 'pharmacokinetics', 'pharmacodynamics', 'drug development', 'clinical applications', 'adverse effects', 'drug interactions', 'therapeutic ranges'],
-    
+
     // Society and Human Interaction
     'politics': ['governance', 'policy-making', 'ideology', 'political systems', 'elections', 'political parties', 'public opinion', 'political movements'],
     'law': ['legislation', 'judicial systems', 'legal principles', 'rights and obligations', 'case law', 'legal interpretation', 'legal practice', 'legal theory'],
@@ -1175,7 +1175,7 @@ function getRelatedConcepts(topic: string): string[] {
     'time management': ['prioritization', 'scheduling', 'delegation', 'efficiency techniques', 'time blocking', 'deadlines', 'productivity tools', 'work-life balance'],
     'personal development': ['self-improvement', 'goal setting', 'habit formation', 'mindset', 'skill acquisition', 'lifelong learning', 'personal growth', 'self-awareness'],
     'relationships': ['interpersonal dynamics', 'communication', 'emotional connection', 'social bonds', 'conflict resolution', 'attachment', 'relationship types', 'social support'],
-    
+
     // Culture and Lifestyle
     'travel': ['exploration', 'cultural experience', 'transportation', 'destination knowledge', 'travel planning', 'tourism', 'accommodations', 'travel logistics'],
     'culture': ['customs', 'traditions', 'social norms', 'cultural identity', 'cultural adaptation', 'cultural heritage', 'cultural expression', 'intercultural communication'],
@@ -1193,20 +1193,20 @@ function getRelatedConcepts(topic: string): string[] {
     'social media': ['digital platforms', 'content creation', 'social networking', 'online communities', 'social influence', 'digital marketing', 'user engagement', 'digital identity'],
     'photography': ['camera techniques', 'composition', 'visual storytelling', 'image editing', 'photographic styles', 'lighting', 'digital imaging', 'photographic equipment']
   };
-  
+
   // Check for direct matches
   const lowerTopic = topic.toLowerCase();
   if (topicConceptsMap[lowerTopic]) {
     return topicConceptsMap[lowerTopic].slice(0, 3);
   }
-  
+
   // Check for partial matches
   for (const [key, value] of Object.entries(topicConceptsMap)) {
     if (lowerTopic.includes(key)) {
       return value.slice(0, 3);
     }
   }
-  
+
   // Default response for unknown topics
   return ['fundamental principles', 'key methodologies', 'theoretical frameworks'];
 }
@@ -1219,7 +1219,7 @@ function getRelatedConcepts(topic: string): string[] {
 function extractTopicsFromMessage(message: string): string[] {
   // Convert message to lowercase for easier matching
   const lowerMessage = message.toLowerCase();
-  
+
   // Define common stop words to exclude
   const stopWordsArray = [
     'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'as', 'at', 
@@ -1235,37 +1235,37 @@ function extractTopicsFromMessage(message: string): string[] {
     'to', 'too', 'under', 'until', 'up', 
     'very', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'while', 'who', 'whom', 'why', 'will', 'with', 'would', 'you', 'your', 'yours', 'yourself', 'yourselves'
   ];
-  
+
   // Use an array for stopWords instead of a Set to avoid TypeScript issues
   const isStopWord = (word: string): boolean => stopWordsArray.includes(word);
-  
+
   // Clean the message
   let cleanedMessage = lowerMessage
     .replace(/[,.?!;:()"']/g, ' ') // Replace punctuation with spaces
     .replace(/\s+/g, ' ')          // Replace multiple spaces with a single space
     .trim();
-  
+
   // Extract words and remove stop words
   const words = cleanedMessage.split(' ')
     .filter(word => word.length > 2)             // Only words longer than 2 chars
     .filter(word => !isStopWord(word));          // Remove stop words
-  
+
   // Extract potential topic phrases
   const potentialTopics: string[] = [];
-  
+
   // Extract 1-word topics (significant nouns)
   const significantWords = words.filter(word => 
     !word.match(/^(get|want|need|tell|show|explain|find|search|look|see|make|think|know|like|help)$/)
   );
   potentialTopics.push(...significantWords);
-  
+
   // Extract 2-word topics (bigrams)
   for (let i = 0; i < words.length - 1; i++) {
     if (!isStopWord(words[i]) && !isStopWord(words[i+1])) {
       potentialTopics.push(`${words[i]} ${words[i+1]}`);
     }
   }
-  
+
   // Specific topic patterns to look for
   const topicPatterns = [
     /(?:tell me about|explain|what is|how does) ([\w\s]+?) (?:work|mean|refer to|stand for)/i,
@@ -1273,7 +1273,7 @@ function extractTopicsFromMessage(message: string): string[] {
     /(?:interested in|learning about|studying) ([\w\s]+)/i,
     /(?:difference between) ([\w\s]+?) (?:and) ([\w\s]+)/i
   ];
-  
+
   // Extract topics from patterns
   for (const pattern of topicPatterns) {
     const matches = message.match(pattern);
@@ -1287,13 +1287,13 @@ function extractTopicsFromMessage(message: string): string[] {
       }
     }
   }
-  
+
   // Extract explicit topic mentions
   const topicIndicators = [
     "about", "regarding", "concerning", "on the subject of", "on the topic of",
     "related to", "in relation to", "with respect to", "in regards to"
   ];
-  
+
   for (const indicator of topicIndicators) {
     const indexOfIndicator = lowerMessage.indexOf(indicator + " ");
     if (indexOfIndicator !== -1) {
@@ -1304,20 +1304,20 @@ function extractTopicsFromMessage(message: string): string[] {
           return index === -1 ? Infinity : index;
         })
       );
-      
+
       const topic = topicEndIndex === Infinity 
         ? afterIndicator 
         : afterIndicator.substring(0, topicEndIndex);
-      
+
       if (topic.trim().length > 2) {
         potentialTopics.push(topic.trim());
       }
     }
   }
-  
+
   // Use the getRelatedConcepts function to check for topics
   const identifiedTopics: string[] = [];
-  
+
   // Check for topics related to our message content
   for (const word of words) {
     if (word.length > 3) { // Only consider longer words for mapping to topics
@@ -1328,7 +1328,7 @@ function extractTopicsFromMessage(message: string): string[] {
       }
     }
   }
-  
+
   // Check message for more specific topics
   const commonTopics = [
     'machine learning', 'artificial intelligence', 'deep learning', 'neural networks',
@@ -1341,21 +1341,21 @@ function extractTopicsFromMessage(message: string): string[] {
     'finance', 'investing', 'entrepreneurship', 'innovation', 'design',
     'productivity', 'time management', 'personal development', 'relationships'
   ];
-  
+
   for (const topic of commonTopics) {
     if (lowerMessage.includes(topic)) {
       identifiedTopics.push(topic);
     }
   }
-  
+
   // Remove duplicates from potential topics and identified topics using array filter for compatibility
   const uniquePotentialTopics = potentialTopics.filter((topic, index) => 
     potentialTopics.indexOf(topic) === index
   );
   const uniqueIdentifiedTopics = identifiedTopics.filter((topic, index) => 
     identifiedTopics.indexOf(topic) === index
-  );
-  
+);
+
   // Fall back to potential topics if we haven't identified any known topics
   return uniqueIdentifiedTopics.length > 0 
     ? uniqueIdentifiedTopics.slice(0, 3) // Remove duplicates and limit to 3
@@ -1426,20 +1426,20 @@ function getCommonApplications(topic: string): string {
     'ethics': 'moral decision-making, professional conduct, and social harmony',
     'morality': 'ethical decision-making, social norms, and personal conscience'
   };
-  
+
   // Check for direct matches
   const lowerTopic = topic.toLowerCase();
   if (topicApplicationsMap[lowerTopic]) {
     return topicApplicationsMap[lowerTopic];
   }
-  
+
   // Check for partial matches
   for (const [key, value] of Object.entries(topicApplicationsMap)) {
     if (lowerTopic.includes(key)) {
       return value;
     }
   }
-  
+
   // Default response for unknown topics
   return 'various practical applications in relevant fields';
 }
@@ -1508,20 +1508,20 @@ function getFoundationalPrinciples(topic: string): string[] {
     'ethics': ['moral principles', 'value systems', 'reasoned judgment'],
     'morality': ['ethical frameworks', 'normative standards', 'virtuous character']
   };
-  
+
   // Check for direct matches
   const lowerTopic = topic.toLowerCase();
   if (topicPrinciplesMap[lowerTopic]) {
     return topicPrinciplesMap[lowerTopic];
   }
-  
+
   // Check for partial matches
   for (const [key, value] of Object.entries(topicPrinciplesMap)) {
     if (lowerTopic.includes(key)) {
       return value;
     }
   }
-  
+
   // Default response for unknown topics
   return ['core theoretical concepts', 'established methodologies', 'fundamental insights'];
 }
@@ -1542,4 +1542,47 @@ export function getSessionContext(sessionId: string): LocalContext | null {
  */
 export function clearSessionContext(sessionId: string): boolean {
   return localContextStore.delete(sessionId);
+}
+
+// Add the new determineMemoryType function
+function determineMemoryType(message: ChatMessage): 'episodic' | 'semantic' | 'procedural' | 'emotional' {
+  // Enhanced memory type detection using deep pattern analysis
+  const content = message.content.toLowerCase();
+  const features = extractMemoryFeatures(content);
+
+  // Use weighted scoring for memory type classification
+  const scores = {
+    episodic: features.narrativeElements * 0.4 + features.temporalMarkers * 0.3,
+    semantic: features.conceptualElements * 0.5 + features.factualContent * 0.3,
+    procedural: features.actionSequences * 0.6 + features.methodPatterns * 0.4,
+    emotional: features.emotionalMarkers * 0.7 + features.sentimentIntensity * 0.3
+  };
+
+  // Return the memory type with highest score
+  return Object.entries(scores)
+    .reduce((prev, curr) => curr[1] > prev[1] ? curr : prev)[0] as any;
+}
+
+// Placeholder function - needs implementation based on deep pattern analysis
+function extractMemoryFeatures(content: string): {
+  narrativeElements: number;
+  temporalMarkers: number;
+  conceptualElements: number;
+  factualContent: number;
+  actionSequences: number;
+  methodPatterns: number;
+  emotionalMarkers: number;
+  sentimentIntensity: number;
+} {
+  // Placeholder implementation - replace with actual feature extraction logic
+  return {
+    narrativeElements: 0,
+    temporalMarkers: 0,
+    conceptualElements: 0,
+    factualContent: 0,
+    actionSequences: 0,
+    methodPatterns: 0,
+    emotionalMarkers: 0,
+    sentimentIntensity: 0
+  };
 }
