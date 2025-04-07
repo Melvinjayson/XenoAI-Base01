@@ -1,6 +1,6 @@
 import { ApiQuotaMonitor } from '@/components/admin/api-quota-monitor';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'; // Added imports for Card components
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ChevronLeft, 
@@ -10,8 +10,14 @@ import {
   Database 
 } from 'lucide-react';
 import { Link } from 'wouter';
+// Placeholder for ModelStatusWidget - replace with actual implementation
+const ModelStatusWidget = ({ sessionId }) => <p>Model Status for session: {sessionId}</p>;
+
 
 export default function AdminPage() {
+  //const [activeTab, setActiveTab] = useState('models'); //Removed as not needed and causes error.
+  //const [sessionId] = useState('default-session'); //Removed as not needed and causes error.
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
@@ -43,6 +49,10 @@ export default function AdminPage() {
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Settings</span>
           </TabsTrigger>
+          <TabsTrigger value="models" className="flex items-center gap-2"> {/* Added Models tab */}
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Models</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="api" className="space-y-6">
@@ -50,14 +60,14 @@ export default function AdminPage() {
             <div className="md:col-span-2">
               <ApiQuotaMonitor />
             </div>
-            
+
             <Card className="p-6">
               <h2 className="text-lg font-medium mb-4">API Usage Trends</h2>
               <div className="h-64 flex items-center justify-center border rounded-md bg-muted/20">
                 <p className="text-muted-foreground">Usage analytics coming soon</p>
               </div>
             </Card>
-            
+
             <Card className="p-6">
               <h2 className="text-lg font-medium mb-4">API Service Status</h2>
               <div className="space-y-4">
@@ -93,6 +103,24 @@ export default function AdminPage() {
             <h2 className="text-lg font-medium mb-4">System Settings</h2>
             <p className="text-muted-foreground">Settings configuration coming soon.</p>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="models" className="space-y-4"> {/* Added Models tab content */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <ApiQuotaMonitor />
+            </div>
+
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>Model Transition Settings</CardTitle>
+                <CardDescription>Configure how the system transitions between local and cloud models</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ModelStatusWidget sessionId={'default-session'} /> {/* Added default session ID */}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

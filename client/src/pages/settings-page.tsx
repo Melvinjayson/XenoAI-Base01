@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import ModelStatusWidget from '@/components/model-status-widget';
+//import ModelStatusWidget from '@/components/model-status-widget'; // Removed since ModelStatusWidget is no longer used.
 import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
@@ -33,7 +33,7 @@ export default function SettingsPage() {
           Customize your Xeno AI experience
         </p>
       </header>
-      
+
       <Tabs
         defaultValue="models"
         value={activeTab}
@@ -62,11 +62,11 @@ export default function SettingsPage() {
             <span className="sm:hidden">Info</span>
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="models" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ModelStatusWidget />
-            
+            {/*ModelStatusWidget removed */}
+
             <div className="space-y-4">
               <Card>
                 <CardHeader>
@@ -93,9 +93,9 @@ export default function SettingsPage() {
                         Configure
                       </Button>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     <div className="flex justify-between items-center">
                       <div className="space-y-0.5">
                         <h4 className="text-sm font-medium">ElevenLabs</h4>
@@ -117,48 +117,12 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Local Model Settings</CardTitle>
-                  <CardDescription>Manage locally running models</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p className="text-sm">Current local model: <span className="font-mono text-sm">Xeno-Mini-v1</span></p>
-                    <div className="flex space-x-2">
-                      <Button 
-                        onClick={() => {
-                          toast({
-                            title: "Local Model",
-                            description: "Local model would be restarted in a complete implementation.",
-                          });
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Restart
-                      </Button>
-                      <Button 
-                        onClick={() => {
-                          toast({
-                            title: "Local Model Options",
-                            description: "Local model options would be shown here in a complete implementation.",
-                          });
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Advanced Options
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+
+              {/*Local Model Settings Card removed */}
             </div>
           </div>
         </TabsContent>
-        
+
         <TabsContent value="voice" className="space-y-4">
           <Card>
             <CardHeader>
@@ -184,7 +148,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="appearance" className="space-y-4">
           <Card>
             <CardHeader>
@@ -210,7 +174,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="about" className="space-y-4">
           <Card>
             <CardHeader>
@@ -230,9 +194,9 @@ export default function SettingsPage() {
                     and cloud models for complex processing.
                   </p>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="space-y-1">
                   <h4 className="text-sm font-medium">Technologies</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
