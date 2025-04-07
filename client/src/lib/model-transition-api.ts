@@ -40,7 +40,7 @@ export interface OptimalChatOptions {
  */
 export async function getModelTransitionSettings(sessionId: string = 'default-session'): Promise<ModelTransitionSettings> {
   try {
-    const res = await apiRequest('GET', `/api/model/transition?sessionId=${sessionId}`);
+    const res = await apiRequest(`/api/model/transition?sessionId=${sessionId}`, 'GET');
     const data = await res.json();
     return data as ModelTransitionSettings;
   } catch (error) {
@@ -62,7 +62,7 @@ export async function updateModelTransitionSettings(
   }
 ): Promise<ModelTransitionSettings> {
   try {
-    const res = await apiRequest('POST', '/api/model/transition', settings);
+    const res = await apiRequest('/api/model/transition', 'POST', settings);
     const data = await res.json();
     return data as ModelTransitionSettings;
   } catch (error) {
@@ -84,7 +84,7 @@ export async function processWithOptimalModel(
   options: OptimalChatOptions = {}
 ): Promise<ProcessorResponse> {
   try {
-    const res = await apiRequest('POST', '/api/chat/optimal', {
+    const res = await apiRequest('/api/chat/optimal', 'POST', {
       message,
       history,
       options
