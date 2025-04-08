@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCompanion } from '@/context/companion-context';
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 
 interface FloatingCompanionProps {
   className?: string;
@@ -39,7 +39,8 @@ export function FloatingCompanion({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [animationState, setAnimationState] = useState<'idle' | 'thinking' | 'speaking'>('idle');
-  const [location] = useLocation();
+  const navigate = useNavigate();
+  const location = window.location.pathname;
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
 
@@ -48,7 +49,7 @@ export function FloatingCompanion({
   if (isHiddenPage) return null;
 
   // Drag handlers
-  const handleDragStart = (e: React.MouseEvent) => {
+  const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
     setIsDragging(true);
     const rect = e.currentTarget.getBoundingClientRect();
     setDragPosition({
@@ -57,14 +58,15 @@ export function FloatingCompanion({
     });
   };
 
-  const handleDrag = (e: React.MouseEvent) => {
+  const handleDrag = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging) return;
 
     const x = e.clientX - dragPosition.x;
     const y = e.clientY - dragPosition.y;
 
-    e.currentTarget.style.left = `${x}px`;
-    e.currentTarget.style.top = `${y}px`;
+    const element = e.currentTarget as HTMLDivElement;
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
   };
 
   const handleDragEnd = () => {

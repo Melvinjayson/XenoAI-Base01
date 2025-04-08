@@ -13,8 +13,7 @@ import { Message } from "@/types";
 import { Button } from "@/components/ui/button";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { useTheme } from "@/context/theme-context";
-import { Link, useLocation } from "wouter";
-import { SearchFilterOptions } from "@/components/search-filters";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { SearchFilters } from "@/types";
 import { useGestureArea } from "@/context/gesture-context";
 import { GestureHandlers } from "@/hooks/use-gestures";
@@ -52,7 +51,7 @@ export default function Home() {
   const [showGestureIndicator, setShowGestureIndicator] = useState<string | null>(null);
   const { messages, isLoading, sendMessage, clearConversation } = useChat();
   const { isDarkMode } = useTheme();
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
 
   const { 
     isListening, 
@@ -268,7 +267,7 @@ export default function Home() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 py-3 border-b border-border">
         {/* Logo and Brand */}
-        <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+        <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
           <div className="relative flex items-center justify-center w-10 h-10">
             <div className="absolute inset-0 bg-primary/20 rounded-xl rotate-45 animate-pulse" />
             <div className="absolute inset-0 bg-primary/10 rounded-xl rotate-45 animate-ping opacity-75" />
@@ -296,32 +295,32 @@ export default function Home() {
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem asChild>
-                  <Link href="/workbench" className="flex items-center gap-2">
+                  <Link to="/workbench" className="flex items-center gap-2">
                     <Layout className="w-4 h-4" />
                     <span>Workbench</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/canvas" className="flex items-center gap-2">
+                  <Link to="/canvas" className="flex items-center gap-2">
                     <GripHorizontal className="w-4 h-4" />
                     <span>Canvas</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/knowledge-graph" className="flex items-center gap-2">
+                  <Link to="/knowledge-graph" className="flex items-center gap-2">
                     <Network className="w-4 h-4" />
                     <span>Knowledge Graph</span>
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Link href="/project-management">
+            <Link to="/project-management">
               <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
                 <Kanban className="w-4 h-4" />
                 <span className="font-medium">Projects</span>
               </Button>
             </Link>
-            <Link href="/admin">
+            <Link to="/admin">
               <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
                 <Settings className="w-4 h-4" />
                 <span className="font-medium">Admin</span>
@@ -339,26 +338,26 @@ export default function Home() {
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem asChild>
-                  <Link href="/canvas" className="flex items-center gap-2">
+                  <Link to="/canvas" className="flex items-center gap-2">
                     <GripHorizontal className="w-4 h-4" />
                     <span>Canvas</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/knowledge-graph" className="flex items-center gap-2">
+                  <Link to="/knowledge-graph" className="flex items-center gap-2">
                     <Network className="w-4 h-4" />
                     <span>Knowledge Graph</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/workbench" className="flex items-center gap-2">
+                  <Link to="/workbench" className="flex items-center gap-2">
                     <Layout className="w-4 h-4" />
                     <span>Workbench</span>
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Link href="/project-management">
+            <Link to="/project-management">
               <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 relative" aria-label="Projects">
                 <Kanban className="w-5 h-5" />
                 <span className="absolute top-1 right-1 flex h-2 w-2">
@@ -367,7 +366,7 @@ export default function Home() {
                 </span>
               </Button>
             </Link>
-            <Link href="/admin">
+            <Link to="/admin">
               <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Admin">
                 <Settings className="w-5 h-5" />
               </Button>
