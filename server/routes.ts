@@ -25,6 +25,7 @@ import { memoryManager } from './memory-manager';
 import { enhancedMemoryManager } from './enhanced-memory-manager';
 import { isLocalLLMAvailable, getLocalLLMStatus } from './local-llm';
 import { modelTransitionManager, ModelType } from './model-transition-manager';
+import { analyzeDecision, generateReflectionPrompts, generateInsights } from './decision-framework';
 
 // Define API Service type for quota manager
 type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
@@ -690,6 +691,15 @@ function setupApiRoutes(app: Express): void {
       res.status(500).json({ error: String(error) || 'An unknown error occurred' });
     }
   });
+
+  // Decision Framework Analysis
+  app.post('/api/decision/analyze', analyzeDecision);
+  
+  // Generate Reflection Prompts for Decision
+  app.post('/api/decision/reflection-prompts', generateReflectionPrompts);
+  
+  // Generate Insights for Decision
+  app.post('/api/decision/insights', generateInsights);
 
   // Fallback for unmatched API routes
   app.use('/api/*', (req: Request, res: Response) => {
