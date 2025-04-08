@@ -55,6 +55,14 @@ const searchingMessages = [
   "Gathering data...",
 ];
 
+const idleMessages = [
+  "Ready to assist...",
+  "How can I help?",
+  "Xeno AI at your service",
+  "Ask me anything...",
+  "Waiting for your command",
+];
+
 interface AIProcessingIndicatorProps {
   state: ProcessingState;
   message?: string;
@@ -89,20 +97,20 @@ export function AIProcessingIndicator({
     setMessageIndex(0);
     setDisplayMessage(getDefaultMessage(state, 0));
     
-    // Only rotate messages for active states
-    if (state !== 'idle') {
-      const messageInterval = setInterval(() => {
-        if (stateRef.current === state) {
-          setMessageIndex(prev => {
-            const nextIndex = (prev + 1) % getMessagesForState(state).length;
-            setDisplayMessage(getDefaultMessage(state, nextIndex));
-            return nextIndex;
-          });
-        }
-      }, 3500); // Rotate messages every 3.5 seconds
-      
-      return () => clearInterval(messageInterval);
-    }
+    // Rotate messages for all states, but at different intervals
+    const rotationInterval = state === 'idle' ? 5000 : 3500; // Slower rotation for idle state
+    
+    const messageInterval = setInterval(() => {
+      if (stateRef.current === state) {
+        setMessageIndex(prev => {
+          const nextIndex = (prev + 1) % getMessagesForState(state).length;
+          setDisplayMessage(getDefaultMessage(state, nextIndex));
+          return nextIndex;
+        });
+      }
+    }, rotationInterval);
+    
+    return () => clearInterval(messageInterval);
   }, [message, state]);
 
   // Enhanced audio level simulation for a more realistic experience
@@ -133,16 +141,40 @@ export function AIProcessingIndicator({
     }
   }, [state]);
 
-  // Only show when AI is speaking, listening or processing
-  const shouldShow = ['speaking', 'listening', 'processing'].includes(state);
-  if (!shouldShow) return null;
+  // Show in all states, including idle, to provide continuous presence
+  const isActive = ['speaking', 'listening', 'processing', 'thinking', 'analyzing', 'searching', 'connecting'].includes(state);
+  // For idle state, we still show the indicator but in a minimized form
 
+  // Different styling and positioning for idle vs active states
+  const isIdleState = state === 'idle';
+  
+  // Handle user interaction with the component
+  const handleClick = () => {
+    // If in idle state, let's trigger an interaction event (placeholder for future implementation)
+    if (isIdleState) {
+      console.log('User interacted with AI Assistant in idle state');
+      // Here we could dispatch a custom event for the parent component to handle
+      // For example, showing a suggestion panel or opening the chat interface
+      
+      // For now, just update the icon scale for visual feedback
+      setIconScale(1.2);
+      setTimeout(() => setIconScale(1), 300);
+    }
+  };
+  
   return (
-    <div className={`fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 ${className}`} style={{ maxWidth: '85%' }}>
-      <div className="bg-[#F5F0FF] dark:bg-[#2D2065] text-primary shadow-md
-        flex items-center gap-2 rounded-lg px-2.5 py-1.5 animate-in slide-in-from-bottom duration-300
-        border border-primary/10 dark:border-primary/30 hover:shadow-primary/10 hover:shadow-sm
-        transition-all duration-300 ease-in-out scale-90">
+    <div 
+      className={`fixed ${isIdleState ? 'bottom-20' : 'bottom-24'} left-1/2 transform -translate-x-1/2 z-50 ${className}`} 
+      style={{ maxWidth: isIdleState ? '70%' : '85%' }}
+      onClick={handleClick}
+    >
+      <div className={cn(
+        "bg-[#F5F0FF] dark:bg-[#2D2065] text-primary shadow-md",
+        "flex items-center gap-2 rounded-lg px-2.5 py-1.5 animate-in slide-in-from-bottom duration-300",
+        "border border-primary/10 dark:border-primary/30 hover:shadow-primary/10 hover:shadow-sm",
+        "transition-all duration-300 ease-in-out",
+        isIdleState ? "scale-75 opacity-80 hover:opacity-100 hover:scale-80" : "scale-90"
+      )}>
         <div className="flex-shrink-0 relative">
           <div className={cn(
             "w-8 h-8 bg-primary/10 dark:bg-primary/20 rounded-lg flex items-center justify-center",
@@ -153,7 +185,8 @@ export function AIProcessingIndicator({
             state === 'analyzing' && "bg-cyan-500/20 dark:bg-cyan-600/30",
             state === 'searching' && "bg-primary/20 dark:bg-primary/30",
             state === 'processing' && "bg-emerald-500/20 dark:bg-emerald-600/30",
-            state === 'connecting' && "bg-purple-500/20 dark:bg-purple-600/30"
+            state === 'connecting' && "bg-purple-500/20 dark:bg-purple-600/30",
+            state === 'idle' && "bg-primary/5 dark:bg-primary/10"
           )} style={{ transform: `scale(${iconScale * 0.9})` }}>
             {getIconForState(state)}
             
@@ -204,7 +237,10 @@ export function AIProcessingIndicator({
         </div>
         
         <div className="flex flex-col">
-          <span className="text-xs font-medium dark:text-white transition-all duration-300">
+          <span className={cn(
+            "text-xs font-medium dark:text-white transition-all duration-300",
+            isIdleState && "text-primary/70 dark:text-primary/70"
+          )}>
             {displayMessage}
           </span>
           
@@ -236,7 +272,7 @@ export function AIProcessingIndicator({
         
         {/* Controls */}
         <div className="flex items-center ml-1 gap-1">
-          {onPauseToggle && (
+          {onPauseToggle && !isIdleState && (
             <button 
               onClick={onPauseToggle} 
               className="p-1.5 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-lg 
@@ -270,6 +306,7 @@ function getMessagesForState(state: ProcessingState): string[] {
     case 'analyzing': return analyzingMessages;
     case 'listening': return listeningMessages;
     case 'searching': return searchingMessages;
+    case 'idle': return idleMessages;
     default: return [];
   }
 }
@@ -357,6 +394,16 @@ function getIconForState(state: ProcessingState) {
         <div className="relative">
           <CircleDot className={`${baseAnimationClass} animate-spin absolute opacity-50`} style={{animationDuration: '2s'}} />
           <CircleDot className={`${baseAnimationClass} relative`} />
+        </div>
+      );
+    case 'idle':
+      return (
+        <div className="relative">
+          <Wand2 className={`${baseAnimationClass} relative opacity-60`} />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-pulse" 
+                  style={{animationDuration: '4s'}}></span>
+          </div>
         </div>
       );
     default:
