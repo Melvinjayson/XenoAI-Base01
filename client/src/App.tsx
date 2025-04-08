@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -50,35 +50,35 @@ function OfflineDialog() {
   );
 }
 
-function Router() {
-  const [location, setLocation] = useLocation();
+function AppRoutes() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [showVoiceWidget, setShowVoiceWidget] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [showGestureTutorial, setShowGestureTutorial] = useState(false);
   const { isOnline } = useOfflineContext();
-  
-  // Redirect to splash screen on initial load
+
   useEffect(() => {
-    if (initialLoad && location === "/") {
-      setLocation("/splash");
+    if (initialLoad && location.pathname === "/") {
+      navigate("/splash", { replace: true });
       setInitialLoad(false);
     }
-  }, [initialLoad, location, setLocation]);
-  
+  }, [initialLoad, location, navigate]);
+
   useEffect(() => {
-    // Only show the voice widget on main pages, not splash or onboarding
-    const isMainPage = location === "/" || location === "/knowledge-graph" || location.startsWith("/canvas");
+    const isMainPage = location.pathname === "/" || 
+                      location.pathname === "/knowledge-graph" || 
+                      location.pathname.startsWith("/canvas");
     setShowVoiceWidget(isMainPage);
-    
-    // Show gesture tutorial when first arriving at main pages from onboarding
-    if (isMainPage && location === "/" && !showGestureTutorial) {
+
+    if (isMainPage && location.pathname === "/" && !showGestureTutorial) {
       const hasSeenTutorial = localStorage.getItem('gesture-tutorial-seen');
       if (!hasSeenTutorial) {
         setShowGestureTutorial(true);
         localStorage.setItem('gesture-tutorial-seen', 'true');
       }
     }
-  }, [location, showGestureTutorial]);
+  }, [location.pathname, showGestureTutorial]);
   
   const handleTutorialComplete = () => {
     setShowGestureTutorial(false);
@@ -92,22 +92,22 @@ function Router() {
       <div className="pt-2">
         {showOfflineBanner && <OfflineModeBanner />}
         
-        <Switch>
-          <Route path="/splash" component={SplashPage} />
-          <Route path="/onboarding" component={OnboardingPage} />
-          <Route path="/" component={Home} />
-          <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
-          <Route path="/enhanced-knowledge-graph" component={EnhancedKnowledgeGraphPage} />
-          <Route path="/vr-experience" component={VRExperience} />
-          <Route path="/canvas" component={CanvasPage} />
-          <Route path="/canvas/:id" component={CanvasPage} />
-          <Route path="/admin" component={AdminPage} />
-          <Route path="/project-management" component={ProjectManagementPage} />
-          <Route path="/color-palette" component={ColorPaletteGeneratorPage} />
-          <Route path="/workbench" component={EnhancedKnowledgeGraphPage} />
-          <Route path="/settings" component={SettingsPage} />
-          <Route component={NotFound} />
-        </Switch>
+        <Routes>
+          <Route path="/splash" element={<SplashPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/knowledge-graph" element={<KnowledgeGraphPage />} />
+          <Route path="/enhanced-knowledge-graph" element={<EnhancedKnowledgeGraphPage />} />
+          <Route path="/vr-experience" element={<VRExperience />} />
+          <Route path="/canvas" element={<CanvasPage />} />
+          <Route path="/canvas/:id" element={<CanvasPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/project-management" element={<ProjectManagementPage />} />
+          <Route path="/color-palette" element={<ColorPaletteGeneratorPage />} />
+          <Route path="/workbench" element={<EnhancedKnowledgeGraphPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
         
         {/* Re-enable the voice widget */}
         {showVoiceWidget && <FloatingVoiceWidget />}
@@ -171,7 +171,8 @@ function CompanionWrapper() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <LanguageProvider>
           <UserProfileProvider>
@@ -201,6 +202,7 @@ function App() {
         </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
+    </BrowserRouter>
   );
 }
 
