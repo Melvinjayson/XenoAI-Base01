@@ -1136,6 +1136,10 @@ export class MemStorage implements IStorage {
     return allProjects;
   }
   
+  async getProject(projectId: number): Promise<Project | undefined> {
+    return this.projects.get(projectId);
+  }
+  
   async getProjectById(projectId: number): Promise<Project | undefined> {
     return this.projects.get(projectId);
   }

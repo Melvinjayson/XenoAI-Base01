@@ -640,7 +640,7 @@ function setupApiRoutes(app: Express): void {
         return res.status(400).json({ error: 'Invalid project ID' });
       }
       
-      const project = await storage.getProject(id);
+      const project = await storage.getProjectById(id);
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
