@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import ModelStatusWidget from "@/components/model-status-widget";
+import { useIsMobile } from '@/hooks/use-mobile'; // Added import
 
 interface ChatMessageProps {
   message: Message;
@@ -37,14 +38,15 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const { sendMessage } = useChat();
   const { language } = useLanguage();
   const { toast } = useToast();
-  
+  const isMobile = useIsMobile(); // Use the hook
+
   // State for feedback
   const [hasFeedback, setHasFeedback] = useState(false);
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Reference for the feedback dialog
   const feedbackInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +61,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const handleRelatedQueryClick = (query: string) => {
     sendMessage(query);
   };
-  
+
   const handleFeedback = (type: 'positive' | 'negative') => {
     if (type === 'negative') {
       setShowFeedbackForm(true);
@@ -73,10 +75,10 @@ export default function ChatMessage({ message }: ChatMessageProps) {
       });
     }
   };
-  
+
   const handleSubmitFeedback = () => {
     setIsSubmitting(true);
-    
+
     // Simulate API call to submit feedback
     setTimeout(() => {
       setIsSubmitting(false);
@@ -84,7 +86,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
       setFeedback('negative');
       setHasFeedback(true);
       setFeedbackText('');
-      
+
       toast({
         title: "Feedback submitted",
         description: "Thank you for your feedback! This helps Xeno AI improve.",
@@ -96,7 +98,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
   const date = new Date(message.timestamp);
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
+
   // Design based on the provided screenshot
   return (
     <div className={cn("flex flex-col mb-4 sm:mb-6 w-full", isUser && "items-end")}>
@@ -115,7 +117,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full dark:text-slate-100 relative">
             {message.fallback && (
               <div className="mb-2 flex items-center gap-1">
@@ -140,7 +142,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 </TooltipProvider>
               </div>
             )}
-            
+
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
@@ -180,7 +182,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 </div>
               </div>
             )}
-            
+
             {/* Message Footer with Utilities and Feedback */}
             <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-200 dark:border-gray-700 pt-2">
               <div className="flex items-center gap-2">
@@ -195,7 +197,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 >
                   {isSpeaking ? "Stop" : "Listen"}
                 </Button>
-                
+
                 {/* Show Badge for Feedback State */}
                 {hasFeedback && (
                   <Badge variant={feedback === 'positive' ? 'default' : 'destructive'} className="h-5 text-[10px]">
@@ -211,14 +213,14 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                   </Badge>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <ModelStatusWidget />
                 {/* Feedback system */}
-                {!hasFeedback && (
+                {!isMobile && !hasFeedback && ( // Hide on mobile
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-500 mr-1">Have feedback?</span>
-                    
+
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -236,7 +238,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    
+
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -254,7 +256,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
@@ -293,7 +295,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           </div>
         </div>
       )}
-      
+
       {/* Feedback Form Dialog */}
       <Dialog open={showFeedbackForm} onOpenChange={setShowFeedbackForm}>
         <DialogContent className="sm:max-w-md">
@@ -303,7 +305,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
               Please provide details about what was incorrect or could be improved.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <Input
               ref={feedbackInputRef}
@@ -313,7 +315,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
               className="w-full"
             />
           </div>
-          
+
           <DialogFooter>
             <Button
               variant="outline"
