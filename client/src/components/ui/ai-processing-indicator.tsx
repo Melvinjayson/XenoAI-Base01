@@ -158,23 +158,29 @@ export function AIProcessingIndicator({
             {getIconForState(state)}
             
             {/* Voice activity visualization for active states */}
-            {(state === 'speaking' || state === 'listening') && (
+            {(state === 'speaking' || state === 'listening' || state === 'idle') && (
               <>
                 <div className={cn(
-                  "absolute inset-0 rounded-lg border",
+                  "absolute inset-0 rounded-lg border transition-all duration-500",
                   "animate-[ripple_1.8s_ease-out_infinite]",
-                  state === 'speaking' ? "border-primary" : "border-destructive"
+                  state === 'speaking' ? "border-primary" : 
+                  state === 'listening' ? "border-destructive" :
+                  "border-muted-foreground/30"
                 )} style={{
-                  transform: `scale(${1 + audioLevel * 0.65})`,
-                  opacity: 0.7 - (audioLevel * 0.3)
+                  transform: `scale(${state === 'idle' ? 1.1 : 1 + audioLevel * 0.65})`,
+                  opacity: state === 'idle' ? 0.3 : 0.7 - (audioLevel * 0.3),
+                  animationDuration: state === 'idle' ? '3s' : '1.8s'
                 }} />
                 <div className={cn(
-                  "absolute inset-0 rounded-lg border",
+                  "absolute inset-0 rounded-lg border transition-all duration-500",
                   "animate-[ripple_2.2s_ease-out_infinite_300ms]",
-                  state === 'speaking' ? "border-primary" : "border-destructive"
+                  state === 'speaking' ? "border-primary" : 
+                  state === 'listening' ? "border-destructive" :
+                  "border-muted-foreground/20"
                 )} style={{
-                  transform: `scale(${1 + audioLevel * 0.5})`,
-                  opacity: 0.5 - (audioLevel * 0.2) 
+                  transform: `scale(${state === 'idle' ? 1.05 : 1 + audioLevel * 0.5})`,
+                  opacity: state === 'idle' ? 0.2 : 0.5 - (audioLevel * 0.2),
+                  animationDuration: state === 'idle' ? '4s' : '2.2s'
                 }} />
               </>
             )}
@@ -278,6 +284,8 @@ function getDefaultMessage(state: ProcessingState, index: number = 0): string {
   switch (state) {
     case 'connecting':
       return 'Connecting to AI...';
+    case 'idle':
+      return 'Ready to assist...';
     default:
       return '';
   }
