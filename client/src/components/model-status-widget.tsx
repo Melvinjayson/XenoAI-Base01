@@ -85,11 +85,11 @@ export default function ModelStatusWidget({
   return (
     <Card className="w-full max-w-sm">
       <CardContent className="pt-6">
-        <div className="flex items-center justify-center">
-          <Badge variant="outline" className={settings.cloudModelsAvailable ? "bg-green-100 text-green-800 border-green-300" : "bg-yellow-100 text-yellow-800 border-yellow-300"}>
-            {settings.cloudModelsAvailable ? "Models Available" : "Limited Availability"}
-          </Badge>
-        </div>
+        {error && (
+          <div className="text-center text-destructive">
+            <p>Error loading model status</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
