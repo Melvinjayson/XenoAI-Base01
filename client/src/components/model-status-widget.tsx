@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Server, Cloud } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getModelTransitionSettings, forceModelType, ModelType } from '@/lib/model-transition-api';
 
 interface ModelStatusWidgetProps {
@@ -81,7 +84,13 @@ export default function ModelStatusWidget({
 
   return (
     <Card className="w-full max-w-sm">
-      <CardContent className="pt-6"></CardContent>
+      <CardContent className="pt-6">
+        {error && (
+          <div className="text-center text-destructive">
+            <p>Error loading model status</p>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
