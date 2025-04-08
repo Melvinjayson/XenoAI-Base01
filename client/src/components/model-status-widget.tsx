@@ -84,13 +84,11 @@ export default function ModelStatusWidget({
 
   return (
     <Card className="w-full max-w-sm">
-      <CardContent className="pt-6">
-        {error && (
-          <div className="text-center text-destructive">
-            <p>Error loading model status</p>
-          </div>
-        )}
-      </CardContent>
+      {error && (
+        <div className="p-4 text-center text-destructive">
+          <p>Error loading model status</p>
+        </div>
+      )}
     </Card>
   );
 }
