@@ -89,23 +89,7 @@ function Router() {
   
   return (
     <>
-      {/* Status bar for offline notification and model status */}
-      <div className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center">
-        {!isOnline && (
-          <div className="flex-1 bg-red-500 text-white p-2 text-center text-xs flex items-center justify-center gap-2">
-            <WifiOff className="h-3 w-3" /> You're currently offline. Some features may be limited.
-          </div>
-        )}
-        
-        {/* Only show on main pages */}
-        {location !== "/splash" && location !== "/onboarding" && (
-          <div className="flex-shrink-0 bg-background/80 backdrop-blur-sm shadow-sm border-b p-1 flex items-center">
-            <ModelStatusWidget compact={true} />
-          </div>
-        )}
-      </div>
-      
-      <div className={`${!isOnline ? 'pt-8' : 'pt-10'}`}>
+      <div className="pt-2">
         {showOfflineBanner && <OfflineModeBanner />}
         
         <Switch>
