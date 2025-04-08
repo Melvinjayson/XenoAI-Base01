@@ -85,39 +85,11 @@ export default function ModelStatusWidget({
   return (
     <Card className="w-full max-w-sm">
       <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            {settings.currentModelType === ModelType.LOCAL ? (
-              <Server className="h-5 w-5 text-primary" />
-            ) : (
-              <Cloud className="h-5 w-5 text-primary" />
-            )}
-            <span className="font-medium">
-              {settings.currentModelType === ModelType.LOCAL ? 'Local' : 'Cloud'} Model
-            </span>
-          </div>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Switch
-                  checked={settings.currentModelType === ModelType.CLOUD}
-                  onCheckedChange={handleModelToggle}
-                  disabled={!settings.cloudModelsAvailable && settings.currentModelType === ModelType.LOCAL}
-                />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Switch to {settings.currentModelType === ModelType.LOCAL ? 'cloud' : 'local'} model</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-
-        {!settings.cloudModelsAvailable && settings.currentModelType === ModelType.LOCAL && (
-          <Badge variant="outline" className="mt-2 bg-yellow-100 text-yellow-800 border-yellow-300">
-            Cloud models unavailable
+        <div className="flex items-center justify-center">
+          <Badge variant="outline" className={settings.cloudModelsAvailable ? "bg-green-100 text-green-800 border-green-300" : "bg-yellow-100 text-yellow-800 border-yellow-300"}>
+            {settings.cloudModelsAvailable ? "Models Available" : "Limited Availability"}
           </Badge>
-        )}
+        </div>
       </CardContent>
     </Card>
   );
