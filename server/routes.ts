@@ -607,6 +607,90 @@ function setupApiRoutes(app: Express): void {
     }
   });
 
+  // Project management endpoints
+  app.get('/api/projects', async (req: Request, res: Response) => {
+    try {
+      const projects = await storage.getProjects();
+      res.status(200).json(projects);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+
+  app.post('/api/projects', async (req: Request, res: Response) => {
+    try {
+      const projectData = req.body;
+      const project = await storage.createProject(projectData);
+      
+      // Provide real-time status update
+      console.log(`Project created successfully: ${project.name} (ID: ${project.id})`);
+      
+      res.status(201).json(project);
+    } catch (error) {
+      console.error('Error creating project:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+
+  app.get('/api/projects/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid project ID' });
+      }
+      
+      const project = await storage.getProject(id);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      res.status(200).json(project);
+    } catch (error) {
+      console.error('Error fetching project:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+
+  app.patch('/api/projects/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid project ID' });
+      }
+      
+      const projectData = req.body;
+      const project = await storage.updateProject(id, projectData);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      res.status(200).json(project);
+    } catch (error) {
+      console.error('Error updating project:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+
+  app.delete('/api/projects/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid project ID' });
+      }
+      
+      const success = await storage.deleteProject(id);
+      if (!success) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+
   // Fallback for unmatched API routes
   app.use('/api/*', (req: Request, res: Response) => {
     res.status(404).json({ error: 'API endpoint not found' });

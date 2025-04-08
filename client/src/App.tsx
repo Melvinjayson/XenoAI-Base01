@@ -85,7 +85,7 @@ function AppRoutes() {
   };
   
   // Determine if we should show the offline banner
-  const showOfflineBanner = location !== "/splash" && location !== "/onboarding";
+  const showOfflineBanner = location.pathname !== "/splash" && location.pathname !== "/onboarding";
   
   return (
     <>
@@ -113,6 +113,7 @@ function AppRoutes() {
         {showVoiceWidget && <FloatingVoiceWidget />}
         {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
         <OfflineDialog />
+        <CompanionWrapper />
       </div>
     </>
   );
@@ -122,12 +123,14 @@ function CompanionWrapper() {
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const { isVisible, position, mode, showHelpOnStartup } = useCompanion();
-  const [location, navigate] = useLocation();
+  const location = useLocation();
+  const navigate = useNavigate();
   
   // Check if we should show help on startup
   useEffect(() => {
     // Only show help on main pages, not splash or onboarding
-    const isMainPage = location === "/" || location === "/knowledge-graph" || location.startsWith("/canvas");
+    const pathname = location.pathname;
+    const isMainPage = pathname === "/" || pathname === "/knowledge-graph" || pathname.startsWith("/canvas");
     if (isMainPage && showHelpOnStartup) {
       // Small delay to ensure everything is loaded
       const timer = setTimeout(() => {
@@ -185,9 +188,7 @@ function App() {
                         <GestureProvider>
                           <OfflineProvider>
                             <CompanionProvider>
-                              <Router />
-                              {/* Re-enable the companion */}
-                              <CompanionWrapper />
+                              <AppRoutes />
                               <Toaster />
                             </CompanionProvider>
                           </OfflineProvider>

@@ -42,8 +42,8 @@ export class ModelTransitionManager {
   private complexityThresholds: Map<string, number> = new Map();
   
   private constructor() {
-    // Initialize with default complexity threshold (0.7)
-    this.setComplexityThreshold('default', 0.7);
+    // Initialize with default complexity threshold (0.9) - 90% local model capacity
+    this.setComplexityThreshold('default', 0.9);
   }
   
   /**
@@ -78,7 +78,7 @@ export class ModelTransitionManager {
     // Use session-specific threshold or default
     return this.complexityThresholds.get(sessionId) || 
            this.complexityThresholds.get('default') || 
-           0.7;
+           0.9; // Fallback to 90% local model capacity
   }
   
   /**
@@ -250,8 +250,8 @@ export class ModelTransitionManager {
     const processingOptions = {
       model: model,
       useLocalModels: modelType === ModelType.LOCAL,
-      // Set max tokens based on model type
-      max_tokens: modelType === ModelType.LOCAL ? 512 : 1024,
+      // Set max tokens based on model type - increased local model capacity to 90%
+      max_tokens: modelType === ModelType.LOCAL ? 768 : 1024,
       // Local models often need more temperature to be creative
       temperature: modelType === ModelType.LOCAL ? 0.8 : 0.7
     };
@@ -306,11 +306,11 @@ export class ModelTransitionManager {
       const threshold = this.getComplexityThreshold(sessionId);
       const complexityIndicator = complexity > threshold;
       
-      // 2. Check length
-      const messageTooLong = message.length > 1000;
+      // 2. Check length - increased message length threshold to allow longer local processing
+      const messageTooLong = message.length > 1500;
       
-      // 3. Check history length
-      const historyTooLong = history.length > 15;
+      // 3. Check history length - increased history threshold for better context handling
+      const historyTooLong = history.length > 20;
       
       // 4. Check for specific trigger phrases that indicate the need for advanced reasoning
       const triggerPhrases = [
