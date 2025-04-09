@@ -157,6 +157,46 @@ export class EnhancedMemoryManager {
    * @param entities Extracted entities from the message
    * @param topics Detected topics
    */
+  /**
+   * Add a memory entry that isn't necessarily part of a conversation
+   * @param content The content to add to memory
+   * @param sessionId Session identifier
+   * @param memoryType Type of memory (defaults to 'semantic')
+   * @param entities Related entities
+   * @param topics Associated topics 
+   */
+  public async addMemory(
+    content: string,
+    sessionId: string,
+    memoryType: 'episodic' | 'semantic' | 'procedural' | 'emotional' = 'semantic',
+    entities: Entity[] = [],
+    topics: string[] = []
+  ): Promise<void> {
+    // Create or retrieve the active episode for this session
+    this.ensureActiveEpisode(sessionId);
+    
+    // Create a memory segment
+    const segment: MemorySegment = {
+      type: memoryType,
+      content: content,
+      entities,
+      timestamp: new Date(),
+      importance: 0.7, // Default to fairly important
+      topics,
+      role: 'system' // Memory entries added this way are considered system knowledge
+    };
+    
+    // Add segment to active episode
+    const activeEpisode = this.activeEpisodes.get(sessionId)!;
+    activeEpisode.segments.push(segment);
+    activeEpisode.endTime = new Date();
+    
+    // Update conceptual memory if it's semantic knowledge
+    if (memoryType === 'semantic') {
+      await this.updateConceptualMemory(sessionId, content, topics);
+    }
+  }
+
   public async processMessage(
     message: ChatMessage,
     sessionId: string,
@@ -219,7 +259,7 @@ export class EnhancedMemoryManager {
     // Update user profile if this is a user message
     if (message.role === 'user') {
       // Attempt to get emotional context (this could come from a sentiment analysis module)
-      const emotionalContext = await this.extractEmotionalContext(message);
+      const emotionalContext = await this.extractEmotionalContext(message.content);
       await this.updateUserProfile(sessionId, message.content, topics, emotionalContext);
     }
 

@@ -87,12 +87,36 @@ export function useTextToSpeech() {
         
         const data = await response.json();
         
-        // Check if we got a fallback response with empty audioUrl
+        // Check if we should use enhanced browser TTS
+        if (data.status === 'browser') {
+          console.log('Using enhanced browser text-to-speech');
+          
+          // Use the enhanced settings if provided
+          if (data.enhancedSettings) {
+            const settings: EnhancedTTSSettings = {
+              rate: data.enhancedSettings.rate,
+              pitch: data.enhancedSettings.pitch,
+              volume: data.enhancedSettings.volume,
+              preferredVoices: data.enhancedSettings.preferredVoices
+            };
+            
+            await useBrowserSpeechSynthesis(
+              text, 
+              language, 
+              settings
+            );
+          } else {
+            // Fallback to standard browser TTS
+            await useBrowserSpeechSynthesis(text, language);
+          }
+          return; // Exit early since we're using browser TTS
+        }
+        
+        // Handle other fallback cases
         if (data && data.fallback === true && !data.audioUrl) {
           console.log('Using browser speech synthesis as fallback');
-          // Use browser's built-in speech synthesis
           await useBrowserSpeechSynthesis(text, language);
-          return; // Exit early since we're using browser TTS
+          return;
         }
         
         if (!data || (!data.audioUrl && !data.fallback)) {
@@ -194,8 +218,20 @@ export function useTextToSpeech() {
     }
   }, [retryCount]);
   
-  // Helper function to use browser's built-in speech synthesis
-  const useBrowserSpeechSynthesis = async (text: string, language: string = 'en'): Promise<void> => {
+  // Enhanced settings interface for speech synthesis
+  interface EnhancedTTSSettings {
+    rate?: number;
+    pitch?: number;
+    volume?: number;
+    preferredVoices?: string[];
+  }
+
+  // Helper function to use browser's built-in speech synthesis with optional enhanced settings
+  const useBrowserSpeechSynthesis = async (
+    text: string, 
+    language: string = 'en',
+    enhancedSettings?: EnhancedTTSSettings
+  ): Promise<void> => {
     // Clear any previous error
     setError(null);
     
@@ -236,7 +272,7 @@ export function useTextToSpeech() {
       
       // Create a promise to handle speech events
       return new Promise((resolve, reject) => {
-        // Set up voice if available
+        // Set up voice and enhanced settings if available
         try {
           // Force voices to load if they haven't already
           window.speechSynthesis.getVoices();
@@ -245,17 +281,46 @@ export function useTextToSpeech() {
           setTimeout(() => {
             const voices = window.speechSynthesis.getVoices();
             if (voices.length > 0) {
-              // Try to find a voice for the specified language
-              const exactMatch = voices.find(v => v.lang === utterance.lang);
-              const baseMatch = voices.find(v => v.lang.startsWith(baseLanguage));
+              // Get list of preferred voices if provided in enhanced settings
+              const preferredVoices = enhancedSettings?.preferredVoices || [];
               
-              // Prefer exact match, then base language match, then just pick the first voice
-              utterance.voice = exactMatch || baseMatch || voices[0];
+              // Try to find a voice using preferences
+              let selectedVoice = null;
               
-              // Better voice settings for most browsers
-              utterance.rate = 1.0; // Normal speaking rate
-              utterance.pitch = 1.0; // Normal pitch
-              utterance.volume = 1.0; // Full volume
+              // First try to find one of the preferred voices
+              if (preferredVoices.length > 0) {
+                for (const preferredVoice of preferredVoices) {
+                  const match = voices.find(v => 
+                    v.name === preferredVoice || 
+                    v.name.includes(preferredVoice)
+                  );
+                  if (match) {
+                    selectedVoice = match;
+                    console.log(`Using preferred voice: ${match.name}`);
+                    break;
+                  }
+                }
+              }
+              
+              // If no preferred voice found, try language matching
+              if (!selectedVoice) {
+                // Try to find a voice for the specified language
+                const exactMatch = voices.find(v => v.lang === utterance.lang);
+                const baseMatch = voices.find(v => v.lang.startsWith(baseLanguage));
+                
+                // Prefer exact match, then base language match, then just pick the first voice
+                selectedVoice = exactMatch || baseMatch || voices[0];
+              }
+              
+              // Set the selected voice
+              utterance.voice = selectedVoice;
+              
+              // Apply enhanced settings if provided, otherwise use defaults
+              utterance.rate = enhancedSettings?.rate ?? 1.0;
+              utterance.pitch = enhancedSettings?.pitch ?? 1.0;
+              utterance.volume = enhancedSettings?.volume ?? 1.0;
+              
+              console.log(`Voice settings: voice=${utterance.voice?.name}, rate=${utterance.rate}, pitch=${utterance.pitch}`);
             }
             
             // Set up event handlers

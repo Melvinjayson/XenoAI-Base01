@@ -317,7 +317,11 @@ function setupApiRoutes(app: Express): void {
       };
       
       // Get the appropriate system prompt for this character
-      const systemPrompt = characterPrompts[characterType] || characterPrompts.assistant;
+      const validCharacterTypes = ['assistant', 'scientist', 'guide', 'mentor'] as const;
+      const validatedCharType = validCharacterTypes.includes(characterType as any) 
+        ? characterType as keyof typeof characterPrompts 
+        : 'assistant';
+      const systemPrompt = characterPrompts[validatedCharType];
       
       // Process the voice command with enhanced context
       const response = await processMessage(
@@ -331,19 +335,18 @@ function setupApiRoutes(app: Express): void {
       );
       
       // Record the interaction in the memory manager for future context
-      enhancedMemoryManager.addMemory(sessionId, {
-        type: 'voice-interaction',
-        content: {
-          character: characterType,
-          query: message,
-          response: response.message
-        },
-        timestamp: Date.now()
-      });
+      const memoryContent = `Voice interaction with character=${validatedCharType}, query='${message}', response='${response.message}'`;
+      await enhancedMemoryManager.addMemory(
+        memoryContent,
+        sessionId,
+        'episodic',  // Store as episodic memory type
+        [], // No specific entities
+        ['voice-interaction', validatedCharType] // Add relevant topics
+      );
       
       res.status(200).json({
         response: response.message,
-        character: characterType,
+        character: validatedCharType,
         processed: true
       });
     } catch (error) {
@@ -371,35 +374,29 @@ function setupApiRoutes(app: Express): void {
         return res.status(400).json({ error: 'Text is required' });
       }
       
-      // Check if we have ElevenLabs API key
-      if (process.env.ELEVENLABS_API_KEY) {
-        // Stub implementation - in a full implementation this would use ElevenLabs API
-        console.log(`Synthesizing speech with ElevenLabs: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
-        // Return a 201 Accepted status but with an error message to indicate it's a stub
-        return res.status(201).json({ 
-          status: 'stub', 
-          message: 'ElevenLabs synthesis would happen here in a complete implementation'
-        });
-      }
+      // For the best local experience, we'll prioritize browser-based TTS with enhanced settings
+      // This gives more consistent and reliable results across all devices
+      console.log(`Synthesizing speech with local TTS: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
       
-      // Check if we have OpenAI API key as fallback
-      if (process.env.OPENAI_API_KEY) {
-        // Stub implementation - in a full implementation this would use OpenAI TTS
-        console.log(`Synthesizing speech with OpenAI TTS: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
-        // Return a 201 Accepted status but with an error message to indicate it's a stub
-        return res.status(201).json({ 
-          status: 'stub', 
-          message: 'OpenAI TTS synthesis would happen here in a complete implementation'
-        });
-      }
-      
-      // As a last resort, tell the client to use browser TTS
+      // Return enhanced browser TTS settings for better quality
       return res.status(200).json({
         status: 'browser',
-        message: 'Use browser text-to-speech capabilities',
+        message: 'Use enhanced browser text-to-speech capabilities',
         text,
         voice,
-        language
+        language,
+        enhancedSettings: {
+          rate: 1.0,            // Normal speaking rate
+          pitch: 1.0,           // Normal pitch
+          volume: 1.0,          // Full volume
+          preferredVoices: [    // List of high-quality voices to try first
+            'Google UK English Female',
+            'Microsoft Zira Desktop',
+            'Microsoft David Desktop',
+            'Alex',             // macOS voice
+            'Samantha'          // macOS voice
+          ]
+        }
       });
     } catch (error) {
       console.error('Error in speech synthesis:', error);
