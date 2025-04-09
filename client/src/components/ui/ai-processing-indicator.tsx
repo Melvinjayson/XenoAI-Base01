@@ -161,7 +161,11 @@ export function AIProcessingIndicator({
     "What can you help me with?",
     "Tell me about knowledge graphs",
     "How do I use voice commands?",
-    "Summarize the latest tech news"
+    "Generate a research summary",
+    "Help me make a decision about...",
+    "Create a visual concept map",
+    "Upload and analyze this document",
+    "Switch to local LLM model"
   ];
   
   // Handle user interaction with the component
@@ -194,13 +198,22 @@ export function AIProcessingIndicator({
     >
       {/* Suggestions Panel - only shows when idle state is clicked */}
       {isIdleState && showSuggestions && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-primary/20 p-3 animate-in fade-in zoom-in-95 duration-200">
-          <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Try asking me about:</h4>
-          <ul className="space-y-1.5">
+        <div className="absolute bottom-full left-0 right-0 mb-3 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-primary/20 p-3 animate-in fade-in zoom-in-95 duration-200 min-w-[250px]">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-semibold text-primary dark:text-primary/90">AI Assistant Available</h4>
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+              <span className="text-[10px] text-gray-500 dark:text-gray-400">active</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-600 dark:text-gray-300 mb-3">Try asking me about:</p>
+          <ul className="space-y-1.5 max-h-[200px] overflow-y-auto">
             {suggestionExamples.map((suggestion, index) => (
               <li 
                 key={index}
-                className="text-xs bg-primary/5 hover:bg-primary/10 text-primary/90 dark:text-primary/80 dark:hover:text-primary px-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center"
+                className="text-xs bg-primary/5 hover:bg-primary/10 text-primary/90 dark:text-primary/80 
+                         dark:hover:text-primary px-2.5 py-2 rounded-md cursor-pointer 
+                         transition-colors flex items-center hover:translate-x-0.5 transform duration-150"
                 onClick={(e) => {
                   e.stopPropagation(); // Prevent the parent click handler from firing
                   console.log(`User clicked suggestion: ${suggestion}`);
@@ -208,7 +221,7 @@ export function AIProcessingIndicator({
                   setShowSuggestions(false);
                 }}
               >
-                <span className="w-1 h-1 bg-primary/60 rounded-full mr-2"></span>
+                <span className="w-1.5 h-1.5 bg-primary/60 rounded-full mr-2.5 flex-shrink-0"></span>
                 {suggestion}
               </li>
             ))}
@@ -464,12 +477,12 @@ function getIconForState(state: ProcessingState) {
                   style={{animationDuration: '4s'}}></span>
           </div>
           
-          {/* Touch/Click indicator */}
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse">
-            <div className="absolute inset-0 bg-primary rounded-full animate-ping opacity-70"
+          {/* Touch/Click indicator - "A" for Available */}
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse shadow-sm">
+            <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-70"
                  style={{animationDuration: '2s'}}></div>
-            <div className="absolute inset-0.5 bg-white rounded-full flex items-center justify-center">
-              <span className="w-1 h-1 bg-primary rounded-full"></span>
+            <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white">
+              A
             </div>
           </div>
           
