@@ -320,12 +320,7 @@ export default function Home() {
                 <span className="font-medium">Projects</span>
               </Button>
             </Link>
-            <Link to="/tutorials">
-              <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
-                <Mic className="w-4 h-4" />
-                <span className="font-medium">Tutorials</span>
-              </Button>
-            </Link>
+{/* Tutorials button hidden as requested */}
             <Link to="/admin">
               <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
                 <Settings className="w-4 h-4" />
@@ -361,12 +356,7 @@ export default function Home() {
                     <span>Workbench</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/tutorials" className="flex items-center gap-2">
-                    <Mic className="w-4 h-4" />
-                    <span>Voice Tutorials</span>
-                  </Link>
-                </DropdownMenuItem>
+{/* Tutorials dropdown item hidden as requested */}
               </DropdownMenuContent>
             </DropdownMenu>
             <Link to="/project-management">
@@ -378,11 +368,7 @@ export default function Home() {
                 </span>
               </Button>
             </Link>
-            <Link to="/tutorials">
-              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Tutorials">
-                <Mic className="w-5 h-5" />
-              </Button>
-            </Link>
+{/* Mobile Tutorials button hidden as requested */}
             <Link to="/admin">
               <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Admin">
                 <Settings className="w-5 h-5" />

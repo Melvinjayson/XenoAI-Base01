@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useRef } from "react";
 import { 
   apiRequest,
+  apiRequestJson,
   analyzeConversationForCommands as apiAnalyzeCommands,
   executeSystemCommand as apiExecuteCommand,
   generateTaskList as apiGenerateTaskList,
@@ -44,13 +45,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       console.log("Request already in progress, ignoring duplicate send");
       return;
     }
+    
+    // Add additional check for duplicate messages
+    const messageTimestamp = Date.now();
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && 
+        lastMessage.role === "user" && 
+        lastMessage.content === content && 
+        messageTimestamp - lastMessage.timestamp < 5000) {
+      console.log("Duplicate message detected within 5 seconds, ignoring");
+      return;
+    }
 
     // Add user message to chat
     const userMessage: Message = {
-      id: `user-${Date.now()}`,
+      id: `user-${messageTimestamp}`,
       role: "user",
       content,
-      timestamp: Date.now(),
+      timestamp: messageTimestamp,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -293,8 +305,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           content: msg.content,
         }));
       
-      // Call new API endpoint
-      const result = await apiRequest(
+      // Call API endpoint with the JSON helper that returns parsed response directly
+      const data = await apiRequestJson<{ 
+        graph: KnowledgeGraph; 
+        insights: any[]; 
+        query: string;
+      }>(
         "/api/knowledge-graph/from-conversation", 
         "POST", 
         {
@@ -303,7 +319,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       );
       
-      return result;
+      return data;
     } catch (error) {
       console.error("Error creating knowledge graph from conversation:", error);
       toast({
@@ -317,17 +333,36 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Add a message to the chat (for internal use)
   const addMessage = (message: { role: "user" | "assistant", content: string }) => {
+    // Prevent adding empty messages
+    if (!message.content.trim()) return;
+    
+    const messageTimestamp = Date.now();
+    
+    // Check for duplicate messages in the last 5 seconds
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && 
+          lastMessage.role === message.role && 
+          lastMessage.content === message.content && 
+          messageTimestamp - lastMessage.timestamp < 5000) {
+        console.log("Duplicate message detected in addMessage, ignoring");
+        return;
+      }
+    }
+    
+    // Create the new message with timestamp
     const newMessage: Message = {
-      id: `${message.role}-${Date.now()}`,
+      id: `${message.role}-${messageTimestamp}`,
       role: message.role,
       content: message.content,
-      timestamp: Date.now(),
+      timestamp: messageTimestamp,
     };
     
     setMessages((prev) => [...prev, newMessage]);
     
     // If it's a user message, automatically trigger the AI response
-    if (message.role === "user") {
+    // but ensure we're not already processing a request
+    if (message.role === "user" && !requestInProgress.current) {
       sendMessage(message.content);
     }
   };
