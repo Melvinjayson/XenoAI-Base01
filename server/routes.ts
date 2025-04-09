@@ -8,7 +8,7 @@
 import { Request, Response, Express } from 'express';
 import { Server as HTTPServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { processMessage } from './model-router';
+import { processMessage, DEFAULT_PROMPTS } from './model-router';
 import { getAvailableModels } from './model-selector';
 import { apiQuotaManager } from './api-quota-manager';
 import { ChatMessage, ActionType } from './types';
@@ -290,6 +290,68 @@ function setupApiRoutes(app: Express): void {
     } catch (error) {
       console.error('Error processing optimal chat:', error);
       res.status(500).json({ error: String(error) || 'An unknown error occurred' });
+    }
+  });
+  
+  // Voice chat API for companion characters
+  app.post('/api/chat/voice', async (req: Request, res: Response) => {
+    try {
+      const { 
+        message, 
+        characterType = 'assistant', 
+        sessionId = 'voice-session'
+      } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+      
+      console.log(`Processing voice command for ${characterType}: "${message}"`);
+      
+      // Define character-specific system prompts based on character type
+      const characterPrompts = {
+        assistant: `${DEFAULT_PROMPTS.generic} As a helpful AI assistant named Xeno, provide concise and helpful responses to voice commands. Focus on direct, actionable answers suitable for voice interaction.`,
+        scientist: `You are Prof. X, an AI research scientist with expertise in analyzing complex questions. Provide informative, educational responses that explain concepts clearly. Your answers should be concise but thorough, with a slightly academic tone.`,
+        guide: `You are Guido, a friendly guide to the Xeno AI system. Your responses should help users navigate the application, understand features, and make the most of the system. Be encouraging and offer practical tips.`,
+        mentor: `You are Mentor, an AI specializing in decision support and personal development. Help users think through problems, consider different perspectives, and develop structured approaches to challenges. Focus on prompting deeper thinking and reflection.`
+      };
+      
+      // Get the appropriate system prompt for this character
+      const systemPrompt = characterPrompts[characterType] || characterPrompts.assistant;
+      
+      // Process the voice command with enhanced context
+      const response = await processMessage(
+        message,
+        [{ role: 'system', content: systemPrompt }],
+        {
+          temperature: 0.7,
+          maxTokens: 150, // Keep responses concise for voice
+          systemPrompt
+        }
+      );
+      
+      // Record the interaction in the memory manager for future context
+      enhancedMemoryManager.addMemory(sessionId, {
+        type: 'voice-interaction',
+        content: {
+          character: characterType,
+          query: message,
+          response: response.message
+        },
+        timestamp: Date.now()
+      });
+      
+      res.status(200).json({
+        response: response.message,
+        character: characterType,
+        processed: true
+      });
+    } catch (error) {
+      console.error('Error processing voice command:', error);
+      res.status(500).json({ 
+        error: String(error) || 'An unknown error occurred',
+        fallbackResponse: "I'm sorry, I couldn't process that voice command. Could you try again?"
+      });
     }
   });
 

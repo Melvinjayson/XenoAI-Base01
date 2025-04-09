@@ -8,8 +8,10 @@ import {
   Volume2,
   Sparkles,
   LifeBuoy,
-  Brain
+  Brain,
+  Mic
 } from 'lucide-react';
+import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -142,9 +144,20 @@ const FloatingCharacter: React.FC<FloatingCharacterProps> = ({
   const [currentTip, setCurrentTip] = useState(0);
   const [showDialog, setShowDialog] = useState(false);
   const [quickMessage, setQuickMessage] = useState<string | null>(null);
-  const [animationState, setAnimationState] = useState<'idle' | 'thinking' | 'speaking'>('idle');
+  const [animationState, setAnimationState] = useState<'idle' | 'thinking' | 'speaking' | 'listening'>('idle');
+  const [voiceResponse, setVoiceResponse] = useState<string | null>(null);
   const companionRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  
+  // Speech recognition state
+  const { 
+    isListening, 
+    transcript, 
+    startListening, 
+    stopListening, 
+    resetTranscript,
+    hasRecognitionSupport 
+  } = useSpeechRecognition();
 
   // Set a random initial position based on window size
   useEffect(() => {
@@ -293,6 +306,83 @@ const FloatingCharacter: React.FC<FloatingCharacterProps> = ({
       duration: 3000,
     });
   };
+  
+  // Handle voice interaction
+  const handleVoiceInteraction = async () => {
+    if (!hasRecognitionSupport) {
+      toast({
+        title: "Speech Recognition Not Supported",
+        description: "Your browser doesn't support speech recognition.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isListening) {
+      stopListening();
+      setAnimationState('thinking');
+      
+      // Process the transcript if we have one
+      if (transcript.trim()) {
+        // Show the processing animation
+        setVoiceResponse(`Processing: "${transcript}"`);
+        showQuickMessage("Processing your request...");
+        
+        try {
+          // Send the voice input to the AI for processing
+          const response = await fetch('/api/chat/voice', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              message: transcript,
+              characterType: character
+            }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setVoiceResponse(data.response);
+            
+            // Speak the response if sound is enabled
+            if (!isMuted) {
+              setAnimationState('speaking');
+              const utterance = new SpeechSynthesisUtterance(data.response);
+              window.speechSynthesis.speak(utterance);
+              
+              // Reset animation state after speaking
+              setTimeout(() => {
+                setAnimationState('idle');
+              }, 2000);
+            }
+            
+            logInteraction(); // Log interaction in context
+          } else {
+            throw new Error('Failed to get AI response');
+          }
+        } catch (error) {
+          console.error('Error processing voice command:', error);
+          toast({
+            title: "Processing Error",
+            description: "There was an error processing your voice command.",
+            variant: "destructive",
+          });
+          setAnimationState('idle');
+        }
+      } else {
+        setAnimationState('idle');
+      }
+      
+      // Reset transcript
+      resetTranscript();
+    } else {
+      // Start listening
+      startListening();
+      setAnimationState('listening');
+      showQuickMessage("I'm listening...");
+    }
+  };
 
   // Don't show if not visible
   if (!isVisible) return null;
@@ -320,18 +410,37 @@ const FloatingCharacter: React.FC<FloatingCharacterProps> = ({
             currentAppearance.color,
             isExpanded ? "scale-110" : "hover:scale-105",
             animationState === 'thinking' && "animate-pulse",
-            animationState === 'speaking' && "animate-bounce"
+            animationState === 'speaking' && "animate-bounce",
+            animationState === 'listening' && "animate-pulse"
           )}
           onClick={toggleExpand}
           onMouseDown={handleMouseDown}
           aria-label="Floating companion"
         >
-          {currentAppearance.icon}
+          {animationState === 'listening' ? <Mic size={24} /> : currentAppearance.icon}
         </button>
+        
+        {/* Speech recognition bubble */}
+        <AnimatePresence>
+          {isListening && transcript && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-red-500 text-white px-3 py-2 rounded-lg shadow-md text-sm max-w-[250px]"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Mic size={14} className="animate-pulse" />
+                <span className="text-xs font-medium">Listening...</span>
+              </div>
+              <p className="break-words">{transcript}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
         
         {/* Quick message bubble */}
         <AnimatePresence>
-          {quickMessage && (
+          {quickMessage && !isListening && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -405,8 +514,15 @@ const FloatingCharacter: React.FC<FloatingCharacterProps> = ({
                 </AnimatePresence>
               </div>
               
+              {/* Voice response display */}
+              {voiceResponse && (
+                <div className="bg-primary/10 p-3 rounded-lg mb-3 text-sm">
+                  <p className="text-sm">{voiceResponse}</p>
+                </div>
+              )}
+              
               {/* Action buttons */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -436,6 +552,26 @@ const FloatingCharacter: React.FC<FloatingCharacterProps> = ({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>{isMuted ? "Unmute" : "Mute"}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isListening ? "default" : "outline"}
+                        size="icon"
+                        onClick={handleVoiceInteraction}
+                        className={cn(
+                          "rounded-lg",
+                          isListening && "bg-red-500 hover:bg-red-600",
+                          animationState === 'listening' && "animate-pulse"
+                        )}
+                      >
+                        <Mic size={18} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{isListening ? "Stop listening" : "Start voice command"}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 
