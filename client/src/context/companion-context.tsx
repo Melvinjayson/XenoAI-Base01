@@ -1,146 +1,95 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, useState, useCallback } from 'react';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { CompanionCharacter } from '@/components/ui/floating-companion';
 
-type CompanionPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
-type CompanionMode = 'always' | 'auto' | 'minimal' | 'hidden';
-
+// Types for the companion context
 interface CompanionContextType {
   isVisible: boolean;
-  position: CompanionPosition;
-  mode: CompanionMode;
+  isMuted: boolean;
+  character: CompanionCharacter;
+  recentTips: string[];
+  lastInteraction: Date | null;
   toggleVisibility: () => void;
-  setPosition: (position: CompanionPosition) => void;
-  setMode: (mode: CompanionMode) => void;
-  characterStyle: number;
-  setCharacterStyle: (style: number) => void;
-  showHelpOnStartup: boolean;
-  setShowHelpOnStartup: (show: boolean) => void;
-  speechEnabled: boolean;
-  setSpeechEnabled: (enabled: boolean) => void;
+  toggleMute: () => void;
+  changeCharacter: (character: CompanionCharacter) => void;
+  showTip: (tip: string) => void;
+  logInteraction: () => void;
 }
 
-const CompanionContext = createContext<CompanionContextType | null>(null);
+// Create the context
+const CompanionContext = createContext<CompanionContextType | undefined>(undefined);
 
+// Custom hook to use the companion context
+export function useCompanion() {
+  const context = useContext(CompanionContext);
+  
+  if (context === undefined) {
+    throw new Error('useCompanion must be used within a CompanionProvider');
+  }
+  
+  return context;
+}
+
+// Provider component to wrap around components that need the companion context
 interface CompanionProviderProps {
   children: ReactNode;
 }
 
 export function CompanionProvider({ children }: CompanionProviderProps) {
-  // Try to load preferences from localStorage
-  const loadFromStorage = (key: string, defaultValue: any) => {
-    try {
-      const saved = localStorage.getItem(`companion_${key}`);
-      return saved ? JSON.parse(saved) : defaultValue;
-    } catch {
-      return defaultValue;
-    }
-  };
-
-  const [isVisible, setIsVisible] = useState<boolean>(loadFromStorage('isVisible', true));
-  const [position, setPositionState] = useState<CompanionPosition>(loadFromStorage('position', 'bottom-right'));
-  const [mode, setModeState] = useState<CompanionMode>(loadFromStorage('mode', 'auto'));
-  const [characterStyle, setCharacterStyleState] = useState<number>(loadFromStorage('characterStyle', 0));
-  const [showHelpOnStartup, setShowHelpOnStartupState] = useState<boolean>(loadFromStorage('showHelpOnStartup', true));
-  const [speechEnabled, setSpeechEnabledState] = useState<boolean>(loadFromStorage('speechEnabled', true));
-
-  // Save to localStorage when values change
-  useEffect(() => {
-    localStorage.setItem('companion_isVisible', JSON.stringify(isVisible));
-  }, [isVisible]);
-
-  useEffect(() => {
-    localStorage.setItem('companion_position', JSON.stringify(position));
-  }, [position]);
-
-  useEffect(() => {
-    localStorage.setItem('companion_mode', JSON.stringify(mode));
-  }, [mode]);
-
-  useEffect(() => {
-    localStorage.setItem('companion_characterStyle', JSON.stringify(characterStyle));
-  }, [characterStyle]);
-
-  useEffect(() => {
-    localStorage.setItem('companion_showHelpOnStartup', JSON.stringify(showHelpOnStartup));
-  }, [showHelpOnStartup]);
-
-  useEffect(() => {
-    localStorage.setItem('companion_speechEnabled', JSON.stringify(speechEnabled));
-  }, [speechEnabled]);
-
-  // Auto-hide companion based on scroll if mode is 'auto'
-  useEffect(() => {
-    if (mode !== 'auto') return;
-
-    const handleScroll = () => {
-      const scrollThreshold = 200;
-      if (window.scrollY > scrollThreshold && isVisible) {
-        setIsVisible(false);
-      } else if (window.scrollY <= scrollThreshold && !isVisible) {
-        setIsVisible(true);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [mode, isVisible]);
-
-  // Utility functions
-  const toggleVisibility = () => setIsVisible(prev => !prev);
+  // State from local storage to persist across sessions
+  const [isVisible, setIsVisible] = useLocalStorage('companion-visible', true);
+  const [isMuted, setIsMuted] = useLocalStorage('companion-muted', false);
+  const [character, setCharacter] = useLocalStorage<CompanionCharacter>('companion-character', 'assistant');
   
-  const setPosition = (newPosition: CompanionPosition) => {
-    setPositionState(newPosition);
-  };
+  // State that doesn't need to persist
+  const [recentTips, setRecentTips] = useState<string[]>([]);
+  const [lastInteraction, setLastInteraction] = useState<Date | null>(null);
   
-  const setMode = (newMode: CompanionMode) => {
-    setModeState(newMode);
-    // If changing to always show, make sure it's visible
-    if (newMode === 'always') {
-      setIsVisible(true);
-    }
-    // If changing to hidden, hide it
-    if (newMode === 'hidden') {
-      setIsVisible(false);
-    }
-  };
+  // Toggle visibility
+  const toggleVisibility = useCallback(() => {
+    setIsVisible(!isVisible);
+  }, [isVisible, setIsVisible]);
   
-  const setCharacterStyle = (style: number) => {
-    setCharacterStyleState(style);
-  };
+  // Toggle mute
+  const toggleMute = useCallback(() => {
+    setIsMuted(!isMuted);
+  }, [isMuted, setIsMuted]);
   
-  const setShowHelpOnStartup = (show: boolean) => {
-    setShowHelpOnStartupState(show);
-  };
+  // Change character
+  const changeCharacter = useCallback((newCharacter: CompanionCharacter) => {
+    setCharacter(newCharacter);
+  }, [setCharacter]);
   
-  const setSpeechEnabled = (enabled: boolean) => {
-    setSpeechEnabledState(enabled);
-  };
-
-  const value = {
+  // Show a tip (and keep track of recent tips)
+  const showTip = useCallback((tip: string) => {
+    setRecentTips((prev) => {
+      const newTips = [tip, ...prev.slice(0, 4)]; // Keep only 5 most recent tips
+      return newTips;
+    });
+  }, []);
+  
+  // Log an interaction
+  const logInteraction = useCallback(() => {
+    setLastInteraction(new Date());
+  }, []);
+  
+  // Provide the context value
+  const contextValue: CompanionContextType = {
     isVisible,
-    position,
-    mode,
+    isMuted,
+    character,
+    recentTips,
+    lastInteraction,
     toggleVisibility,
-    setPosition,
-    setMode,
-    characterStyle,
-    setCharacterStyle,
-    showHelpOnStartup,
-    setShowHelpOnStartup,
-    speechEnabled,
-    setSpeechEnabled,
+    toggleMute,
+    changeCharacter,
+    showTip,
+    logInteraction
   };
-
+  
   return (
-    <CompanionContext.Provider value={value}>
+    <CompanionContext.Provider value={contextValue}>
       {children}
     </CompanionContext.Provider>
   );
-}
-
-export function useCompanion() {
-  const context = useContext(CompanionContext);
-  if (!context) {
-    throw new Error('useCompanion must be used within a CompanionProvider');
-  }
-  return context;
 }

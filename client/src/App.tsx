@@ -29,6 +29,7 @@ import { CompanionProvider, useCompanion } from "@/context/companion-context";
 import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 import { FloatingCompanion } from "@/components/floating-companion";
+import { FloatingCharacter } from "@/components/ui/floating-character"; 
 import { CompanionHelpDialog } from "@/components/companion-help-dialog";
 import { CompanionSettingsDialog } from "@/components/companion-settings-dialog";
 import ModelStatusWidget from "@/components/model-status-widget";
@@ -122,26 +123,29 @@ function AppRoutes() {
 function CompanionWrapper() {
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
-  const { isVisible, position, mode, showHelpOnStartup } = useCompanion();
+  const { isVisible } = useCompanion();
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Check if we should show help on startup
+  // Check if we should show help on first visit
   useEffect(() => {
     // Only show help on main pages, not splash or onboarding
     const pathname = location.pathname;
     const isMainPage = pathname === "/" || pathname === "/knowledge-graph" || pathname.startsWith("/canvas");
-    if (isMainPage && showHelpOnStartup) {
+    const hasSeenHelp = localStorage.getItem('companion-help-seen');
+    
+    if (isMainPage && !hasSeenHelp) {
       // Small delay to ensure everything is loaded
       const timer = setTimeout(() => {
         setShowHelpDialog(true);
+        localStorage.setItem('companion-help-seen', 'true');
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [location, showHelpOnStartup]);
+  }, [location]);
   
   // Only show the companion on main pages
-  const showCompanion = isVisible && mode !== 'hidden';
+  const showCompanion = isVisible;
   
   const handleAssistantClick = () => {
     // Navigate to home page to access the chat
@@ -150,12 +154,12 @@ function CompanionWrapper() {
   
   return (
     <>
+      {/* Enhanced Character-based Companion - this is the new feature */}
       {showCompanion && (
-        <FloatingCompanion 
-          position={position}
-          onHelp={() => setShowHelpDialog(true)}
-          onSettings={() => setShowSettingsDialog(true)}
-          onAssistant={handleAssistantClick}
+        <FloatingCharacter 
+          onAskHelp={() => setShowHelpDialog(true)}
+          onNavigateToPage={(page) => navigate(page)}
+          className="hidden md:block" // Only show on larger screens
         />
       )}
       

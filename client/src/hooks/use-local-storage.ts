@@ -1,32 +1,28 @@
-import { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import { useState, useEffect } from 'react';
 
-type SetValue<T> = Dispatch<SetStateAction<T>>;
-
-export function useLocalStorage<T>(
-  key: string,
-  initialValue: T
-): [T, SetValue<T>] {
-  // State to store our value
-  // Pass initial state function to useState so logic is only executed once
+/**
+ * A hook for persisting state to localStorage
+ * @param key The localStorage key
+ * @param initialValue The initial value (used if no value exists in localStorage)
+ * @returns A stateful value and a function to update it (persists to localStorage)
+ */
+export function useLocalStorage<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  // Get from local storage then set initial state
   const [storedValue, setStoredValue] = useState<T>(() => {
-    if (typeof window === 'undefined') {
-      return initialValue;
-    }
     try {
       // Get from local storage by key
       const item = window.localStorage.getItem(key);
-      // Parse stored json or if none return initialValue
+      // Parse stored json or return initialValue
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      // If error also return initialValue
-      console.error('Error reading from localStorage:', error);
+      // If error, return initialValue
+      console.error(`Error reading localStorage key "${key}":`, error);
       return initialValue;
     }
   });
 
-  // Return a wrapped version of useState's setter function that ...
-  // ... persists the new value to localStorage.
-  const setValue: SetValue<T> = (value) => {
+  // Return a wrapped version of useState's setter function that persists the new value to localStorage
+  const setValue: React.Dispatch<React.SetStateAction<T>> = (value) => {
     try {
       // Allow value to be a function so we have same API as useState
       const valueToStore =
@@ -34,28 +30,23 @@ export function useLocalStorage<T>(
       // Save state
       setStoredValue(valueToStore);
       // Save to local storage
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
-      }
+      window.localStorage.setItem(key, JSON.stringify(valueToStore));
     } catch (error) {
       // A more advanced implementation would handle the error case
-      console.error('Error writing to localStorage:', error);
+      console.error(`Error setting localStorage key "${key}":`, error);
     }
   };
 
-  // Listen for changes to this local storage key in other tabs/windows
+  // Sync with other tabs/windows
   useEffect(() => {
-    function handleStorageChange(e: StorageEvent) {
+    const handleStorageChange = (e: StorageEvent) => {
       if (e.key === key && e.newValue) {
         setStoredValue(JSON.parse(e.newValue));
       }
-    }
-    
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', handleStorageChange);
-      return () => window.removeEventListener('storage', handleStorageChange);
-    }
-    return undefined;
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [key]);
 
   return [storedValue, setValue];
