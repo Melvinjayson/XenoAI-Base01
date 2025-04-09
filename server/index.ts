@@ -14,6 +14,7 @@ import { isOpenAIAvailable } from './openai';
 import { getAvailableModels } from './model-selector';
 import { setupVite, serveStatic, log } from './vite';
 import { enhancedMemoryManager } from './enhanced-memory-manager';
+import { initializeCrossDomainIntegration } from './cross-domain-integration';
 import { ChatMessage } from './types';
 import { 
   enhancedContextAnalysis, 
@@ -98,7 +99,7 @@ const PORT = process.env.PORT || 5000;
       const systemMessage: ChatMessage = {
         role: 'system',
         content: 'Memory system initialized with default session.',
-        timestamp: new Date().toISOString()
+        timestamp: new Date()
       };
       
       await enhancedMemoryManager.processMessage(
@@ -129,6 +130,9 @@ const PORT = process.env.PORT || 5000;
     models.forEach(model => {
       console.log(`- ${model.name} (${model.provider}) - ${model.category} category`);
     });
+    
+    // Initialize cross-domain integration system
+    initializeCrossDomainIntegration();
 
     // Setup Vite for development or serve static files for production
     if (process.env.NODE_ENV === 'production') {

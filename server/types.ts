@@ -91,6 +91,19 @@ export interface EthicalLogEntry {
 }
 
 // Autonomous Engine Types
+// Action Types for Agent System
+export enum ActionType {
+  RESEARCH = 'research',
+  SUMMARIZE = 'summarize',
+  ANALYZE = 'analyze',
+  GENERATE = 'generate',
+  VISUALIZE = 'visualize',
+  CREATE_KNOWLEDGE_GRAPH = 'create_knowledge_graph',
+  CREATE_MIND_MAP = 'create_mind_map',
+  CREATE_PROJECT = 'create_project',
+  ADD_RESEARCH_INSIGHT = 'add_research_insight'
+}
+
 export interface AutonomousTask {
   id: string;
   type: 'research' | 'summarize' | 'analyze' | 'generate' | 'visualize';

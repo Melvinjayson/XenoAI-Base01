@@ -28,6 +28,11 @@ import { isLocalLLMAvailable, getLocalLLMStatus } from './local-llm';
 import { modelTransitionManager, ModelType } from './model-transition-manager';
 import { analyzeDecision, generateReflectionPrompts, generateInsights } from './decision-framework';
 import visualReasoningRoutes from './routes/visual-reasoning';
+import ethicalRoutes from './routes/ethical-routes';
+import evaluationRoutes from './routes/evaluation-routes';
+import agentRoutes from './routes/agent-routes';
+import errorRecoveryRoutes from './routes/error-recovery-routes';
+import crossDomainRoutes from './routes/cross-domain-routes';
 
 // Define API Service type for quota manager
 type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
@@ -44,6 +49,21 @@ function setupApiRoutes(app: Express): void {
   
   // Use visual reasoning routes
   app.use(visualReasoningRoutes);
+  
+  // Use ethical routes
+  app.use(ethicalRoutes);
+  
+  // Use evaluation routes
+  app.use(evaluationRoutes);
+  
+  // Use multi-agent framework routes
+  app.use(agentRoutes);
+  
+  // Use error recovery system routes
+  app.use('/api', errorRecoveryRoutes);
+  
+  // Use cross-domain integration routes
+  app.use('/api/integration', crossDomainRoutes);
 
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
