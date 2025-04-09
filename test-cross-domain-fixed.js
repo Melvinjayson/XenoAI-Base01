@@ -33,17 +33,13 @@ async function testRegisterDataSource() {
   // Register a test REST API source
   const source = {
     id: `test_source_${Date.now()}`,
-    name: 'Test News API',
+    name: 'Test JSON Placeholder API',
     type: 'json_endpoint',
-    url: 'https://newsapi.org/v2/top-headlines?country=us&apiKey=test',
-    authType: 'api_key',
-    authConfig: {
-      apiKeyName: 'apiKey',
-      apiKeyValue: 'test'
-    },
-    dataPath: 'articles',
+    url: 'https://jsonplaceholder.typicode.com/posts',
+    authType: 'none',
+    dataPath: '',
     responseType: 'json',
-    tags: ['news', 'api', 'test'],
+    tags: ['test', 'api', 'demo'],
     enabled: true
   };
   
@@ -101,10 +97,13 @@ async function testTransformationPipeline() {
     {
       type: 'map',
       config: {
-        mapping: {
-          headlineText: { field: 'title' },
-          source: { field: 'source.name' },
-          date: { field: 'publishedAt', format: 'dateFormat' }
+        mappings: {
+          headlineText: 'title',
+          source: 'source.name',
+          date: {
+            function: 'dateFormat',
+            field: 'publishedAt'
+          }
         },
         preserveOtherFields: false
       }
