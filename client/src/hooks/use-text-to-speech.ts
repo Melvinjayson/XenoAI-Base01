@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-import { apiRequest } from '@/lib/queryClient';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface VisualizationCommand {
   type: 'zoom' | 'rotate' | 'highlight' | 'focus' | 'color';
@@ -9,26 +8,33 @@ export interface VisualizationCommand {
   target?: string;
 }
 
-let audioElement: HTMLAudioElement | null = null;
-
 export function useTextToSpeech() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentText, setCurrentText] = useState<string | null>(null);
   const [currentVisualCommands, setCurrentVisualCommands] = useState<VisualizationCommand[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [lastSpokenText, setLastSpokenText] = useState<string>('');
   const [lastSpeakTime, setLastSpeakTime] = useState(0);
-  const SPEAK_DEBOUNCE_MS = 1000;
-  const MAX_RETRIES = 2;
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const pendingSpeechRef = useRef<boolean>(false);
   
-  // Clean up when component unmounts or on page navigation
+  // Constants
+  const SPEAK_DEBOUNCE_MS = 1000; // Debounce time to prevent duplicate speaks
+  
+  // Clear speech on component unmount
   useEffect(() => {
     return () => {
-      if (audioElement) {
-        audioElement.pause();
-        audioElement = null;
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current = null;
       }
+      
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      
+      pendingSpeechRef.current = false;
     };
   }, []);
   
@@ -39,31 +45,34 @@ export function useTextToSpeech() {
     language: string = 'en',
     visualCommands: VisualizationCommand[] = []
   ) => {
-    // Prevent duplicate speaks
+    // Prevent duplicate speaks in short succession
     if (text === lastSpokenText && Date.now() - lastSpeakTime < SPEAK_DEBOUNCE_MS) {
       return;
     }
+    
+    // Skip empty text
+    if (!text || text.trim() === '') {
+      return;
+    }
+    
+    // Update tracking variables
     setLastSpokenText(text);
     setLastSpeakTime(Date.now());
+    pendingSpeechRef.current = true;
+    
     try {
+      // Reset error state
       setError(null);
-      setRetryCount(0);
       
       // Stop any current speech
-      if (audioElement) {
-        audioElement.pause();
-        audioElement = null;
-      }
+      stopSpeakingInternal();
       
-      // Immediately cancel any ongoing speech synthesis from the browser
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-      
+      // Set speaking states
       setIsSpeaking(true);
       setCurrentText(text);
-      setCurrentVisualCommands(visualCommands);
+      setCurrentVisualCommands(visualCommands?.length > 0 ? visualCommands : null);
       
+      // Log the request
       console.log('Synthesizing speech with voice:', voiceId, 'language:', language);
       
       try {
@@ -71,11 +80,11 @@ export function useTextToSpeech() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
         
-        // Make the API request with timeout
+        // Make the API request
         const response = await fetch('/api/synthesize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, voiceId, language }),
+          body: JSON.stringify({ text, voice: voiceId, language }),
           signal: controller.signal
         });
         
@@ -87,136 +96,155 @@ export function useTextToSpeech() {
         
         const data = await response.json();
         
-        // Check if we should use enhanced browser TTS
+        // Cancel if another speech request has superseded this one
+        if (!pendingSpeechRef.current) {
+          return;
+        }
+        
+        // Handle browser-based TTS
         if (data.status === 'browser') {
           console.log('Using enhanced browser text-to-speech');
           
-          // Use the enhanced settings if provided
           if (data.enhancedSettings) {
-            const settings: EnhancedTTSSettings = {
-              rate: data.enhancedSettings.rate,
-              pitch: data.enhancedSettings.pitch,
-              volume: data.enhancedSettings.volume,
-              preferredVoices: data.enhancedSettings.preferredVoices
-            };
-            
             await useBrowserSpeechSynthesis(
               text, 
               language, 
-              settings
+              data.enhancedSettings
             );
           } else {
-            // Fallback to standard browser TTS
             await useBrowserSpeechSynthesis(text, language);
           }
-          return; // Exit early since we're using browser TTS
+          return;
         }
         
-        // Handle other fallback cases
-        if (data && data.fallback === true && !data.audioUrl) {
+        // Handle fallback if server indicates
+        if (data.fallback === true) {
           console.log('Using browser speech synthesis as fallback');
           await useBrowserSpeechSynthesis(text, language);
           return;
         }
         
-        if (!data || (!data.audioUrl && !data.fallback)) {
-          throw new Error('Invalid response from speech synthesis server');
+        // Handle server-generated audio URL
+        if (data.audioUrl) {
+          await playAudioUrl(data.audioUrl, text, language);
+          return;
         }
         
-        // Only proceed with audio element if we have a valid audio URL
-        if (!data.audioUrl) {
-          return; // Nothing more to do without a URL
-        }
+        // If we get here without an audio URL or a fallback instruction, use browser TTS
+        await useBrowserSpeechSynthesis(text, language);
         
+      } catch (fetchError) {
+        // Log the error and fallback to browser TTS
+        console.error('Server request error:', fetchError);
+        if (pendingSpeechRef.current) {
+          await useBrowserSpeechSynthesis(text, language);
+        }
+      }
+    } catch (e) {
+      console.error('Text-to-speech error:', e);
+      
+      // Reset the state
+      setIsSpeaking(false);
+      setCurrentText(null);
+      setCurrentVisualCommands(null);
+      pendingSpeechRef.current = false;
+      
+      // Set error for UI to display
+      setError(e instanceof Error ? e.message : 'Unknown error occurred');
+      
+      // Final fallback - ensure audio element is cleared
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current = null;
+      }
+    }
+  }, [lastSpokenText, lastSpeakTime]);
+  
+  // Helper function to play audio from URL
+  const playAudioUrl = async (
+    audioUrl: string, 
+    fallbackText: string,
+    fallbackLanguage: string
+  ): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      try {
         // Create and set up audio element
-        audioElement = new Audio();
+        const audio = new Audio();
+        audioElementRef.current = audio;
         
-        // Add random cache-busting parameter to avoid browser caching
+        // Add random cache-busting parameter
         const cacheBust = `?t=${Date.now()}`;
         
         // Get the full URL for the audio file
         const baseUrl = window.location.origin;
-        const audioUrl = data.audioUrl.startsWith('http') 
-          ? data.audioUrl 
-          : `${baseUrl}${data.audioUrl}${cacheBust}`;
+        const fullUrl = audioUrl.startsWith('http') 
+          ? audioUrl 
+          : `${baseUrl}${audioUrl}${cacheBust}`;
         
-        audioElement.src = audioUrl;
-        
-        // Set up some audio element properties
-        audioElement.preload = 'auto';
+        audio.src = fullUrl;
+        audio.preload = 'auto';
         
         // Set a timeout for loading the audio
         const loadTimeoutId = setTimeout(() => {
-          if (audioElement) {
-            console.log('Audio load timeout, falling back to browser synthesis');
-            audioElement = null;
-            useBrowserSpeechSynthesis(text, language);
-          }
-        }, 5000); // 5 second timeout for loading
+          console.log('Audio load timeout, falling back to browser synthesis');
+          audioElementRef.current = null;
+          useBrowserSpeechSynthesis(fallbackText, fallbackLanguage)
+            .then(resolve)
+            .catch(reject);
+        }, 5000);
         
-        // Handle audio playback ending
-        audioElement.addEventListener('ended', () => {
+        // Success handler
+        audio.addEventListener('ended', () => {
           clearTimeout(loadTimeoutId);
           setIsSpeaking(false);
           setCurrentText(null);
           setCurrentVisualCommands(null);
-          audioElement = null;
+          pendingSpeechRef.current = false;
+          audioElementRef.current = null;
+          resolve();
         });
         
-        // Handle when audio is ready to play
-        audioElement.addEventListener('canplaythrough', () => {
+        // Progress handler
+        audio.addEventListener('canplaythrough', () => {
           clearTimeout(loadTimeoutId);
         });
         
-        // Handle audio playback errors
-        audioElement.addEventListener('error', async (e: Event) => {
+        // Error handler
+        audio.addEventListener('error', () => {
           clearTimeout(loadTimeoutId);
-          console.error('Audio playback error:', e);
+          console.error('Audio playback error');
+          audioElementRef.current = null;
           
-          // Use the audioElement's error property directly
-          if (audioElement && audioElement.error) {
-            console.error('Failed to play audio:', audioElement.error);
+          // Only proceed with fallback if this request is still active
+          if (pendingSpeechRef.current) {
+            useBrowserSpeechSynthesis(fallbackText, fallbackLanguage)
+              .then(resolve)
+              .catch(reject);
+          } else {
+            resolve();
           }
-          
-          // Try to recover with browser speech synthesis
-          console.log('Falling back to browser speech synthesis');
-          audioElement = null;
-          await useBrowserSpeechSynthesis(text, language);
         });
         
         // Start playing
-        if (audioElement) {
-          try {
-            await audioElement.play();
-          } catch (playError) {
-            clearTimeout(loadTimeoutId);
-            console.error('Failed to play audio:', playError);
-            
-            // Use browser speech synthesis as a fallback
-            audioElement = null;
-            await useBrowserSpeechSynthesis(text, language);
+        audio.play().catch(playError => {
+          clearTimeout(loadTimeoutId);
+          console.error('Failed to play audio:', playError);
+          
+          // Only proceed with fallback if this request is still active
+          if (pendingSpeechRef.current) {
+            audioElementRef.current = null;
+            useBrowserSpeechSynthesis(fallbackText, fallbackLanguage)
+              .then(resolve)
+              .catch(reject);
+          } else {
+            resolve();
           }
-        }
-      } catch (fetchError) {
-        console.error('Server request error:', fetchError);
-        // Fallback to browser speech synthesis
-        await useBrowserSpeechSynthesis(text, language);
+        });
+      } catch (error) {
+        reject(error);
       }
-      
-    } catch (e) {
-      console.error('Text-to-speech error:', e);
-      setIsSpeaking(false);
-      setCurrentText(null);
-      setCurrentVisualCommands(null);
-      setError(e instanceof Error ? e.message : 'Unknown error occurred');
-      
-      // Final fallback - just clear the state in case of total failure
-      if (audioElement) {
-        audioElement.pause();
-        audioElement = null;
-      }
-    }
-  }, [retryCount]);
+    });
+  };
   
   // Enhanced settings interface for speech synthesis
   interface EnhancedTTSSettings {
@@ -232,19 +260,18 @@ export function useTextToSpeech() {
     language: string = 'en',
     enhancedSettings?: EnhancedTTSSettings
   ): Promise<void> => {
-    // Clear any previous error
-    setError(null);
-    
+    // Skip if speech synthesis not available
     if (!('speechSynthesis' in window)) {
       setIsSpeaking(false);
       setCurrentText(null);
       setCurrentVisualCommands(null);
+      pendingSpeechRef.current = false;
       setError('Speech synthesis not supported in this browser');
       return;
     }
     
     try {
-      // Map common language codes to browser-compatible codes
+      // Map language codes to browser-compatible codes
       const languageMap: Record<string, string> = {
         'en': 'en-US',
         'fr': 'fr-FR',
@@ -263,31 +290,29 @@ export function useTextToSpeech() {
         'pl': 'pl-PL',
       };
       
-      // Create a speech utterance
+      // Create the utterance
       const utterance = new SpeechSynthesisUtterance(text);
+      utteranceRef.current = utterance;
       
-      // Set the language, using the mapped version if available
+      // Set language
       const baseLanguage = language.split('-')[0]; // Extract base language code
       utterance.lang = languageMap[baseLanguage] || languageMap[language] || language || 'en-US';
       
-      // Create a promise to handle speech events
-      return new Promise((resolve, reject) => {
-        // Set up voice and enhanced settings if available
-        try {
-          // Force voices to load if they haven't already
-          window.speechSynthesis.getVoices();
-          
-          // Use setTimeout to ensure voices are loaded (browser quirk)
-          setTimeout(() => {
+      return new Promise<void>((resolve, reject) => {
+        // Set up voice selection and settings
+        let voiceInitTimeout: NodeJS.Timeout;
+        
+        const setupVoiceAndPlay = () => {
+          try {
+            // Get available voices
             const voices = window.speechSynthesis.getVoices();
-            if (voices.length > 0) {
-              // Get list of preferred voices if provided in enhanced settings
+            
+            if (voices && voices.length > 0) {
+              // Find appropriate voice
+              let selectedVoice = null;
               const preferredVoices = enhancedSettings?.preferredVoices || [];
               
-              // Try to find a voice using preferences
-              let selectedVoice = null;
-              
-              // First try to find one of the preferred voices
+              // Try preferred voices first
               if (preferredVoices.length > 0) {
                 for (const preferredVoice of preferredVoices) {
                   const match = voices.find(v => 
@@ -304,83 +329,125 @@ export function useTextToSpeech() {
               
               // If no preferred voice found, try language matching
               if (!selectedVoice) {
-                // Try to find a voice for the specified language
                 const exactMatch = voices.find(v => v.lang === utterance.lang);
                 const baseMatch = voices.find(v => v.lang.startsWith(baseLanguage));
-                
-                // Prefer exact match, then base language match, then just pick the first voice
                 selectedVoice = exactMatch || baseMatch || voices[0];
               }
               
-              // Set the selected voice
+              // Apply voice and settings
               utterance.voice = selectedVoice;
-              
-              // Apply enhanced settings if provided, otherwise use defaults
               utterance.rate = enhancedSettings?.rate ?? 1.0;
               utterance.pitch = enhancedSettings?.pitch ?? 1.0;
               utterance.volume = enhancedSettings?.volume ?? 1.0;
               
               console.log(`Voice settings: voice=${utterance.voice?.name}, rate=${utterance.rate}, pitch=${utterance.pitch}`);
+              
+              // Set up event handlers
+              utterance.onend = () => {
+                setIsSpeaking(false);
+                setCurrentText(null);
+                setCurrentVisualCommands(null);
+                pendingSpeechRef.current = false;
+                utteranceRef.current = null;
+                resolve();
+              };
+              
+              utterance.onerror = (event) => {
+                console.warn('Browser speech synthesis error:', event);
+                setIsSpeaking(false);
+                setCurrentText(null);
+                setCurrentVisualCommands(null);
+                pendingSpeechRef.current = false;
+                utteranceRef.current = null;
+                reject(new Error('Browser speech synthesis failed'));
+              };
+              
+              // Start speaking if this request is still active
+              if (pendingSpeechRef.current) {
+                window.speechSynthesis.speak(utterance);
+              } else {
+                resolve(); // The request was cancelled, so just resolve
+              }
+            } else {
+              // No voices available, try again or fail gracefully
+              if (voiceInitTimeout) {
+                clearTimeout(voiceInitTimeout);
+              }
+              
+              // Only try again if this request is still active
+              if (pendingSpeechRef.current) {
+                voiceInitTimeout = setTimeout(setupVoiceAndPlay, 100);
+              } else {
+                resolve(); // The request was cancelled, so just resolve
+              }
             }
+          } catch (voiceError) {
+            console.warn('Voice configuration error:', voiceError);
             
-            // Set up event handlers
+            // Simplified fallback approach
             utterance.onend = () => {
               setIsSpeaking(false);
               setCurrentText(null);
               setCurrentVisualCommands(null);
+              pendingSpeechRef.current = false;
+              utteranceRef.current = null;
               resolve();
             };
             
-            utterance.onerror = (e) => {
-              console.error('Browser speech synthesis error:', e);
+            utterance.onerror = () => {
               setIsSpeaking(false);
               setCurrentText(null);
               setCurrentVisualCommands(null);
-              setError('Browser speech synthesis failed.');
-              reject(e);
+              pendingSpeechRef.current = false;
+              utteranceRef.current = null;
+              reject(new Error('Browser speech synthesis failed'));
             };
             
-            // Speak the text
-            window.speechSynthesis.speak(utterance);
-          }, 100);
-        } catch (voiceError) {
-          console.warn('Could not set voice:', voiceError);
-          
-          // Try with default settings if voice setting fails
-          utterance.onend = () => {
-            setIsSpeaking(false);
-            setCurrentText(null);
-            setCurrentVisualCommands(null);
-            resolve();
-          };
-          
-          utterance.onerror = (e) => {
-            setIsSpeaking(false);
-            setCurrentText(null);
-            setCurrentVisualCommands(null);
-            setError('Browser speech synthesis failed.');
-            reject(e);
-          };
-          
-          window.speechSynthesis.speak(utterance);
-        }
+            // Only speak if this request is still active
+            if (pendingSpeechRef.current) {
+              window.speechSynthesis.speak(utterance);
+            } else {
+              resolve();
+            }
+          }
+        };
+        
+        // Force voices to load and then set up
+        window.speechSynthesis.getVoices();
+        setupVoiceAndPlay();
       });
     } catch (ttsError) {
       console.error('Browser speech synthesis error:', ttsError);
       setIsSpeaking(false);
       setCurrentText(null);
       setCurrentVisualCommands(null);
-      setError('Browser speech synthesis failed: ' + (ttsError instanceof Error ? ttsError.message : String(ttsError)));
+      pendingSpeechRef.current = false;
+      setError('Browser speech synthesis failed');
       throw ttsError;
     }
   };
   
-  // Function to stop speaking
-  const stopSpeaking = useCallback(() => {
-    if (audioElement) {
-      audioElement.pause();
-      audioElement = null;
+  // Internal function to stop all speaking
+  const stopSpeakingInternal = () => {
+    // Cancel pending speech flag
+    pendingSpeechRef.current = false;
+    
+    // Stop audio element if it exists
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current = null;
     }
+    
+    // Cancel any browser speech synthesis
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      utteranceRef.current = null;
+    }
+  };
+  
+  // Public function to stop speaking
+  const stopSpeaking = useCallback(() => {
+    stopSpeakingInternal();
     setIsSpeaking(false);
     setCurrentText(null);
     setCurrentVisualCommands(null);

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Server, Cloud } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -62,33 +61,63 @@ export default function ModelStatusWidget({
 
   if (loading) {
     return (
-      <Card className="w-full max-w-sm">
-        <CardContent className="pt-6 flex justify-center items-center h-24">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-sm bg-background rounded-lg shadow-sm p-4">
+        <div className="flex justify-center items-center h-16">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      </div>
     );
   }
 
   if (error || !settings) {
     return (
-      <Card className="w-full max-w-sm">
-        <CardContent className="pt-6">
-          <div className="text-center text-destructive">
-            <p>Error loading model status</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-sm bg-background rounded-lg shadow-sm p-4">
+        <div className="text-center text-destructive">
+          <p>Error loading model status</p>
+        </div>
+      </div>
     );
   }
 
+  // Return properly formatted model status widget
   return (
-    <Card className="w-full max-w-sm">
-      {error && (
-        <div className="p-4 text-center text-destructive">
-          <p>Error loading model status</p>
+    <div className="w-full max-w-sm bg-background rounded-lg shadow-sm p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          {settings.currentModelType === ModelType.LOCAL ? (
+            <Server className="h-5 w-5 text-emerald-500" />
+          ) : (
+            <Cloud className="h-5 w-5 text-blue-500" />
+          )}
+          <span className="font-medium">
+            {settings.currentModelType === ModelType.LOCAL ? 'Local' : 'Cloud'} Processing
+          </span>
+          <Badge variant={settings.currentModelType === ModelType.LOCAL ? 'outline' : 'default'}>
+            {settings.currentModel || 'Unknown'}
+          </Badge>
         </div>
+        
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Switch 
+                checked={settings.currentModelType === ModelType.CLOUD}
+                onCheckedChange={handleModelToggle}
+                disabled={settings.forceLocal}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{settings.currentModelType === ModelType.LOCAL ? 'Switch to cloud processing' : 'Switch to local processing'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+      
+      {settings.forceLocal && (
+        <p className="text-xs text-muted-foreground mt-2">
+          Cloud processing unavailable due to quota limits
+        </p>
       )}
-    </Card>
+    </div>
   );
 }
