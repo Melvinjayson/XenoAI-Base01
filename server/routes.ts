@@ -27,6 +27,7 @@ import { enhancedMemoryManager } from './enhanced-memory-manager';
 import { isLocalLLMAvailable, getLocalLLMStatus } from './local-llm';
 import { modelTransitionManager, ModelType } from './model-transition-manager';
 import { analyzeDecision, generateReflectionPrompts, generateInsights } from './decision-framework';
+import visualReasoningRoutes from './routes/visual-reasoning';
 
 // Define API Service type for quota manager
 type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
@@ -40,6 +41,9 @@ function setupApiRoutes(app: Express): void {
   app.get('/api', (req: Request, res: Response) => {
     res.status(200).json({ message: 'API server is running' });
   });
+  
+  // Use visual reasoning routes
+  app.use(visualReasoningRoutes);
 
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
@@ -766,6 +770,9 @@ function setupApiRoutes(app: Express): void {
   app.get('/api/files/session/:sessionId', getSessionFiles);
   app.get('/api/files/:fileId', getFile);
   app.delete('/api/files/:fileId', deleteFile);
+
+  // Add visual reasoning routes
+  visualReasoningRoutes(app);
 
   // Fallback for unmatched API routes
   app.use('/api/*', (req: Request, res: Response) => {

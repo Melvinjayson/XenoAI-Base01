@@ -16,6 +16,7 @@ import ColorPaletteGeneratorPage from "@/pages/color-palette-generator";
 import SettingsPage from "@/pages/settings-page";
 import TutorialsPage from "@/pages/tutorials-page";
 import FileTestPage from "@/pages/file-test-page";
+import VisualReasoningPage from "@/pages/visual-reasoning-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -110,6 +111,7 @@ function AppRoutes() {
           <Route path="/project-management" element={<ProjectManagementPage />} />
           <Route path="/color-palette" element={<ColorPaletteGeneratorPage />} />
           <Route path="/workbench" element={<EnhancedKnowledgeGraphPage />} />
+          <Route path="/visual-reasoning" element={<VisualReasoningPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/tutorials" element={<TutorialsPage />} />
           <Route path="/file-test" element={<FileTestPage />} />

@@ -100,6 +100,18 @@ export interface CanvasSuggestion {
   timestamp: number;
 }
 
+export interface Diagram {
+  id: string;
+  sessionId: string;
+  diagramType: 'flowchart' | 'entity' | 'mindmap' | 'sequence' | 'ui-mockup';
+  svgContent: string;
+  title: string;
+  description: string;
+  tags: string[];
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
 // Storage interface
 export interface IStorage {
   // User methods
@@ -269,6 +281,13 @@ export interface IStorage {
   saveKnowledgeGraph(graph: KnowledgeGraph): Promise<boolean>;
   updateKnowledgeGraph(graphId: string, graph: KnowledgeGraph): Promise<boolean>;
   deleteKnowledgeGraph(sessionId: string): Promise<boolean>;
+  
+  // Visual reasoning diagram methods
+  saveDiagram(diagram: Diagram): Promise<Diagram>;
+  getDiagrams(sessionId: string): Promise<Diagram[]>;
+  getDiagramById(diagramId: string): Promise<Diagram | undefined>;
+  updateDiagram(diagramId: string, updates: Partial<Diagram>): Promise<boolean>;
+  deleteDiagram(diagramId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -332,6 +351,9 @@ export class MemStorage implements IStorage {
   // Knowledge Graph storage
   private knowledgeGraphs: Map<string, KnowledgeGraph> = new Map(); // Key is sessionId
   
+  // Visual reasoning diagrams storage
+  private diagrams: Map<string, Diagram[]> = new Map(); // Key is sessionId
+  
   // Project management maps
   private projects: Map<number, Project>;
   private milestones: Map<number, Milestone>;
@@ -379,6 +401,7 @@ export class MemStorage implements IStorage {
     this.colorPalettes = new Map();
     this.canvasSuggestions = new Map();
     this.knowledgeGraphs = new Map();
+    this.diagrams = new Map();
     
     // Initialize project management maps
     this.projects = new Map();
@@ -2249,6 +2272,95 @@ export class MemStorage implements IStorage {
       console.error('Error updating milestone:', error);
       return false;
     }
+  }
+  
+  // Visual reasoning diagram methods
+  async saveDiagram(diagram: Diagram): Promise<Diagram> {
+    if (!diagram.id) {
+      diagram.id = `diagram-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    }
+    
+    if (!diagram.createdAt) {
+      diagram.createdAt = new Date();
+    }
+    
+    diagram.updatedAt = new Date();
+    
+    // Get the diagrams for this session
+    const sessionDiagrams = this.diagrams.get(diagram.sessionId) || [];
+    
+    // Check if diagram already exists
+    const existingIndex = sessionDiagrams.findIndex(d => d.id === diagram.id);
+    
+    if (existingIndex >= 0) {
+      // Update existing diagram
+      sessionDiagrams[existingIndex] = diagram;
+    } else {
+      // Add new diagram
+      sessionDiagrams.push(diagram);
+    }
+    
+    // Save back to storage
+    this.diagrams.set(diagram.sessionId, sessionDiagrams);
+    
+    return diagram;
+  }
+  
+  async getDiagrams(sessionId: string): Promise<Diagram[]> {
+    return this.diagrams.get(sessionId) || [];
+  }
+  
+  async getDiagramById(diagramId: string): Promise<Diagram | undefined> {
+    // Search through all diagrams in all sessions
+    for (const diagrams of this.diagrams.values()) {
+      const diagram = diagrams.find(d => d.id === diagramId);
+      if (diagram) {
+        return diagram;
+      }
+    }
+    return undefined;
+  }
+  
+  async updateDiagram(diagramId: string, updates: Partial<Diagram>): Promise<boolean> {
+    // Find the diagram first
+    let found = false;
+    
+    for (const [sessionId, diagrams] of this.diagrams.entries()) {
+      const index = diagrams.findIndex(d => d.id === diagramId);
+      
+      if (index >= 0) {
+        // Found the diagram, update it
+        const diagram = diagrams[index];
+        const updatedDiagram = {
+          ...diagram,
+          ...updates,
+          updatedAt: new Date()
+        };
+        
+        diagrams[index] = updatedDiagram;
+        this.diagrams.set(sessionId, diagrams);
+        found = true;
+        break;
+      }
+    }
+    
+    return found;
+  }
+  
+  async deleteDiagram(diagramId: string): Promise<boolean> {
+    // Find the diagram first
+    for (const [sessionId, diagrams] of this.diagrams.entries()) {
+      const index = diagrams.findIndex(d => d.id === diagramId);
+      
+      if (index >= 0) {
+        // Found the diagram, remove it
+        diagrams.splice(index, 1);
+        this.diagrams.set(sessionId, diagrams);
+        return true;
+      }
+    }
+    
+    return false;
   }
 }
 
