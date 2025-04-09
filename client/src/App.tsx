@@ -60,11 +60,13 @@ function AppRoutes() {
   const { isOnline } = useOfflineContext();
 
   useEffect(() => {
-    if (initialLoad && location.pathname === "/") {
-      navigate("/splash", { replace: true });
+    if (initialLoad) {
+      if (location.pathname === "/") {
+        navigate("/splash", { replace: true });
+      }
       setInitialLoad(false);
     }
-  }, [initialLoad, location, navigate]);
+  }, [initialLoad, location.pathname, navigate]);
 
   useEffect(() => {
     const isMainPage = location.pathname === "/" || 

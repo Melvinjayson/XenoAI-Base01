@@ -54,14 +54,10 @@ export function SplashScreen() {
   const handleStart = () => {
     const audio = new Audio("/audio/click.mp3");
     audio.volume = 0.3;
-    audio.play();
+    audio.play().catch(() => {});
 
-    if (firstVisit) {
-      setLocation("/onboarding");
-      setFirstVisit(false);
-    } else {
-      setLocation("/");
-    }
+    setFirstVisit(false);
+    props.onStart?.();
   };
 
   return (

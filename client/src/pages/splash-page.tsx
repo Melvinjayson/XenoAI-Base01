@@ -1,5 +1,13 @@
 import { SplashScreen } from "@/components/splash/splash-screen";
 
+import { useNavigate } from 'react-router-dom';
+
 export default function SplashPage() {
-  return <SplashScreen />;
+  const navigate = useNavigate();
+  
+  const handleStart = () => {
+    navigate('/', { replace: true });
+  };
+  
+  return <SplashScreen onStart={handleStart} />;
 }
