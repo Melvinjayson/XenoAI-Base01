@@ -79,45 +79,6 @@ export default function ModelStatusWidget({
     );
   }
 
-  // Return properly formatted model status widget
-  return (
-    <div className="w-full max-w-sm bg-background rounded-lg shadow-sm p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          {settings.currentModelType === ModelType.LOCAL ? (
-            <Server className="h-5 w-5 text-emerald-500" />
-          ) : (
-            <Cloud className="h-5 w-5 text-blue-500" />
-          )}
-          <span className="font-medium">
-            {settings.currentModelType === ModelType.LOCAL ? 'Local' : 'Cloud'} Processing
-          </span>
-          <Badge variant={settings.currentModelType === ModelType.LOCAL ? 'outline' : 'default'}>
-            {settings.currentModel || 'Unknown'}
-          </Badge>
-        </div>
-        
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Switch 
-                checked={settings.currentModelType === ModelType.CLOUD}
-                onCheckedChange={handleModelToggle}
-                disabled={settings.forceLocal}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{settings.currentModelType === ModelType.LOCAL ? 'Switch to cloud processing' : 'Switch to local processing'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-      
-      {settings.forceLocal && (
-        <p className="text-xs text-muted-foreground mt-2">
-          Cloud processing unavailable due to quota limits
-        </p>
-      )}
-    </div>
-  );
+  // Return minimal status widget
+  return null;
 }
