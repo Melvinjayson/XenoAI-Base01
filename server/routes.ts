@@ -14,6 +14,7 @@ import { apiQuotaManager } from './api-quota-manager';
 import { ChatMessage, ActionType } from './types';
 import { storage } from './storage';
 import { insertColorPaletteSchema } from '@shared/schema';
+import { uploadFile, getSessionFiles, getFile, deleteFile } from './file-handler';
 import { 
   enhancedContextAnalysis, 
   enhancedContextDetection,
@@ -759,6 +760,12 @@ function setupApiRoutes(app: Express): void {
   
   // Generate Insights for Decision
   app.post('/api/decision/insights', generateInsights);
+
+  // File handling routes
+  app.post('/api/files/upload', uploadFile);
+  app.get('/api/files/session/:sessionId', getSessionFiles);
+  app.get('/api/files/:fileId', getFile);
+  app.delete('/api/files/:fileId', deleteFile);
 
   // Fallback for unmatched API routes
   app.use('/api/*', (req: Request, res: Response) => {

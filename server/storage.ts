@@ -85,6 +85,8 @@ export interface IStorage {
   // File methods
   createFile(file: InsertFile): Promise<File>;
   getFiles(userId?: string, sessionId?: string): Promise<File[]>;
+  getFilesBySession(sessionId: string): Promise<File[]>;
+  getFile(fileId: number): Promise<File | undefined>;
   getFileById(fileId: number): Promise<File | undefined>;
   updateFileAnalysis(fileId: number, analysis: any): Promise<File | undefined>;
   deleteFile(fileId: number): Promise<boolean>;
@@ -546,14 +548,15 @@ export class MemStorage implements IStorage {
     const newFile: File = {
       id,
       path: file.path,
-      sessionId: file.sessionId || null,
+      sessionId: file.sessionId,
       userId: file.userId || null,
-      filename: file.filename,
-      originalName: file.originalName,
-      mimeType: file.mimeType,
+      name: file.name,
+      type: file.type,
       size: file.size,
-      createdAt: now,
-      analysis: typedAnalysis
+      url: file.url,
+      timestamp: file.timestamp,
+      analysis: typedAnalysis,
+      createdAt: now
     };
     
     this.files.set(id, newFile);
@@ -564,14 +567,22 @@ export class MemStorage implements IStorage {
     const allFiles = Array.from(this.files.values());
     
     if (userId && sessionId) {
-      return allFiles.filter(file => file.userId === userId && file.sessionId === sessionId);
+      return allFiles.filter(file => file.userId === Number(userId) && file.sessionId === sessionId);
     } else if (userId) {
-      return allFiles.filter(file => file.userId === userId);
+      return allFiles.filter(file => file.userId === Number(userId));
     } else if (sessionId) {
       return allFiles.filter(file => file.sessionId === sessionId);
     }
     
     return allFiles;
+  }
+  
+  async getFilesBySession(sessionId: string): Promise<File[]> {
+    return this.getFiles(undefined, sessionId);
+  }
+  
+  async getFile(fileId: number): Promise<File | undefined> {
+    return this.files.get(fileId);
   }
   
   async getFileById(fileId: number): Promise<File | undefined> {

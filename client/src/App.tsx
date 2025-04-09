@@ -15,6 +15,7 @@ import ProjectManagementPage from "@/pages/project-management-new";
 import ColorPaletteGeneratorPage from "@/pages/color-palette-generator";
 import SettingsPage from "@/pages/settings-page";
 import TutorialsPage from "@/pages/tutorials-page";
+import FileTestPage from "@/pages/file-test-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -111,6 +112,7 @@ function AppRoutes() {
           <Route path="/workbench" element={<EnhancedKnowledgeGraphPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/tutorials" element={<TutorialsPage />} />
+          <Route path="/file-test" element={<FileTestPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         

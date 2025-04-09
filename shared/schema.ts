@@ -26,33 +26,51 @@ export interface SearchFilterOptions {
 export interface File {
   id: number;
   path: string;
-  sessionId: string;
+  sessionId: string | null;
   userId: number | null;
-  filename: string;
-  originalName: string;
-  mimeType: string;
+  name: string;
+  type: string;
   size: number;
-  createdAt: Date;
+  url: string;
+  timestamp: number;
+  analysis?: {
+    summary?: string;
+    entities?: any[];
+    keywords?: string[];
+  } | null;
+  createdAt?: Date;
 }
 
 export interface InsertFile {
   path: string;
-  sessionId: string;
-  userId: number | null;
-  filename: string;
-  originalName: string;
-  mimeType: string;
+  sessionId: string | null;
+  userId?: number | null;
+  name: string;
+  type: string;
   size: number;
+  url: string;
+  timestamp: number;
+  analysis?: {
+    summary?: string;
+    entities?: any[];
+    keywords?: string[];
+  } | null;
 }
 
 export const insertFileSchema = z.object({
   path: z.string(),
-  sessionId: z.string(),
-  userId: z.number().nullable(),
-  filename: z.string(),
-  originalName: z.string(),
-  mimeType: z.string(),
-  size: z.number()
+  sessionId: z.string().nullable(),
+  userId: z.number().nullable().optional(),
+  name: z.string(),
+  type: z.string(),
+  size: z.number(),
+  url: z.string(),
+  timestamp: z.number(),
+  analysis: z.object({
+    summary: z.string().optional(),
+    entities: z.array(z.any()).optional(),
+    keywords: z.array(z.string()).optional()
+  }).nullable().optional()
 });
 
 // Canvas schemas
