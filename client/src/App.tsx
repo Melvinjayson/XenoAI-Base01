@@ -17,6 +17,7 @@ import SettingsPage from "@/pages/settings-page";
 import TutorialsPage from "@/pages/tutorials-page";
 import FileTestPage from "@/pages/file-test-page";
 import VisualReasoningPage from "@/pages/visual-reasoning-page";
+import TestPage from "@/pages/test-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -115,6 +116,7 @@ function AppRoutes() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/tutorials" element={<TutorialsPage />} />
           <Route path="/file-test" element={<FileTestPage />} />
+          <Route path="/test" element={<TestPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         

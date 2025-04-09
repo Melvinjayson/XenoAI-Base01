@@ -772,7 +772,7 @@ function setupApiRoutes(app: Express): void {
   app.delete('/api/files/:fileId', deleteFile);
 
   // Add visual reasoning routes
-  visualReasoningRoutes(app);
+  app.use(visualReasoningRoutes);
 
   // Fallback for unmatched API routes
   app.use('/api/*', (req: Request, res: Response) => {
