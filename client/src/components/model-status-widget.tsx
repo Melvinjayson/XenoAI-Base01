@@ -70,13 +70,8 @@ export default function ModelStatusWidget({
   }
 
   if (error || !settings) {
-    return (
-      <div className="w-full max-w-sm bg-background rounded-lg shadow-sm p-4">
-        <div className="text-center text-destructive">
-          <p>Error loading model status</p>
-        </div>
-      </div>
-    );
+    // Return minimal status widget instead of showing an error
+    return null;
   }
 
   // Return minimal status widget
