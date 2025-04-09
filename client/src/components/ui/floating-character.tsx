@@ -59,19 +59,55 @@ const COMPANION_APPEARANCES: Record<CompanionCharacter, CompanionAppearance> = {
   }
 };
 
-// Tips that will rotate in the companion's bubble
-const COMPANION_TIPS = [
-  "Try asking me more specific questions for better answers.",
-  "You can use voice input by clicking the microphone icon.",
-  "Need to make a decision? Try the decision framework.",
-  "I can help you organize complex information with knowledge graphs.",
-  "Click the settings icon to customize my behavior.",
-  "I can search the web for you when needed.",
-  "Use the admin page to adjust model preferences.",
-  "My responses adapt to the complexity of your questions.",
-  "I remember our previous conversations to provide better context.",
-  "Need help with something specific? Just ask!"
-];
+// Tips that will rotate in the companion's bubble based on character personality
+const COMPANION_TIPS_BY_CHARACTER: Record<CompanionCharacter, string[]> = {
+  assistant: [
+    "Try asking me more specific questions for better answers.",
+    "You can use voice input by clicking the microphone icon.",
+    "Need to make a decision? Try the decision framework.",
+    "I can help you organize complex information with knowledge graphs.",
+    "Click the settings icon to customize my behavior.",
+    "I can search the web for you when needed.",
+    "My responses adapt to the complexity of your questions.",
+    "I remember our previous conversations to provide better context.",
+    "Need help with something specific? Just ask!"
+  ],
+  scientist: [
+    "Did you know? The knowledge graph can reveal hidden connections in your research.",
+    "Try exploring different data visualization methods for your information.",
+    "I can help analyze patterns in your collected data and research.",
+    "Consider using structured frameworks for complex problem-solving tasks.",
+    "Research shows that breaking problems into smaller components improves solutions.",
+    "When stuck, try approaching your question from a different perspective.",
+    "Information organized visually can reveal patterns invisible in text form.",
+    "The decision framework uses multi-criteria decision analysis techniques.",
+    "I can help you apply scientific methods to your everyday decisions."
+  ],
+  guide: [
+    "New to the app? Start with the knowledge graph to organize your thoughts.",
+    "The canvas feature lets you freely arrange and connect ideas visually.",
+    "Try the voice commands for hands-free operation.",
+    "Stuck on a feature? Click the help icon for a detailed walkthrough.",
+    "Customize your experience in the settings page.",
+    "You can save and export your work from the project management page.",
+    "Try different visualization modes to see your data in new ways.",
+    "Want to work offline? Enable offline mode in the settings.",
+    "Need a quick answer? The search feature can find it for you."
+  ],
+  mentor: [
+    "Remember to consider both logical and emotional factors in decisions.",
+    "When faced with a complex choice, try mapping out all variables first.",
+    "Reflection is key to growth - review past decisions to improve future ones.",
+    "Consider exploring alternative perspectives on challenging problems.",
+    "Breaking large goals into smaller tasks makes them more manageable.",
+    "Try articulating your problem out loud to gain clarity.",
+    "The most difficult problems often require interdisciplinary approaches.",
+    "Taking short breaks can boost creativity when you're stuck.",
+    "I can help you develop frameworks for consistent decision-making."
+  ]
+};
+
+// Note: We directly use COMPANION_TIPS_BY_CHARACTER[character] instead of a reference variable
 
 interface FloatingCharacterProps {
   onAskHelp?: () => void;
@@ -136,16 +172,16 @@ const FloatingCharacter: React.FC<FloatingCharacterProps> = ({
     }
   }, [position, isDragging]);
 
-  // Rotate tips every 5 seconds when expanded
+  // Rotate tips every 5 seconds when expanded and update tips when character changes
   useEffect(() => {
     if (isExpanded) {
       const interval = setInterval(() => {
-        setCurrentTip((prev) => (prev + 1) % COMPANION_TIPS.length);
+        setCurrentTip((prev) => (prev + 1) % COMPANION_TIPS_BY_CHARACTER[character].length);
       }, 5000);
       
       return () => clearInterval(interval);
     }
-  }, [isExpanded]);
+  }, [isExpanded, character]);
   
   // Animation effect for character
   useEffect(() => {
@@ -331,8 +367,8 @@ const FloatingCharacter: React.FC<FloatingCharacterProps> = ({
                 </button>
               </div>
               
-              {/* Random tips */}
-              <div className="bg-muted p-3 rounded-lg mb-3 text-sm min-h-[60px] text-center">
+              {/* Random tips with voice interaction */}
+              <div className="bg-muted p-3 rounded-lg mb-3 text-sm min-h-[60px]">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentTip}
@@ -340,8 +376,31 @@ const FloatingCharacter: React.FC<FloatingCharacterProps> = ({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.5 }}
+                    className="flex flex-col items-center gap-2"
                   >
-                    {COMPANION_TIPS[currentTip]}
+                    <div className="text-center">
+                      {COMPANION_TIPS_BY_CHARACTER[character][currentTip]}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        // Speak the current tip using speech synthesis
+                        if (!isMuted) {
+                          const utterance = new SpeechSynthesisUtterance(COMPANION_TIPS_BY_CHARACTER[character][currentTip]);
+                          window.speechSynthesis.speak(utterance);
+                          setAnimationState('speaking');
+                          // Reset animation state after speaking
+                          setTimeout(() => {
+                            setAnimationState('idle');
+                          }, 2000);
+                        }
+                      }}
+                      className="flex items-center gap-1.5 text-xs mt-1"
+                    >
+                      <Volume2 size={14} />
+                      <span>Speak Tip</span>
+                    </Button>
                   </motion.div>
                 </AnimatePresence>
               </div>

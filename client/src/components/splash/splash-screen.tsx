@@ -31,7 +31,11 @@ const features: FeatureCard[] = [
   }
 ];
 
-export function SplashScreen() {
+interface SplashScreenProps {
+  onStart?: () => void;
+}
+
+export function SplashScreen({ onStart }: SplashScreenProps) {
   const [progress, setProgress] = useState(0);
   const [firstVisit, setFirstVisit] = useLocalStorage("xeno-first-visit", true);
   const [, setLocation] = useLocation();
@@ -57,7 +61,7 @@ export function SplashScreen() {
     audio.play().catch(() => {});
 
     setFirstVisit(false);
-    props.onStart?.();
+    onStart?.();
   };
 
   return (
