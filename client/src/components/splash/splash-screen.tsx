@@ -61,7 +61,12 @@ export function SplashScreen({ onStart }: SplashScreenProps) {
     audio.play().catch(() => {});
 
     setFirstVisit(false);
-    onStart?.();
+    if (onStart) {
+      onStart();
+    } else {
+      // Provide a default navigation if no onStart handler
+      window.location.href = '/home';
+    }
   };
 
   return (

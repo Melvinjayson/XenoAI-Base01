@@ -6,7 +6,7 @@ export default function SplashPage() {
   const navigate = useNavigate();
   
   const handleStart = () => {
-    navigate('/', { replace: true });
+    navigate('/home', { replace: true });
   };
   
   return <SplashScreen onStart={handleStart} />;
