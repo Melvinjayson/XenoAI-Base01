@@ -1,5 +1,7 @@
 import { ApiQuotaMonitor } from '@/components/admin/api-quota-monitor';
 import { ModelSettingsPanel } from '@/components/admin/model-settings-panel';
+import { LocalModelManagement } from '@/components/admin/local-model-management';
+import { VoiceTutorialsPanel } from '@/components/admin/voice-tutorials-panel';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -58,17 +60,7 @@ export default function AdminPage() {
           <div className="grid grid-cols-1 gap-6">
             <ModelSettingsPanel sessionId={sessionId} />
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Local Model Management</CardTitle>
-                <CardDescription>Manage and configure local LLM models</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center h-32 border rounded-md bg-muted/20">
-                  <p className="text-muted-foreground">Local model management coming soon</p>
-                </div>
-              </CardContent>
-            </Card>
+            <LocalModelManagement sessionId={sessionId} />
           </div>
         </TabsContent>
 
@@ -115,11 +107,15 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="settings">
-          <Card className="p-6">
-            <h2 className="text-lg font-medium mb-4">System Settings</h2>
-            <p className="text-muted-foreground">Settings configuration coming soon.</p>
-          </Card>
+        <TabsContent value="settings" className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            <Card className="p-6">
+              <h2 className="text-lg font-medium mb-4">System Settings</h2>
+              <p className="text-muted-foreground">General settings configuration coming soon.</p>
+            </Card>
+            
+            <VoiceTutorialsPanel />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

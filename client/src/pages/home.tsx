@@ -3,7 +3,7 @@ import ChatContainer from "@/components/chat/chat-container";
 import EnhancedInputArea from "@/components/chat/enhanced-input-area";
 import VoiceIndicator from "@/components/chat/voice-indicator";
 import BottomSheet from "@/components/ui/bottom-sheet";
-import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal, Kanban, Brain, Layout } from "lucide-react";
+import { Settings, Mic, VolumeX, Volume2, Trash2, X, Network, GripHorizontal, Kanban, Brain, Layout, HelpCircle } from "lucide-react";
 import { useChat } from "@/context/chat-context";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
@@ -391,16 +391,30 @@ export default function Home() {
           </div>
 
           {/* Voice Controls */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="rounded-full h-9 w-9 relative" 
-            aria-label={isMuteEnabled ? "Enable voice" : "Mute voice"} 
-            onClick={handleToggleMute}
-            title={isMuteEnabled ? "Enable voice" : "Mute voice"}
-          >
-            {isMuteEnabled ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-full h-9 w-9 relative" 
+              aria-label={isMuteEnabled ? "Enable voice" : "Mute voice"} 
+              onClick={handleToggleMute}
+              title={isMuteEnabled ? "Enable voice" : "Mute voice"}
+            >
+              {isMuteEnabled ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </Button>
+            
+            <Link to="/admin?tab=settings">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 px-2 text-xs flex items-center gap-1" 
+                title="Voice Tutorials"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Voice Help</span>
+              </Button>
+            </Link>
+          </div>
 
           {/* Settings Panel */}
           <SettingsPanel 
