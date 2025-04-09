@@ -67,12 +67,12 @@ function AppRoutes() {
 
   useEffect(() => {
     if (initialLoad) {
-      if (location.pathname === "/") {
-        navigate("/splash", { replace: true });
-      }
       setInitialLoad(false);
+      if (location.pathname === "/") {
+        navigate("/splash");
+      }
     }
-  }, [initialLoad, location.pathname, navigate]);
+  }, [initialLoad, navigate]);
 
   useEffect(() => {
     const isMainPage = location.pathname === "/" || 

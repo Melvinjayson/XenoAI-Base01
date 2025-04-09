@@ -63,9 +63,6 @@ export function SplashScreen({ onStart }: SplashScreenProps) {
     setFirstVisit(false);
     if (onStart) {
       onStart();
-    } else {
-      // Provide a default navigation if no onStart handler
-      window.location.href = '/home';
     }
   };
 
