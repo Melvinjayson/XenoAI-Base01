@@ -1,279 +1,223 @@
 /**
- * Type Definitions
+ * Shared Types for AI System Components
  * 
- * This module contains type definitions for the AI system.
+ * This module provides central type definitions for various components of the AI system,
+ * ensuring type consistency across modules and enabling better TypeScript integration.
  */
 
-// Chat message
+import { MemoryType, MemoryImportance, Memory, MemoryQuery, MemorySummary } from './conversation-memory';
+import { TaskType, TaskStatus, TaskPriority, Task, Goal } from './task-planner';
+import { Project, Milestone } from './project-agent';
+
+// Chat Message Types
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: 'system' | 'user' | 'assistant';
   content: string;
-  timestamp?: string; // ISO timestamp string for when message was created
+  timestamp?: Date;
 }
 
-// Model configuration
-export interface ModelConfig {
+// User Preference Types
+export interface UserPreference {
   id: string;
-  name: string;
-  provider: 'openai' | 'anthropic' | 'perplexity' | 'local';
-  contextSize: number;
-  inputCostPer1K: number;
-  outputCostPer1K: number;
-  capabilities: ('text' | 'vision' | 'embedding' | 'audio' | 'search' | 'reasoning')[];
-  maxTokens: number;
-  temperature: number;
-  category: 'basic' | 'advanced' | 'specialized';
-  latency: 'low' | 'medium' | 'high';
-}
-
-// Chat processing options
-export interface ChatOptions {
-  systemPrompt?: string;
-  temperature?: number;
-  maxTokens?: number;
-  topP?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
-  forceAdvanced?: boolean | string;
-  useLocalLLM?: boolean;
-  sessionId?: string;
-  entities?: Entity[];
-  topics?: string[];
-}
-
-// More detailed processing options
-export interface ProcessOptions {
-  systemPrompt?: string;
-  temperature?: number;
-  maxTokens?: number;
-  topP?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
-  includeSources?: boolean;
-}
-
-// Response from a processor
-export interface ProcessorResponse {
-  message: string;
-  model: string;
-  tokens: {
-    prompt: number;
-    completion: number;
-    total: number;
-  };
-  timing: {
-    start: number;
-    end: number;
-    total: number;
-  };
-  sources?: Reference[];
-  // Fields for model transition tracking
-  modelType?: 'local' | 'cloud';
-  transitioned?: boolean;
-  previousModelType?: 'local' | 'cloud';
-}
-
-// Reference to a source
-export interface Reference {
-  title: string;
-  url?: string;
-  text?: string;
-  confidence: number;
-}
-
-// Entity extracted from text
-export interface Entity {
-  type: string;
+  key: string;
   value: string;
-  position: {
-    start: number;
-    end: number;
-  };
-  confidence?: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// Context analysis result
-export interface ContextAnalysis {
-  entities: Entity[];
-  keywords: string[];
-  sentiment: {
-    score: number;
-    label: 'positive' | 'negative' | 'neutral';
-  };
-  topics: string[];
-  intent: string;
-  userGoal?: string | null;
-  relatedTopics?: string[];
-  messageLength: number;
-  historyLength: number;
-}
-
-// Detected context
-export interface DetectedContext {
-  topic: string;
-  entities: Entity[];
-  sentiment: {
-    score: number;
-    label: 'positive' | 'negative' | 'neutral';
-  };
-  intent: string;
-  userGoal?: string | null;
-  keywords: string[];
-  recentMessages: ChatMessage[];
-  relatedTopics?: string[];
-  topics?: string[]; // Added for enhanced context support
-  metadata: {
-    messageLength: number;
-    historyLength: number;
-    timestamp: string;
-  };
-  sessionId?: string; // Added for enhanced context support
-  hasEnhancedMemory?: boolean; // Added for enhanced context support
-}
-
-// Web search result
-export interface WebSearchResult {
-  title: string;
-  link: string;
-  snippet: string;
-  content?: string;
-  publishDate?: string | null;
-  thumbnail?: string | null;
-}
-
-// Search result
-export interface SearchResult {
-  query: string;
-  results: WebSearchResult[];
-  totalResults: number;
-  timestamp: string;
-}
-
-// File search result
-export interface FileSearchResult {
-  filePath: string;
-  fileName: string;
-  fileType: string;
+// Conversation Memory Types (basic types, detailed ones in conversation-memory.ts)
+export interface ConversationMemory {
+  id: string;
+  sessionId: string;
   content: string;
-  startIndex: number;
-  endIndex: number;
-  similarity: number;
+  timestamp: Date;
+  type: string;
+  metadata?: Record<string, any>;
 }
 
-// Voice input options
-export interface VoiceInputOptions {
-  continuous?: boolean;
-  interimResults?: boolean;
-  language?: string;
+export interface ConversationSummary {
+  id: string;
+  sessionId: string;
+  summary: string;
+  mainTopics: string[];
+  createdAt: Date;
 }
 
-// Voice output options
-export interface VoiceOutputOptions {
-  voice?: string;
-  rate?: number;
-  pitch?: number;
-  volume?: number;
+// Meta-Learning System Types
+export interface InteractionMetrics {
+  responseAccuracy?: number; // 0-1 accuracy of information
+  responseRelevance?: number; // 0-1 relevance to user query
+  responseQuality?: number; // 0-1 overall quality
+  responseTime?: number; // milliseconds to respond
+  userSatisfaction?: number; // 0-1 inferred satisfaction
+  interactionComplexity?: number; // 0-1 complexity of interaction
 }
 
-// Knowledge graph node types
-export enum NodeType {
-  CONCEPT = 'concept',
-  ENTITY = 'entity',
-  FACT = 'fact',
-  QUESTION = 'question',
-  DOCUMENT = 'document',
-  USER_INPUT = 'user_input'
+export interface LearningFeedback {
+  id?: string;
+  sessionId: string;
+  userId?: string;
+  timestamp: Date;
+  helpful: boolean;
+  feedbackText?: string;
+  topics: string[];
+  appliedPatterns: string[];
+  metrics?: InteractionMetrics;
+  context?: {
+    previousMessages?: string[];
+    entityContext?: string[];
+  };
 }
 
-// Knowledge graph node
+// Ethical Guardian Types
+export interface EthicalEvaluation {
+  score: number; // 0-1 score (1 = completely ethical)
+  issues: string[];
+  reasoning: string;
+  category: 'bias' | 'harm' | 'misinformation' | 'privacy' | 'transparency';
+  confidence: number; // 0-1 confidence in evaluation
+}
+
+export interface EthicalLogEntry {
+  id: string;
+  sessionId?: string;
+  userId?: string;
+  timestamp: Date;
+  content: string;
+  evaluation: EthicalEvaluation;
+  action: 'pass' | 'modified' | 'blocked';
+  modification?: string;
+  context?: string;
+}
+
+// Autonomous Engine Types
+export interface AutonomousTask {
+  id: string;
+  type: 'research' | 'summarize' | 'analyze' | 'generate' | 'visualize';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  priority: number; // 1-10
+  prompt: string;
+  result?: string;
+  resources?: string[];
+  metadata?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;
+}
+
+export interface ResearchQuery {
+  query: string;
+  context: string;
+  depth: number; // 1-5 search depth
+  maxResults: number;
+  filters?: {
+    contentTypes?: string[];
+    domainRestrictions?: string[];
+    dateRestrictions?: {
+      start?: Date;
+      end?: Date;
+    };
+  };
+}
+
+export interface ResearchResult {
+  query: string;
+  timestamp: Date;
+  sources: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    relevance: number; // 0-1
+  }>;
+  summary: string;
+  keyInsights: string[];
+}
+
+// Knowledge Graph Types
 export interface KnowledgeNode {
   id: string;
-  type: NodeType;
   label: string;
-  properties: Record<string, any>;
-  source?: string;
-  confidence: number;
-  createdAt: string;
+  type: string;
+  properties?: Record<string, any>;
+  confidence: number; // 0-1
+  sourceInfo?: string; // Source of the information
+  createdAt: Date;
 }
 
-// Knowledge graph edge type
-export enum EdgeType {
-  RELATED_TO = 'related_to',
-  PART_OF = 'part_of',
-  CAUSES = 'causes',
-  IMPLIES = 'implies',
-  SAME_AS = 'same_as',
-  CONTRADICTS = 'contradicts',
-  INSTANCE_OF = 'instance_of',
-  ATTRIBUTE_OF = 'attribute_of',
-  REFERENCES = 'references'
-}
-
-// Knowledge graph edge
 export interface KnowledgeEdge {
   id: string;
-  source: string; // Source node ID
+  sourceId: string; // Source node ID
   target: string; // Target node ID
-  type: EdgeType;
-  label?: string;
-  weight: number;
-  properties: Record<string, any>;
-  confidence: number;
-  createdAt: string;
+  relationship: string;
+  properties?: Record<string, any>;
+  confidence: number; // 0-1
+  source?: string; // Source of the information
+  createdAt: Date;
 }
 
-// Knowledge graph
 export interface KnowledgeGraph {
   id: string;
-  name: string;
-  description: string;
+  sessionId: string;
+  userId?: string;
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
-  createdAt: string;
-  updatedAt: string;
-  metadata: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+  snapshot?: {
+    imageUrl?: string;
+    svgData?: string;
+  };
 }
 
-// Local Model Status
-export interface LocalModelStatus {
-  loaded: boolean;
-  model: string | null;
-  memory: number | null;  // Memory usage in MB
-  quantization: string | null;
-  contextLength: number | null;
-  error: string | null;
+// Visual Canvas Types
+export interface CanvasElement {
+  id: string;
+  canvasId: string;
+  type: 'text' | 'image' | 'diagram' | 'connection' | 'note';
+  content: string;
+  position: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    zIndex: number;
+  };
+  style?: Record<string, any>;
+  metadata?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// System Configuration
-export interface SystemConfig {
-  preferLocalModels: boolean;
-  defaultSystemPrompt: string;
-  voiceEnabled: boolean;
-  voiceSettings: VoiceOutputOptions;
-  contextRetention: number; // Number of messages to retain
-  defaultTemperature: number;
-  searchEnabled: boolean;
-  knowledgeGraphEnabled: boolean;
-  logLevel: 'debug' | 'info' | 'warn' | 'error';
+export interface Canvas {
+  id: string;
+  sessionId: string;
+  userId?: string;
+  title: string;
+  description?: string;
+  elements: CanvasElement[];
+  thumbnail?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastModified: Date;
 }
 
-// API Service types
-export enum ApiService {
-  OPENAI = 'openai',
-  ANTHROPIC = 'anthropic',
-  PERPLEXITY = 'perplexity',
-  ELEVENLABS = 'elevenlabs',
-  LOCAL_LLM = 'local_llm',
-  WEB_SEARCH = 'web_search'
-}
-
-// Action types for context-aware assistance
-export enum ActionType {
-  SEARCH_WEB = 'search_web',
-  CREATE_KNOWLEDGE_GRAPH = 'create_knowledge_graph',
-  CREATE_MIND_MAP = 'create_mind_map',
-  ANALYZE_SENTIMENT = 'analyze_sentiment',
-  CREATE_PROJECT = 'create_project',
-  SUGGEST_RESOURCES = 'suggest_resources',
-  SUMMARIZE = 'summarize'
-}
+// Export all types from imported files for easier access
+export {
+  // Conversation Memory types
+  MemoryType,
+  MemoryImportance,
+  Memory,
+  MemoryQuery,
+  MemorySummary,
+  
+  // Task Planning types
+  TaskType,
+  TaskStatus,
+  TaskPriority,
+  Task,
+  Goal,
+  
+  // Project Management types
+  Project,
+  Milestone
+};

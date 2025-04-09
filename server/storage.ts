@@ -20,6 +20,13 @@ import {
   type TaskComment, type InsertTaskComment
 } from "@shared/schema";
 
+import { 
+  KnowledgeGraph,
+  KnowledgeNode,
+  KnowledgeEdge,
+  ChatMessage
+} from "./types";
+
 // Memory types for enhanced context awareness
 export interface UserPreference {
   id: string;
@@ -27,6 +34,40 @@ export interface UserPreference {
   value: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Types for meta-learning and ethical guardian
+export interface LearningPatternRecord {
+  id: string;
+  name: string;
+  description: string;
+  confidence: number;
+  examples: string[];
+  lastUpdated: Date;
+  activationCount: number;
+  successRate: number;
+  sessionId: string;
+}
+
+export interface EthicalLogEntry {
+  id: string;
+  timestamp: Date;
+  sessionId: string;
+  context: any;
+  evaluation: {
+    isApproved: boolean;
+    reason?: string;
+    concerns: {
+      type: string;
+      severity: string;
+      description: string;
+    }[];
+    contentModified: boolean;
+    guardrailsTriggered: string[];
+    confidence: number;
+  };
+  originalContent: string;
+  finalContent: string;
 }
 
 export interface ConversationMemory {
@@ -186,9 +227,86 @@ export interface IStorage {
   createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
   getTaskComments(taskId: number): Promise<TaskComment[]>;
   deleteTaskComment(commentId: number): Promise<boolean>;
+  
+  // Meta-learning and ethical guardian methods
+  saveLearningFeedback(feedback: LearningFeedback): Promise<boolean>;
+  getLearningFeedback(sessionId: string, limit?: number): Promise<LearningFeedback[]>;
+  saveEthicalLogEntry(entry: EthicalLogEntry): Promise<boolean>;
+  getEthicalLogs(sessionId?: string, limit?: number): Promise<EthicalLogEntry[]>;
+  saveRelevantMemory(sessionId: string, content: string, topic: string): Promise<boolean>;
+  getRelevantMemories(topic: string, sessionId: string, limit?: number): Promise<{id: string; content: string}[]>;
+  
+  // Conversation memory methods
+  saveMemory(memory: Memory): Promise<Memory>;
+  getMemories(query: MemoryQuery): Promise<Memory[]>;
+  updateMemoryAccess(memoryId: string): Promise<boolean>;
+  getSessionSummary(sessionId: string): Promise<MemorySummary | null>;
+  saveSessionSummary(summary: MemorySummary): Promise<boolean>;
+  
+  // Task planning methods
+  saveGoal(goal: Goal): Promise<boolean>;
+  getGoal(goalId: string): Promise<Goal | null>;
+  getGoalsBySession(sessionId: string, userId?: string): Promise<Goal[]>;
+  updateGoal(goalId: string, updates: Partial<Goal>): Promise<boolean>;
+  saveTask(task: Task): Promise<boolean>;
+  getTask(taskId: string): Promise<Task | null>;
+  getTasksByGoal(goalId: string): Promise<Task[]>;
+  getTasksWithDependency(taskId: string): Promise<Task[]>;
+  updateTask(taskId: string, updates: Partial<Task>): Promise<boolean>;
+  
+  // Project management methods
+  saveProject(project: Project): Promise<boolean>;
+  getProject(projectId: string): Promise<Project | null>;
+  getProjectsBySession(sessionId: string, userId?: string): Promise<Project[]>;
+  updateProject(projectId: string, updates: Partial<Project>): Promise<boolean>;
+  saveMilestone(milestone: Milestone): Promise<boolean>;
+  getMilestone(milestoneId: string): Promise<Milestone | null>;
+  getMilestonesByProject(projectId: string): Promise<Milestone[]>;
+  updateMilestone(milestoneId: string, updates: Partial<Milestone>): Promise<boolean>;
+  
+  // Knowledge graph methods
+  getKnowledgeGraph(sessionId: string): Promise<KnowledgeGraph | null>;
+  saveKnowledgeGraph(graph: KnowledgeGraph): Promise<boolean>;
+  updateKnowledgeGraph(graphId: string, graph: KnowledgeGraph): Promise<boolean>;
+  deleteKnowledgeGraph(sessionId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
+  // Knowledge Graph methods
+  async getKnowledgeGraph(sessionId: string): Promise<KnowledgeGraph | null> {
+    return this.knowledgeGraphs.get(sessionId) || null;
+  }
+  
+  async saveKnowledgeGraph(graph: KnowledgeGraph): Promise<boolean> {
+    if (!graph.id) {
+      graph.id = `graph-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    }
+    if (!graph.createdAt) {
+      graph.createdAt = new Date();
+    }
+    graph.updatedAt = new Date();
+    
+    this.knowledgeGraphs.set(graph.sessionId, graph);
+    return true;
+  }
+  
+  async updateKnowledgeGraph(graphId: string, graph: KnowledgeGraph): Promise<boolean> {
+    const existingGraph = this.knowledgeGraphs.get(graph.sessionId);
+    if (!existingGraph) {
+      return false;
+    }
+    
+    graph.id = graphId;
+    graph.createdAt = existingGraph.createdAt;
+    graph.updatedAt = new Date();
+    
+    this.knowledgeGraphs.set(graph.sessionId, graph);
+    return true;
+  }
+  
+  async deleteKnowledgeGraph(sessionId: string): Promise<boolean> {
+    return this.knowledgeGraphs.delete(sessionId);
+  }
   private users: Map<number, User>;
   private sessions: Map<string, Session>;
   private messages: Map<string, Message[]>;
@@ -205,6 +323,14 @@ export class MemStorage implements IStorage {
   private canvasElements: Map<number, CanvasElement[]>; // Key is canvasId
   private colorPalettes: Map<number, ColorPalette>; // For adaptive color palette generator
   private canvasSuggestions: Map<string, CanvasSuggestion[]>; // Key is canvasId, for AI research agent
+  
+  // Meta-learning and ethical guardian
+  private learningFeedbacks: Map<string, LearningFeedback[]> = new Map(); // Key is sessionId
+  private ethicalLogs: Map<string, EthicalLogEntry[]> = new Map(); // Key is sessionId
+  private relevantMemories: Map<string, {id: string; content: string; topic: string}[]> = new Map(); // Key is sessionId
+  
+  // Knowledge Graph storage
+  private knowledgeGraphs: Map<string, KnowledgeGraph> = new Map(); // Key is sessionId
   
   // Project management maps
   private projects: Map<number, Project>;
@@ -252,6 +378,7 @@ export class MemStorage implements IStorage {
     this.canvasElements = new Map();
     this.colorPalettes = new Map();
     this.canvasSuggestions = new Map();
+    this.knowledgeGraphs = new Map();
     
     // Initialize project management maps
     this.projects = new Map();
@@ -1653,6 +1780,475 @@ export class MemStorage implements IStorage {
   
   async deleteTaskComment(commentId: number): Promise<boolean> {
     return this.taskComments.delete(commentId);
+  }
+  
+  // Meta-learning system methods
+  private learningFeedbacks: Map<string, LearningFeedback[]> = new Map();
+  private ethicalLogs: Map<string, EthicalLogEntry[]> = new Map();
+  private relevantMemories: Map<string, {id: string; content: string; topic: string}[]> = new Map();
+  
+  // Conversation memory maps
+  private memories: Map<string, Memory[]> = new Map(); // sessionId -> memories
+  private sessionSummaries: Map<string, MemorySummary> = new Map(); // sessionId -> summary
+  
+  // Task planning maps
+  private goals: Map<string, Goal> = new Map(); // goalId -> goal
+  private tasks: Map<string, Task> = new Map(); // taskId -> task
+  
+  // Project management maps
+  private projects: Map<string, Project> = new Map(); // projectId -> project
+  private milestones: Map<string, Milestone> = new Map(); // milestoneId -> milestone
+  
+  async saveLearningFeedback(feedback: LearningFeedback): Promise<boolean> {
+    try {
+      const sessionFeedbacks = this.learningFeedbacks.get(feedback.sessionId) || [];
+      sessionFeedbacks.push(feedback);
+      this.learningFeedbacks.set(feedback.sessionId, sessionFeedbacks);
+      return true;
+    } catch (error) {
+      console.error('Error saving learning feedback:', error);
+      return false;
+    }
+  }
+  
+  async getLearningFeedback(sessionId: string, limit?: number): Promise<LearningFeedback[]> {
+    const feedbacks = this.learningFeedbacks.get(sessionId) || [];
+    
+    if (limit) {
+      return feedbacks.slice(-limit);
+    }
+    
+    return feedbacks;
+  }
+  
+  async saveEthicalLogEntry(entry: EthicalLogEntry): Promise<boolean> {
+    try {
+      const sessionId = entry.sessionId || 'global';
+      const logs = this.ethicalLogs.get(sessionId) || [];
+      
+      // Generate ID if not provided
+      if (!entry.id) {
+        entry.id = `ethical-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      }
+      
+      logs.push(entry);
+      this.ethicalLogs.set(sessionId, logs);
+      return true;
+    } catch (error) {
+      console.error('Error saving ethical log entry:', error);
+      return false;
+    }
+  }
+  
+  async getEthicalLogs(sessionId?: string, limit?: number): Promise<EthicalLogEntry[]> {
+    let logs: EthicalLogEntry[] = [];
+    
+    if (sessionId) {
+      logs = this.ethicalLogs.get(sessionId) || [];
+    } else {
+      // Return logs from all sessions
+      for (const sessionLogs of this.ethicalLogs.values()) {
+        logs = logs.concat(sessionLogs);
+      }
+      
+      // Sort by timestamp (most recent first)
+      logs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    }
+    
+    if (limit) {
+      return logs.slice(0, limit);
+    }
+    
+    return logs;
+  }
+  
+  async saveRelevantMemory(sessionId: string, content: string, topic: string): Promise<boolean> {
+    try {
+      const memories = this.relevantMemories.get(sessionId) || [];
+      
+      // Create memory entry
+      const memory = {
+        id: `memory-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        content,
+        topic
+      };
+      
+      memories.push(memory);
+      this.relevantMemories.set(sessionId, memories);
+      return true;
+    } catch (error) {
+      console.error('Error saving relevant memory:', error);
+      return false;
+    }
+  }
+  
+  async getRelevantMemories(topic: string, sessionId: string, limit?: number): Promise<{id: string; content: string}[]> {
+    const allMemories = this.relevantMemories.get(sessionId) || [];
+    
+    // Filter by topic if provided
+    const topicMemories = topic 
+      ? allMemories.filter(m => m.topic.toLowerCase().includes(topic.toLowerCase()))
+      : allMemories;
+    
+    // Map to return format (excluding topic field)
+    const formattedMemories = topicMemories.map(m => ({
+      id: m.id,
+      content: m.content
+    }));
+    
+    if (limit) {
+      return formattedMemories.slice(0, limit);
+    }
+    
+    return formattedMemories;
+  }
+  
+  // Conversation memory methods
+  async saveMemory(memory: Memory): Promise<Memory> {
+    try {
+      const sessionMemories = this.memories.get(memory.sessionId) || [];
+      sessionMemories.push(memory);
+      this.memories.set(memory.sessionId, sessionMemories);
+      return memory;
+    } catch (error) {
+      console.error('Error saving memory:', error);
+      throw error;
+    }
+  }
+  
+  async getMemories(query: MemoryQuery): Promise<Memory[]> {
+    try {
+      let candidates: Memory[] = [];
+      
+      // Get candidate memories based on sessionId
+      if (query.sessionId) {
+        candidates = this.memories.get(query.sessionId) || [];
+      } else {
+        // Get all memories from all sessions
+        for (const memories of this.memories.values()) {
+          candidates = [...candidates, ...memories];
+        }
+      }
+      
+      // Filter by query parameters
+      let filtered = candidates;
+      
+      // Filter by type
+      if (query.type) {
+        filtered = filtered.filter(m => m.type === query.type);
+      }
+      
+      // Filter by userId
+      if (query.userId) {
+        filtered = filtered.filter(m => m.userId === query.userId);
+      }
+      
+      // Filter by topics
+      if (query.topics && query.topics.length > 0) {
+        filtered = filtered.filter(m => 
+          query.topics!.some(t => m.topics.includes(t))
+        );
+      }
+      
+      // Filter by entities
+      if (query.entities && query.entities.length > 0) {
+        filtered = filtered.filter(m => 
+          query.entities!.some(e => m.entities.includes(e))
+        );
+      }
+      
+      // Filter by content (simple text search)
+      if (query.content) {
+        filtered = filtered.filter(m => 
+          m.content.toLowerCase().includes(query.content!.toLowerCase())
+        );
+      }
+      
+      // Filter by timeframe
+      if (query.timeframe) {
+        filtered = filtered.filter(m => 
+          m.timestamp >= query.timeframe!.start && 
+          m.timestamp <= query.timeframe!.end
+        );
+      }
+      
+      // Filter by importance
+      if (query.minImportance) {
+        const importanceOrder = [
+          MemoryImportance.LOW,
+          MemoryImportance.MEDIUM,
+          MemoryImportance.HIGH,
+          MemoryImportance.CRITICAL
+        ];
+        
+        const minImportanceIndex = importanceOrder.indexOf(query.minImportance);
+        
+        filtered = filtered.filter(m => 
+          importanceOrder.indexOf(m.importance) >= minImportanceIndex
+        );
+      }
+      
+      // Apply limit if specified
+      if (query.limit && filtered.length > query.limit) {
+        filtered = filtered.slice(0, query.limit);
+      }
+      
+      return filtered;
+    } catch (error) {
+      console.error('Error getting memories:', error);
+      return [];
+    }
+  }
+  
+  async updateMemoryAccess(memoryId: string): Promise<boolean> {
+    try {
+      // Find the memory in all sessions
+      for (const [sessionId, memories] of this.memories.entries()) {
+        const memoryIndex = memories.findIndex(m => m.id === memoryId);
+        
+        if (memoryIndex >= 0) {
+          // Update access count and timestamp
+          memories[memoryIndex].accessCount += 1;
+          memories[memoryIndex].lastAccessed = new Date();
+          
+          // Update in the map
+          this.memories.set(sessionId, memories);
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error updating memory access:', error);
+      return false;
+    }
+  }
+  
+  async getSessionSummary(sessionId: string): Promise<MemorySummary | null> {
+    try {
+      return this.sessionSummaries.get(sessionId) || null;
+    } catch (error) {
+      console.error('Error getting session summary:', error);
+      return null;
+    }
+  }
+  
+  async saveSessionSummary(summary: MemorySummary): Promise<boolean> {
+    try {
+      this.sessionSummaries.set(summary.sessionId, summary);
+      return true;
+    } catch (error) {
+      console.error('Error saving session summary:', error);
+      return false;
+    }
+  }
+  
+  // Task planning methods
+  async saveGoal(goal: Goal): Promise<boolean> {
+    try {
+      this.goals.set(goal.id, goal);
+      return true;
+    } catch (error) {
+      console.error('Error saving goal:', error);
+      return false;
+    }
+  }
+  
+  async getGoal(goalId: string): Promise<Goal | null> {
+    try {
+      return this.goals.get(goalId) || null;
+    } catch (error) {
+      console.error('Error getting goal:', error);
+      return null;
+    }
+  }
+  
+  async getGoalsBySession(sessionId: string, userId?: string): Promise<Goal[]> {
+    try {
+      let goals = Array.from(this.goals.values()).filter(g => g.sessionId === sessionId);
+      
+      if (userId) {
+        goals = goals.filter(g => g.userId === userId);
+      }
+      
+      return goals;
+    } catch (error) {
+      console.error('Error getting goals by session:', error);
+      return [];
+    }
+  }
+  
+  async updateGoal(goalId: string, updates: Partial<Goal>): Promise<boolean> {
+    try {
+      const goal = this.goals.get(goalId);
+      
+      if (!goal) {
+        return false;
+      }
+      
+      const updatedGoal = { ...goal, ...updates, id: goal.id };
+      this.goals.set(goalId, updatedGoal);
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      return false;
+    }
+  }
+  
+  async saveTask(task: Task): Promise<boolean> {
+    try {
+      this.tasks.set(task.id, task);
+      return true;
+    } catch (error) {
+      console.error('Error saving task:', error);
+      return false;
+    }
+  }
+  
+  async getTask(taskId: string): Promise<Task | null> {
+    try {
+      return this.tasks.get(taskId) || null;
+    } catch (error) {
+      console.error('Error getting task:', error);
+      return null;
+    }
+  }
+  
+  async getTasksByGoal(goalId: string): Promise<Task[]> {
+    try {
+      return Array.from(this.tasks.values()).filter(t => t.goalId === goalId);
+    } catch (error) {
+      console.error('Error getting tasks by goal:', error);
+      return [];
+    }
+  }
+  
+  async getTasksWithDependency(taskId: string): Promise<Task[]> {
+    try {
+      return Array.from(this.tasks.values())
+        .filter(t => t.dependencies && t.dependencies.includes(taskId));
+    } catch (error) {
+      console.error('Error getting tasks with dependency:', error);
+      return [];
+    }
+  }
+  
+  async updateTask(taskId: string, updates: Partial<Task>): Promise<boolean> {
+    try {
+      const task = this.tasks.get(taskId);
+      
+      if (!task) {
+        return false;
+      }
+      
+      const updatedTask = { ...task, ...updates, id: task.id };
+      this.tasks.set(taskId, updatedTask);
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating task:', error);
+      return false;
+    }
+  }
+  
+  // Project management methods
+  async saveProject(project: Project): Promise<boolean> {
+    try {
+      this.projects.set(project.id, project);
+      return true;
+    } catch (error) {
+      console.error('Error saving project:', error);
+      return false;
+    }
+  }
+  
+  async getProject(projectId: string): Promise<Project | null> {
+    try {
+      return this.projects.get(projectId) || null;
+    } catch (error) {
+      console.error('Error getting project:', error);
+      return null;
+    }
+  }
+  
+  async getProjectsBySession(sessionId: string, userId?: string): Promise<Project[]> {
+    try {
+      let projects = Array.from(this.projects.values()).filter(p => p.sessionId === sessionId);
+      
+      if (userId) {
+        projects = projects.filter(p => p.userId === userId);
+      }
+      
+      return projects;
+    } catch (error) {
+      console.error('Error getting projects by session:', error);
+      return [];
+    }
+  }
+  
+  async updateProject(projectId: string, updates: Partial<Project>): Promise<boolean> {
+    try {
+      const project = this.projects.get(projectId);
+      
+      if (!project) {
+        return false;
+      }
+      
+      const updatedProject = { ...project, ...updates, id: project.id };
+      this.projects.set(projectId, updatedProject);
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating project:', error);
+      return false;
+    }
+  }
+  
+  async saveMilestone(milestone: Milestone): Promise<boolean> {
+    try {
+      this.milestones.set(milestone.id, milestone);
+      return true;
+    } catch (error) {
+      console.error('Error saving milestone:', error);
+      return false;
+    }
+  }
+  
+  async getMilestone(milestoneId: string): Promise<Milestone | null> {
+    try {
+      return this.milestones.get(milestoneId) || null;
+    } catch (error) {
+      console.error('Error getting milestone:', error);
+      return null;
+    }
+  }
+  
+  async getMilestonesByProject(projectId: string): Promise<Milestone[]> {
+    try {
+      return Array.from(this.milestones.values()).filter(m => m.projectId === projectId);
+    } catch (error) {
+      console.error('Error getting milestones by project:', error);
+      return [];
+    }
+  }
+  
+  async updateMilestone(milestoneId: string, updates: Partial<Milestone>): Promise<boolean> {
+    try {
+      const milestone = this.milestones.get(milestoneId);
+      
+      if (!milestone) {
+        return false;
+      }
+      
+      const updatedMilestone = { ...milestone, ...updates, id: milestone.id };
+      this.milestones.set(milestoneId, updatedMilestone);
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating milestone:', error);
+      return false;
+    }
   }
 }
 
