@@ -33,6 +33,7 @@ import evaluationRoutes from './routes/evaluation-routes';
 import agentRoutes from './routes/agent-routes';
 import errorRecoveryRoutes from './routes/error-recovery-routes';
 import crossDomainRoutes from './routes/cross-domain-routes';
+import advancedSystemRoutes from './routes/advanced-system-routes';
 
 // Define API Service type for quota manager
 type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
@@ -64,6 +65,9 @@ function setupApiRoutes(app: Express): void {
   
   // Use cross-domain integration routes
   app.use('/api/integration', crossDomainRoutes);
+  
+  // Use advanced system routes
+  app.use('/api/advanced', advancedSystemRoutes);
 
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
