@@ -58,9 +58,14 @@ const searchingMessages = [
 const idleMessages = [
   "Ready to assist...",
   "How can I help?",
-  "Xeno AI at your service",
   "Ask me anything...",
+  "Xeno AI at your service",
   "Waiting for your command",
+  "Click me for suggestions",
+  "Tap to see what I can do",
+  "I have some ideas for you",
+  "Let's explore something new",
+  "Need inspiration? Try me",
 ];
 
 interface AIProcessingIndicatorProps {
@@ -148,17 +153,34 @@ export function AIProcessingIndicator({
   // Different styling and positioning for idle vs active states
   const isIdleState = state === 'idle';
   
+  // For tracking hover state
+  const [isHovered, setIsHovered] = useState(false);
+  // For suggestion examples when the idle state is clicked
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionExamples = [
+    "What can you help me with?",
+    "Tell me about knowledge graphs",
+    "How do I use voice commands?",
+    "Summarize the latest tech news"
+  ];
+  
   // Handle user interaction with the component
   const handleClick = () => {
-    // If in idle state, let's trigger an interaction event (placeholder for future implementation)
+    // If in idle state, let's trigger an interaction with animated feedback
     if (isIdleState) {
-      console.log('User interacted with AI Assistant in idle state');
-      // Here we could dispatch a custom event for the parent component to handle
-      // For example, showing a suggestion panel or opening the chat interface
+      // Create a more dramatic pulse effect
+      setIconScale(1.4);
+      setTimeout(() => setIconScale(0.9), 150);
+      setTimeout(() => setIconScale(1.2), 300);
+      setTimeout(() => setIconScale(1), 450);
       
-      // For now, just update the icon scale for visual feedback
-      setIconScale(1.2);
-      setTimeout(() => setIconScale(1), 300);
+      // Toggle suggestions panel
+      setShowSuggestions(!showSuggestions);
+      
+      // Rotate through idle messages more rapidly for a more dynamic experience
+      const nextIndex = (messageIndex + 1) % idleMessages.length;
+      setMessageIndex(nextIndex);
+      setDisplayMessage(idleMessages[nextIndex]);
     }
   };
   
@@ -167,13 +189,40 @@ export function AIProcessingIndicator({
       className={`fixed ${isIdleState ? 'bottom-20' : 'bottom-24'} left-1/2 transform -translate-x-1/2 z-50 ${className}`} 
       style={{ maxWidth: isIdleState ? '70%' : '85%' }}
       onClick={handleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Suggestions Panel - only shows when idle state is clicked */}
+      {isIdleState && showSuggestions && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-primary/20 p-3 animate-in fade-in zoom-in-95 duration-200">
+          <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Try asking me about:</h4>
+          <ul className="space-y-1.5">
+            {suggestionExamples.map((suggestion, index) => (
+              <li 
+                key={index}
+                className="text-xs bg-primary/5 hover:bg-primary/10 text-primary/90 dark:text-primary/80 dark:hover:text-primary px-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center"
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent the parent click handler from firing
+                  console.log(`User clicked suggestion: ${suggestion}`);
+                  // Here we would trigger the actual input of this suggestion
+                  setShowSuggestions(false);
+                }}
+              >
+                <span className="w-1 h-1 bg-primary/60 rounded-full mr-2"></span>
+                {suggestion}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
       <div className={cn(
         "bg-[#F5F0FF] dark:bg-[#2D2065] text-primary shadow-md",
         "flex items-center gap-2 rounded-lg px-2.5 py-1.5 animate-in slide-in-from-bottom duration-300",
-        "border border-primary/10 dark:border-primary/30 hover:shadow-primary/10 hover:shadow-sm",
+        "border border-primary/10 dark:border-primary/30",
+        isHovered ? "shadow-primary/20 shadow-sm" : "shadow-md", 
         "transition-all duration-300 ease-in-out",
-        isIdleState ? "scale-75 opacity-80 hover:opacity-100 hover:scale-80" : "scale-90"
+        isIdleState ? `scale-75 ${isHovered ? "opacity-100 scale-80" : "opacity-80"}` : "scale-90"
       )}>
         <div className="flex-shrink-0 relative">
           <div className={cn(
@@ -398,12 +447,34 @@ function getIconForState(state: ProcessingState) {
       );
     case 'idle':
       return (
-        <div className="relative">
-          <Wand2 className={`${baseAnimationClass} relative opacity-60`} />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-pulse" 
+        <div className="relative cursor-pointer group">
+          <Wand2 className={`${baseAnimationClass} relative opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300`} />
+          <div className="absolute inset-0 flex items-center justify-center opacity-70 group-hover:opacity-100">
+            {/* Magical sparkles animation */}
+            <span className="absolute w-1 h-1 bg-primary rounded-full animate-ping" 
+                  style={{animationDuration: '1.5s', left: '30%', top: '20%'}}></span>
+            <span className="absolute w-0.5 h-0.5 bg-primary rounded-full animate-ping" 
+                  style={{animationDuration: '2s', left: '70%', top: '30%'}}></span>
+            <span className="absolute w-1 h-1 bg-primary rounded-full animate-ping" 
+                  style={{animationDuration: '2.5s', left: '20%', top: '60%'}}></span>
+            <span className="absolute w-0.5 h-0.5 bg-primary rounded-full animate-ping" 
+                  style={{animationDuration: '1.8s', left: '60%', top: '70%'}}></span>
+            {/* Central glow */}
+            <span className="w-2 h-2 bg-primary/30 rounded-full animate-pulse" 
                   style={{animationDuration: '4s'}}></span>
           </div>
+          
+          {/* Touch/Click indicator */}
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse">
+            <div className="absolute inset-0 bg-primary rounded-full animate-ping opacity-70"
+                 style={{animationDuration: '2s'}}></div>
+            <div className="absolute inset-0.5 bg-white rounded-full flex items-center justify-center">
+              <span className="w-1 h-1 bg-primary rounded-full"></span>
+            </div>
+          </div>
+          
+          {/* Growing ring animation on hover */}
+          <div className="absolute inset-0 rounded-full border border-primary/40 opacity-0 group-hover:opacity-100 group-hover:scale-125 transition-all duration-300"></div>
         </div>
       );
     default:
