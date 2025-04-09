@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <circle cx="50" cy="50" r="45" fill="#4BB87F" />
+  <circle cx="50" cy="50" r="40" fill="#F0F3FF" />
+  
+  <!-- Robot face -->
+  <rect x="30" y="35" width="40" height="30" rx="5" fill="#4BB87F" />
+  
+  <!-- Eyes -->
+  <circle cx="40" cy="45" r="5" fill="#FFFFFF" />
+  <circle cx="60" cy="45" r="5" fill="#FFFFFF" />
+  <circle cx="40" cy="45" r="2" fill="#000000" />
+  <circle cx="60" cy="45" r="2" fill="#000000" />
+  
+  <!-- Smile mouth -->
+  <path d="M35,52 Q50,65 65,52" stroke="#FFFFFF" stroke-width="3" fill="none" />
+  
+  <!-- Compass element -->
+  <circle cx="50" cy="20" r="8" fill="#F0F3FF" stroke="#4BB87F" stroke-width="2" />
+  <path d="M50,15 L50,25 M45,20 L55,20" stroke="#4BB87F" stroke-width="2" />
+  <path d="M50,20 L54,16" stroke="#FF4B4B" stroke-width="2" />
+  <path d="M50,20 L46,24" stroke="#4B8BFF" stroke-width="2" />
+</svg>

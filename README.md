@@ -1,39 +1,97 @@
 # Xeno AI
 
-## Overview
-Xeno AI is an intelligent AI-powered development assistant that transforms coding into an engaging, intuitive experience through advanced technological integration and user-centric design.
+Xeno AI is an advanced conversational AI assistant that combines natural language processing, knowledge graph visualization, and autonomous data acquisition to provide intelligent, contextual responses.
 
-## Key Features
-- **Natural Language Interface**: Engage in natural conversations with the AI
-- **Voice Control**: Speak to Xeno and hear responses using voice synthesis
-- **Knowledge Graph Visualization**: See relationships between concepts visually
-- **Mobile-Optimized**: Designed with touch-friendly controls for mobile devices
-- **Contextual Memory**: The system remembers context for meaningful follow-ups
-- **Tiered AI Processing**: Uses local LLMs for basic tasks, cloud services for complex reasoning
-- **WebSocket Integration**: Real-time updates and notifications
-- **Offline Capabilities**: Core functionality available without internet connection
-- **Customizable Interface**: Personalize the look and feel of your experience
+## Features
 
-## Technical Stack
-- **Frontend**: React with TypeScript, Tailwind CSS, shadcn/ui
-- **Backend**: Node.js with Express
-- **AI Services**: OpenAI (GPT-4o, GPT-3.5 Turbo, embeddings), ElevenLabs (voice synthesis)
-- **Local Processing**: On-device language processing for basic interactions
-- **Connectivity**: WebSockets for real-time communication
+- **Multi-Agent Collaboration**: Specialized sub-agents work together to provide comprehensive analysis and insights
+- **Autonomous Data Acquisition**: System autonomously gathers data from various sources to enhance its knowledge base
+- **Knowledge Visualization**: Interactive knowledge graph for exploring entity-topic relationships
+- **Multi-Modal Interactions**: Support for text, voice, image, and file-based interactions
+- **Advanced Search**: Comprehensive search with filtering options and natural language query processing
+- **Meta-Learning Engine**: Continuous improvement through feedback loops and pattern identification
 
 ## Getting Started
-1. Clone this repository
-2. Set up environment variables:
-   - `OPENAI_API_KEY` - Your OpenAI API key
-   - `ELEVENLABS_API_KEY` - Your ElevenLabs API key (optional)
-3. Start the application using the provided workflow
-4. Access the application at the deployed URL
 
-## Architecture
-The application follows a tiered approach to AI processing:
-- **Basic tasks**: Handled by free, open-source local LLMs
-- **Complex reasoning**: Processed by advanced cloud APIs
-- **Voice synthesis**: Uses a fallback chain (ElevenLabs → OpenAI TTS → browser TTS)
+### Prerequisites
+
+- Node.js v20 or higher
+- PostgreSQL (for persistent storage)
+- OpenAI API Key (for advanced processing)
+- ElevenLabs API Key (optional, for enhanced voice synthesis)
+
+### Environment Variables
+
+Create a `.env` file with the following variables:
+
+```
+# Server configuration
+PORT=5000
+NODE_ENV=production
+
+# Session configuration
+SESSION_SECRET=<your-session-secret>
+
+# Database configuration (if using PostgreSQL)
+DATABASE_URL=<your-database-url>
+
+# OpenAI API Key
+OPENAI_API_KEY=<your-openai-api-key>
+
+# ElevenLabs API Key (optional)
+ELEVENLABS_API_KEY=<your-elevenlabs-api-key>
+
+# AI Model fallback strategy
+MODEL_FALLBACK_ENABLED=true
+DEFAULT_LOCAL_MODEL=true
+COMPLEXITY_THRESHOLD=0.7
+```
+
+### Installation
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/xeno-ai.git
+   cd xeno-ai
+   ```
+
+2. Install dependencies:
+   ```
+   npm install
+   ```
+
+3. Build the application:
+   ```
+   npm run build
+   ```
+
+4. Start the server:
+   ```
+   npm start
+   ```
+
+The application will be available at http://localhost:5000.
+
+### Docker Deployment
+
+1. Build the Docker image:
+   ```
+   docker build -t xeno-ai .
+   ```
+
+2. Run the container:
+   ```
+   docker run -p 5000:5000 --env-file .env xeno-ai
+   ```
+
+## Deployment on Replit
+
+This application is ready to be deployed on Replit. Simply click the "Deploy" button to start the deployment process.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
-Copyright © 2025 Xeno AI
+
+This project is licensed under the MIT License - see the LICENSE file for details.

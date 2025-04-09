@@ -18,6 +18,8 @@ import TutorialsPage from "@/pages/tutorials-page";
 import FileTestPage from "@/pages/file-test-page";
 import VisualReasoningPage from "@/pages/visual-reasoning-page";
 import TestPage from "@/pages/test-page";
+import ChatPage from "@/pages/chat-page";
+import HomePage from "@/pages/home-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -103,6 +105,8 @@ function AppRoutes() {
           <Route path="/splash" element={<SplashPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/" element={<Home />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/knowledge-graph" element={<KnowledgeGraphPage />} />
           <Route path="/enhanced-knowledge-graph" element={<EnhancedKnowledgeGraphPage />} />
           <Route path="/vr-experience" element={<VRExperience />} />

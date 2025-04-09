@@ -36,6 +36,7 @@ import crossDomainRoutes from './routes/cross-domain-routes';
 import advancedSystemRoutes from './routes/advanced-system-routes';
 import multiModalRoutes from './routes/multi-modal-routes';
 import searchRoutes from './routes/search-routes';
+import dataAcquisitionRoutes from './routes/data-acquisition-routes';
 
 // Define API Service type for quota manager
 type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
@@ -76,10 +77,29 @@ function setupApiRoutes(app: Express): void {
   
   // Use search routes
   app.use('/api/search', searchRoutes);
+  
+  // Use data acquisition routes
+  app.use('/api/acquisition', dataAcquisitionRoutes);
 
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', timestamp: Date.now() });
+    // Detailed health check for deployment monitoring
+    const healthData = {
+      status: 'ok',
+      timestamp: Date.now(),
+      version: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+      cpuUsage: process.cpuUsage()
+    };
+    
+    res.status(200).json(healthData);
+  });
+  
+  // Simple health check for load balancers
+  app.get('/health', (req: Request, res: Response) => {
+    res.status(200).send('OK');
   });
   
   // Model status endpoint
