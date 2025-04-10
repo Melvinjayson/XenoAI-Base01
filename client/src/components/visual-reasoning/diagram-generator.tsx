@@ -403,11 +403,11 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {selectedDiagram && getDiagramIcon(selectedDiagram.type)}
-              {selectedDiagram?.title}
+              {selectedDiagram?.title || 'Diagram'}
             </DialogTitle>
             <DialogDescription>
-              {selectedDiagram && selectedDiagram.type ? 
-                `${selectedDiagram.type.charAt(0).toUpperCase() + selectedDiagram.type.slice(1)} diagram generated from conversation` : 
+              {selectedDiagram ? 
+                `${String(selectedDiagram.type).charAt(0).toUpperCase() + String(selectedDiagram.type).slice(1)} diagram generated from conversation` : 
                 'Diagram generated from conversation'}
             </DialogDescription>
           </DialogHeader>
