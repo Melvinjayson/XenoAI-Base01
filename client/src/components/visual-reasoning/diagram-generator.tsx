@@ -406,7 +406,9 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({
               {selectedDiagram?.title}
             </DialogTitle>
             <DialogDescription>
-              {selectedDiagram?.type.charAt(0).toUpperCase() + selectedDiagram?.type.slice(1)} diagram generated from conversation
+              {selectedDiagram && selectedDiagram.type ? 
+                `${selectedDiagram.type.charAt(0).toUpperCase() + selectedDiagram.type.slice(1)} diagram generated from conversation` : 
+                'Diagram generated from conversation'}
             </DialogDescription>
           </DialogHeader>
           

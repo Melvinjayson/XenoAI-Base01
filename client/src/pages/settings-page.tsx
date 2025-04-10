@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function SettingsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('models');
+  const navigate = useNavigate();
 
   return (
     <div className="container py-10">
@@ -41,7 +42,7 @@ export default function SettingsPage() {
         onValueChange={setActiveTab}
         className="space-y-4"
       >
-        <TabsList className="grid grid-cols-4 h-auto p-1 md:w-[600px] w-full">
+        <TabsList className="grid grid-cols-5 h-auto p-1 md:w-[700px] w-full">
           <TabsTrigger value="models" className="flex items-center">
             <Zap className="mr-2 h-4 w-4" />
             <span className="hidden sm:inline">Models</span>
@@ -56,6 +57,11 @@ export default function SettingsPage() {
             <Palette className="mr-2 h-4 w-4" />
             <span className="hidden sm:inline">Appearance</span>
             <span className="sm:hidden">UI</span>
+          </TabsTrigger>
+          <TabsTrigger value="system" className="flex items-center">
+            <Server className="mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">System</span>
+            <span className="sm:hidden">Sys</span>
           </TabsTrigger>
           <TabsTrigger value="about" className="flex items-center">
             <Info className="mr-2 h-4 w-4" />
@@ -171,6 +177,76 @@ export default function SettingsPage() {
                 >
                   Select theme
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="system" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>System Settings</CardTitle>
+              <CardDescription>Monitor and manage system components</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <div className="space-y-0.5">
+                    <h4 className="text-sm font-medium">System Status Dashboard</h4>
+                    <p className="text-xs text-muted-foreground">Monitor the health of all system components</p>
+                  </div>
+                  <Button 
+                    onClick={() => navigate('/system-status')}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Server className="h-4 w-4" />
+                    View Status
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="flex justify-between items-center">
+                  <div className="space-y-0.5">
+                    <h4 className="text-sm font-medium">Data Acquisition Settings</h4>
+                    <p className="text-xs text-muted-foreground">Configure autonomous data sources</p>
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      toast({
+                        title: "Data Acquisition",
+                        description: "Data source configuration would be shown here in a complete implementation.",
+                      });
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Configure
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="flex justify-between items-center">
+                  <div className="space-y-0.5">
+                    <h4 className="text-sm font-medium">Multi-Agent Settings</h4>
+                    <p className="text-xs text-muted-foreground">Configure agent ecosystem behavior</p>
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      toast({
+                        title: "Multi-Agent Settings",
+                        description: "Agent collaboration settings would be shown here in a complete implementation.",
+                      });
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Configure
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
