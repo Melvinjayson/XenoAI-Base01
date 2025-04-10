@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Settings, Info, Zap, Volume2, Palette } from 'lucide-react';
+import { Settings, Info, Zap, Volume2, Palette, Server } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Tabs, 
   TabsContent, 

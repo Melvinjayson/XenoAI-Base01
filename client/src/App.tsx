@@ -20,6 +20,7 @@ import VisualReasoningPage from "@/pages/visual-reasoning-page";
 import TestPage from "@/pages/test-page";
 import ChatPage from "@/pages/chat-page";
 import HomePage from "@/pages/home-page";
+import SystemStatusPage from "@/pages/system-status-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
@@ -121,6 +122,7 @@ function AppRoutes() {
           <Route path="/tutorials" element={<TutorialsPage />} />
           <Route path="/file-test" element={<FileTestPage />} />
           <Route path="/test" element={<TestPage />} />
+          <Route path="/system-status" element={<SystemStatusPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         
