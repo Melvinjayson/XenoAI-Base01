@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BarChart2, FlowChart, GitBranch, Layers, Download, Copy, Share2, Code, PlusCircle } from 'lucide-react';
+import { BarChart2, GitBranch, Layers, Download, Copy, Share2, Code, PlusCircle, GitMerge } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
 // Types for diagram generation
@@ -195,7 +195,7 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({
   const getDiagramIcon = (type: string) => {
     switch (type) {
       case 'flowchart':
-        return <FlowChart className="h-5 w-5" />;
+        return <GitMerge className="h-5 w-5" />;
       case 'entity':
         return <GitBranch className="h-5 w-5" />;
       case 'mindmap':
@@ -205,7 +205,7 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({
       case 'ui-mockup':
         return <Code className="h-5 w-5" />;
       default:
-        return <FlowChart className="h-5 w-5" />;
+        return <GitMerge className="h-5 w-5" />;
     }
   };
   
@@ -222,7 +222,7 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-5 mb-4">
               <TabsTrigger value="flowchart" className="flex items-center gap-2">
-                <FlowChart className="h-4 w-4" />
+                <GitMerge className="h-4 w-4" />
                 <span className="hidden sm:inline">Flowchart</span>
               </TabsTrigger>
               <TabsTrigger value="entity" className="flex items-center gap-2">

@@ -37,6 +37,7 @@ import advancedSystemRoutes from './routes/advanced-system-routes';
 import multiModalRoutes from './routes/multi-modal-routes';
 import searchRoutes from './routes/search-routes';
 import dataAcquisitionRoutes from './routes/data-acquisition-routes';
+import systemStatusRoutes from './routes/system-status-routes';
 
 // Define API Service type for quota manager
 type ApiService = 'openai' | 'anthropic' | 'elevenlabs';
@@ -80,6 +81,9 @@ function setupApiRoutes(app: Express): void {
   
   // Use data acquisition routes
   app.use('/api/acquisition', dataAcquisitionRoutes);
+  
+  // Use system status routes
+  app.use('/api/system-status', systemStatusRoutes);
 
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
