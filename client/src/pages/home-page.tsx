@@ -52,21 +52,13 @@ const HomePage: React.FC = () => {
                 Xeno AI combines advanced natural language processing, knowledge graph visualization, and autonomous data acquisition to provide you with intelligent, contextual responses.
               </p>
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-                <Button size="lg" asChild>
-                  <Link href="/chat">
-                    <a className="flex items-center">
-                      <MessageSquare className="mr-2 h-5 w-5" />
-                      Start Chatting
-                    </a>
-                  </Link>
+                <Button size="lg" onClick={() => navigate('/splash')} className="flex items-center">
+                  <MessageSquare className="mr-2 h-5 w-5" />
+                  Get Started
                 </Button>
-                <Button size="lg" variant="outline" asChild>
-                  <Link href="/features">
-                    <a className="flex items-center">
-                      Learn More
-                      <ChevronRight className="ml-2 h-5 w-5" />
-                    </a>
-                  </Link>
+                <Button size="lg" variant="outline" onClick={() => navigate('/chat')} className="flex items-center">
+                  Start Chatting
+                  <ChevronRight className="ml-2 h-5 w-5" />
                 </Button>
               </div>
             </div>

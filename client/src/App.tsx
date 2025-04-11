@@ -70,7 +70,7 @@ function AppRoutes() {
     if (initialLoad) {
       setInitialLoad(false);
       if (location.pathname === "/") {
-        navigate("/splash");
+        navigate("/home");
       }
     }
   }, [initialLoad, navigate]);
