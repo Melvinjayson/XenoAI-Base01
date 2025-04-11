@@ -6,12 +6,13 @@ import {
   PopoverContent, 
   PopoverTrigger 
 } from '@/components/ui/popover';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
+// Removing dropdown for simplicity
+// import {
+//   DropdownMenu,
+//   DropdownMenuContent,
+//   DropdownMenuItem,
+//   DropdownMenuTrigger
+// } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Bot, ChevronDown, Brain, Lightbulb, Compass } from 'lucide-react';
 
@@ -134,34 +135,50 @@ const FloatingCompanion: React.FC<FloatingCompanionProps> = ({
           )}
         </AnimatePresence>
         
-        {/* Character selection dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-7 rounded-full">
-              {currentCharacter.icon}
-              <span className="ml-2">{currentCharacter.name}</span>
-              <ChevronDown className="h-4 w-4 ml-1" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleCharacterChange('assistant')}>
+        {/* Character selection as simple buttons */}
+        <div className="bg-card p-2 rounded-lg shadow-md">
+          <div className="flex flex-col space-y-1">
+            <div className="pb-1 mb-1 border-b border-border">
+              <div className="text-sm font-medium">{currentCharacter.name}</div>
+            </div>
+            <Button 
+              variant={character === 'assistant' ? 'default' : 'ghost'} 
+              size="sm" 
+              className="justify-start h-7"
+              onClick={() => handleCharacterChange('assistant')}
+            >
               <Bot className="h-4 w-4 mr-2" />
               <span>Xeno (Assistant)</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleCharacterChange('scientist')}>
+            </Button>
+            <Button 
+              variant={character === 'scientist' ? 'default' : 'ghost'} 
+              size="sm" 
+              className="justify-start h-7"
+              onClick={() => handleCharacterChange('scientist')}
+            >
               <Brain className="h-4 w-4 mr-2" />
               <span>Prof. X (Scientist)</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleCharacterChange('guide')}>
+            </Button>
+            <Button 
+              variant={character === 'guide' ? 'default' : 'ghost'} 
+              size="sm" 
+              className="justify-start h-7"
+              onClick={() => handleCharacterChange('guide')}
+            >
               <Compass className="h-4 w-4 mr-2" />
               <span>Guido (Guide)</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleCharacterChange('mentor')}>
+            </Button>
+            <Button 
+              variant={character === 'mentor' ? 'default' : 'ghost'} 
+              size="sm" 
+              className="justify-start h-7"
+              onClick={() => handleCharacterChange('mentor')}
+            >
               <Lightbulb className="h-4 w-4 mr-2" />
               <span>Mentor</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </Button>
+          </div>
+        </div>
         
         {/* Character avatar */}
         <Popover open={showPopover} onOpenChange={setShowPopover}>

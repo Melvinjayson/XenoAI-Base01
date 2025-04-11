@@ -17,10 +17,11 @@ import { useLanguage } from "@/context/language-context";
 import { Link } from "wouter";
 import { useState, useRef } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { 
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
-  DropdownMenuSeparator, DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
+// Removing dropdown for simplicity
+// import { 
+//   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
+//   DropdownMenuSeparator, DropdownMenuTrigger 
+// } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -257,37 +258,62 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                       </Tooltip>
                     </TooltipProvider>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
-                          <ArrowRight className="h-4 w-4 text-gray-500" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <Link href="/workbench">
-                          <DropdownMenuItem>
-                            <BrainCircuit className="mr-2 h-4 w-4" />
-                            <span>Open in Workbench</span>
-                          </DropdownMenuItem>
-                        </Link>
-                        <Link href="/knowledge-graph">
-                          <DropdownMenuItem>
-                            <Network className="mr-2 h-4 w-4" />
-                            <span>View Knowledge Graph</span>
-                          </DropdownMenuItem>
-                        </Link>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => {
-                          navigator.clipboard.writeText(message.content);
-                          toast({ 
-                            title: "Copied to clipboard",
-                            description: "Message content copied to clipboard",
-                          });
-                        }}>
-                          <span>Copy text</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {/* Simple button group instead of dropdown */}
+                    <div className="flex space-x-1">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link to="/workbench">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
+                                <BrainCircuit className="h-4 w-4 text-gray-500 hover:text-primary" />
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">Open in Workbench</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link to="/knowledge-graph">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
+                                <Network className="h-4 w-4 text-gray-500 hover:text-primary" />
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">View Knowledge Graph</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 w-7 p-0 rounded-full"
+                              onClick={() => {
+                                navigator.clipboard.writeText(message.content);
+                                toast({ 
+                                  title: "Copied to clipboard",
+                                  description: "Message content copied to clipboard",
+                                });
+                              }}
+                            >
+                              <ArrowRight className="h-4 w-4 text-gray-500 hover:text-primary" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">Copy text</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
                 )}
               </div>
