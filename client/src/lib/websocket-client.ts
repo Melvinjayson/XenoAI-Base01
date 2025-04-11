@@ -7,7 +7,7 @@ interface MessageCallback {
   (data: any): void;
 }
 
-interface WebSocketState {
+export interface WebSocketState {
   isConnected: boolean;
   isConnecting: boolean;
   hasError: boolean;
@@ -90,7 +90,7 @@ export class WebSocketClient {
           this.updateState({
             isConnecting: false,
             hasError: true,
-            errorMessage: 'Connection timeout'
+            errorMessage: 'Connection timeout - Server may be busy or unreachable'
           });
           
           // Increment reconnect attempts
@@ -102,11 +102,11 @@ export class WebSocketClient {
           } else {
             console.error(`Maximum reconnect attempts (${this.maxReconnectAttempts}) reached`);
             this.updateState({
-              errorMessage: 'Failed to connect after multiple attempts'
+              errorMessage: 'Failed to connect after multiple attempts. Please check your network connection and refresh the page.'
             });
           }
         }
-      }, 8000);
+      }, 20000); // Increased timeout from 8s to 20s for slower connections
 
       this.socket.onopen = this.handleOpen.bind(this);
       this.socket.onmessage = this.handleMessage.bind(this);
