@@ -41,7 +41,11 @@ const slides = [
   }
 ];
 
-export function OnboardingCarousel() {
+interface OnboardingCarouselProps {
+  onComplete?: () => void;
+}
+
+export function OnboardingCarousel({ onComplete }: OnboardingCarouselProps) {
   const [[currentIndex, direction], setCurrentIndex] = useState([0, 0]);
   const [, setLocation] = useLocation();
   const touchStartX = useRef<number | null>(null);
@@ -189,7 +193,12 @@ export function OnboardingCarousel() {
   };
   
   const finishOnboarding = () => {
-    setLocation("/");
+    // If onComplete is provided, call it, otherwise use default behavior
+    if (onComplete) {
+      onComplete();
+    } else {
+      setLocation("/");
+    }
   };
   
   return (

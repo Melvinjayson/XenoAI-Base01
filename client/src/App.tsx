@@ -62,6 +62,18 @@ function AppRoutes() {
   const [showVoiceWidget, setShowVoiceWidget] = useState(false);
   const [showGestureTutorial, setShowGestureTutorial] = useState(false);
   const { isOnline } = useOfflineContext();
+  
+  // Check if this is the first visit and redirect to splash page
+  useEffect(() => {
+    // Only redirect if currently on the home page
+    if (location === "/") {
+      const hasVisitedSplash = localStorage.getItem('has-visited-splash');
+      if (!hasVisitedSplash) {
+        localStorage.setItem('has-visited-splash', 'true');
+        setLocation('/splash');
+      }
+    }
+  }, [location, setLocation]);
 
   useEffect(() => {
     const isMainPage = location === "/" || 

@@ -11,7 +11,8 @@ export default function SplashPage() {
     if (!hasSeenOnboarding) {
       setLocation('/onboarding');
     } else {
-      setLocation('/chat');
+      // Navigate to the home page instead of /chat
+      setLocation('/');
     }
   };
   

@@ -19,12 +19,13 @@ import { useGestureArea } from "@/context/gesture-context";
 import { GestureHandlers } from "@/hooks/use-gestures";
 import { GestureIndicator } from "@/components/ui/gesture-indicator";
 import { toast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem
-} from "@/components/ui/dropdown-menu";
+// Removing dropdown imports as we're using simpler buttons for navigation
+// import {
+//   DropdownMenu,
+//   DropdownMenuTrigger,
+//   DropdownMenuContent,
+//   DropdownMenuItem
+// } from "@/components/ui/dropdown-menu";
 
 const handleColorPalettesLoad = async () => {
   try {
@@ -282,38 +283,26 @@ export default function Home() {
         <nav className="flex items-center gap-2">
           {/* Knowledge Graph Navigation with Tooltips */}
           <div className="hidden sm:flex items-center gap-3 mr-2 border-r border-border pr-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="relative flex items-center gap-2 h-9 px-3 text-primary">
-                  <Brain className="w-4 h-4" />
-                  <span className="font-medium">Creative Suite</span>
-                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                  </span>
+            <div className="flex flex-row space-x-2">
+              <Link to="/workbench">
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
+                  <Layout className="w-4 h-4" />
+                  <span className="font-medium">Workbench</span>
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem asChild>
-                  <Link to="/workbench" className="flex items-center gap-2">
-                    <Layout className="w-4 h-4" />
-                    <span>Workbench</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/canvas" className="flex items-center gap-2">
-                    <GripHorizontal className="w-4 h-4" />
-                    <span>Canvas</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/knowledge-graph" className="flex items-center gap-2">
-                    <Network className="w-4 h-4" />
-                    <span>Knowledge Graph</span>
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </Link>
+              <Link to="/canvas">
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
+                  <GripHorizontal className="w-4 h-4" />
+                  <span className="font-medium">Canvas</span>
+                </Button>
+              </Link>
+              <Link to="/knowledge-graph">
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
+                  <Network className="w-4 h-4" />
+                  <span className="font-medium">Knowledge Graph</span>
+                </Button>
+              </Link>
+            </div>
             <Link to="/project-management">
               <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-3">
                 <Kanban className="w-4 h-4" />
@@ -331,34 +320,23 @@ export default function Home() {
 
           {/* Mobile Navigation */}
           <div className="sm:hidden flex items-center gap-1 mr-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Creative Suite">
-                  <Brain className="w-5 h-5" />
+            <div className="flex flex-row space-x-1">
+              <Link to="/canvas">
+                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Canvas">
+                  <GripHorizontal className="w-5 h-5" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem asChild>
-                  <Link to="/canvas" className="flex items-center gap-2">
-                    <GripHorizontal className="w-4 h-4" />
-                    <span>Canvas</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/knowledge-graph" className="flex items-center gap-2">
-                    <Network className="w-4 h-4" />
-                    <span>Knowledge Graph</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/workbench" className="flex items-center gap-2">
-                    <Layout className="w-4 h-4" />
-                    <span>Workbench</span>
-                  </Link>
-                </DropdownMenuItem>
-{/* Tutorials dropdown item hidden as requested */}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </Link>
+              <Link to="/knowledge-graph">
+                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Knowledge Graph">
+                  <Network className="w-5 h-5" />
+                </Button>
+              </Link>
+              <Link to="/workbench">
+                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" aria-label="Workbench">
+                  <Layout className="w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
             <Link to="/project-management">
               <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 relative" aria-label="Projects">
                 <Kanban className="w-5 h-5" />

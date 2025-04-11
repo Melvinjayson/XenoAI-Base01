@@ -8,7 +8,7 @@ export default function OnboardingPage() {
 
   const handleComplete = () => {
     localStorage.setItem('has-seen-onboarding', 'true');
-    setLocation('/chat');
+    setLocation('/'); // Navigate to home page instead of /chat
   };
 
   return (
