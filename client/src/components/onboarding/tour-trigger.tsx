@@ -8,6 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useTutorialStore } from '@/services/tutorial-service';
+import WelcomeTour from './welcome-tour';
+import FeatureTour from './feature-tour';
 
 interface TourTriggerProps {
   className?: string;
@@ -75,13 +77,20 @@ const TourTrigger: React.FC<TourTriggerProps> = ({
         </DropdownMenu>
       </div>
 
-      {/* We'll conditionally render the tour components when these are true */}
-      {/* These will be replaced with actual imports once we implement them */}
+      {/* Render the tour components when active */}
       {showWelcomeTour && (
-        <div className="welcome-tour-placeholder" style={{ display: 'none' }} />
+        <WelcomeTour 
+          onComplete={() => setShowWelcomeTour(false)} 
+          autoStart={true}
+          showSkip={true}
+        />
       )}
       {showFeatureTour && (
-        <div className="feature-tour-placeholder" style={{ display: 'none' }} />
+        <FeatureTour 
+          onComplete={() => setShowFeatureTour(false)} 
+          autoStart={true}
+          showSkip={true}
+        />
       )}
     </>
   );
