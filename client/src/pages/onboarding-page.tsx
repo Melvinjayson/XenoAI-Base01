@@ -1,14 +1,14 @@
 
 import { OnboardingCarousel } from "@/components/onboarding/onboarding-carousel";
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { useEffect } from 'react';
 
 export default function OnboardingPage() {
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
 
   const handleComplete = () => {
     localStorage.setItem('has-seen-onboarding', 'true');
-    navigate('/chat');
+    setLocation('/chat');
   };
 
   return (

@@ -1,17 +1,17 @@
 
 import { SplashScreen } from "@/components/splash/splash-screen";
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { useEffect, useState } from 'react';
 
 export default function SplashPage() {
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
   const [hasSeenOnboarding] = useState(() => localStorage.getItem('has-seen-onboarding'));
   
   const handleStart = () => {
     if (!hasSeenOnboarding) {
-      navigate('/onboarding');
+      setLocation('/onboarding');
     } else {
-      navigate('/chat');
+      setLocation('/chat');
     }
   };
   
