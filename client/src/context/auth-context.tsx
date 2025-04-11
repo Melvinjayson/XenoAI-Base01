@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: email.split("@")[0],
         email,
         role: "user",
-        settings: defaultUserSettings,
+        settings: { ...defaultUserSettings },
         createdAt: new Date().toISOString(),
       };
 
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name,
         email,
         role: "user",
-        settings: defaultUserSettings,
+        settings: { ...defaultUserSettings },
         createdAt: new Date().toISOString(),
       };
 
@@ -241,12 +241,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         settings: {
           ...user.settings,
           ...settings,
+          theme: (user.settings.theme || settings.theme || 'system') as "light" | "dark" | "system",
+          notifications: user.settings.notifications ?? settings.notifications ?? true,
+          defaultVoice: user.settings.defaultVoice || settings.defaultVoice || 'default',
+          enableAIFeatures: user.settings.enableAIFeatures ?? settings.enableAIFeatures ?? true,
+          apiKeyValid: user.settings.apiKeyValid ?? settings.apiKeyValid ?? false,
         },
       };
 
       // Save to localStorage
       localStorage.setItem("xenoUser", JSON.stringify(updatedUser));
-      setUser(updatedUser);
+      setUser(updatedUser as User);
       
       toast({
         title: "Settings updated",
@@ -338,6 +343,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         settings: {
           ...user.settings,
           apiKeyValid: isValid,
+          theme: (user.settings?.theme || 'system') as "light" | "dark" | "system",
+          notifications: user.settings?.notifications ?? true,
+          defaultVoice: user.settings?.defaultVoice || 'default',
+          enableAIFeatures: user.settings?.enableAIFeatures ?? true
         },
       };
 
@@ -364,6 +373,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           settings: {
             ...user.settings,
             apiKeyValid: false,
+            theme: (user.settings?.theme || 'system') as "light" | "dark" | "system",
+            notifications: user.settings?.notifications ?? true,
+            defaultVoice: user.settings?.defaultVoice || 'default',
+            enableAIFeatures: user.settings?.enableAIFeatures ?? true
           },
         };
         
