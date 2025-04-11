@@ -855,6 +855,9 @@ export function setupRoutes(app: Express, httpServer?: HTTPServer): WebSocketSer
       server: httpServer,
       path: '/ws' 
     });
+    
+    // Make WebSocket server globally accessible for status checking
+    global.wsServer = wss;
 
     // Handle WebSocket connections
     wss.on('connection', function connection(ws: WebSocket) {

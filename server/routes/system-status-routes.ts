@@ -84,6 +84,35 @@ router.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+/**
+ * @route GET /api/system-status/websocket
+ * @description Check WebSocket connection status
+ * @access Public
+ */
+router.get('/websocket', (_req, res) => {
+  // This is a simple check to determine if WebSockets are functioning
+  // In a production environment, you would check the actual WebSocket server status
+  
+  try {
+    // Check if we have active WebSocket connections in the global registry
+    const wsServer = global.wsServer;
+    const connected = wsServer && wsServer.clients && wsServer.clients.size > 0;
+    
+    res.json({
+      connected,
+      clientCount: wsServer ? wsServer.clients.size : 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    // If there's an error checking the WebSocket server, assume it's not working
+    res.json({
+      connected: false,
+      error: 'Could not determine WebSocket status',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Helper functions for status checks
 
 async function getAIModelsStatus() {
