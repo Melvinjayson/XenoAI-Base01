@@ -79,24 +79,24 @@ export function NetworkStatus({ wsState }: NetworkStatusProps) {
   return (
     <Alert
       variant={!isOnline ? "destructive" : wsState.hasError ? "destructive" : "default"}
-      className="fixed bottom-4 right-4 w-auto max-w-md z-50 animate-in fade-in slide-in-from-bottom duration-300"
+      className="fixed bottom-20 left-1/2 transform -translate-x-1/2 w-auto min-w-[300px] max-w-md z-[9999] shadow-lg animate-in fade-in slide-in-from-bottom duration-300"
     >
       <div className="flex flex-col space-y-2">
         <div className="flex items-start">
           {!isOnline ? (
-            <WifiOff className="h-4 w-4 mr-2 mt-1 flex-shrink-0" />
+            <WifiOff className="h-5 w-5 mr-2 mt-1 flex-shrink-0" />
           ) : (
-            <AlertCircle className="h-4 w-4 mr-2 mt-1 flex-shrink-0" />
+            <AlertCircle className="h-5 w-5 mr-2 mt-1 flex-shrink-0" />
           )}
           <div className="flex-1">
-            <AlertTitle>
+            <AlertTitle className="text-base font-bold">
               {!isOnline 
                 ? "Network Disconnected" 
                 : wsState.hasError 
                   ? "Connection Issue" 
                   : "Reconnected"}
             </AlertTitle>
-            <AlertDescription>
+            <AlertDescription className="text-sm mt-1">
               {!isOnline 
                 ? "You are currently offline. Some features may not work properly until your connection is restored."
                 : wsState.hasError 
@@ -107,15 +107,15 @@ export function NetworkStatus({ wsState }: NetworkStatusProps) {
         </div>
         
         {(wsState.hasError && isOnline) && (
-          <div className="flex justify-end">
+          <div className="flex justify-end mt-2">
             <Button 
-              variant="outline" 
+              variant="default" 
               size="sm" 
               onClick={handleRetryConnection}
               disabled={isRetrying}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 font-medium"
             >
-              <RefreshCw className={`h-3 w-3 ${isRetrying ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 mr-1 ${isRetrying ? 'animate-spin' : ''}`} />
               {isRetrying ? 'Retrying...' : 'Retry Connection'}
             </Button>
           </div>
