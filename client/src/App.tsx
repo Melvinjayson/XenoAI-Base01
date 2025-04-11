@@ -1,9 +1,10 @@
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Route, Switch } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import HomePage from "@/pages/home-page";
 import KnowledgeGraphPage from "@/pages/knowledge-graph";
 import EnhancedKnowledgeGraphPage from "@/pages/enhanced-knowledge-graph";
 import SplashPage from "@/pages/splash-page";
@@ -19,13 +20,12 @@ import FileTestPage from "@/pages/file-test-page";
 import VisualReasoningPage from "@/pages/visual-reasoning-page";
 import TestPage from "@/pages/test-page";
 import ChatPage from "@/pages/chat-page";
-import HomePage from "@/pages/home-page";
 import SystemStatusPage from "@/pages/system-status-page";
 import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
 import { GestureProvider } from "@/context/gesture-context";
-import { OfflineProvider, useOfflineContext } from "@/context/offline-context";
+import { OfflineProvider } from "@/context/offline-context";
 import { NotificationProvider } from "@/context/notification-context";
 import { WebSocketProvider } from "@/context/websocket-context";
 import { UserProfileProvider } from "@/context/user-profile-context";
@@ -35,8 +35,7 @@ import { KnowledgeGraphProvider } from "@/context/knowledge-graph-context";
 import { CompanionProvider, useCompanion } from "@/context/companion-context";
 import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
-import { FloatingCompanion } from "@/components/floating-companion";
-import { FloatingCharacter } from "@/components/ui/floating-character"; 
+import { FloatingCharacter } from "@/components/ui/floating-character";
 import { CompanionHelpDialog } from "@/components/companion-help-dialog";
 import { CompanionSettingsDialog } from "@/components/companion-settings-dialog";
 import ModelStatusWidget from "@/components/model-status-widget";
@@ -44,112 +43,62 @@ import OfflineModeBanner from "@/components/offline-mode-banner";
 import OfflineSettingsPanel from "@/components/offline-settings-panel";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
-import { WifiOff } from "lucide-react";
+import { useLocation } from 'wouter';
+
 
 function OfflineDialog() {
-  const { showOfflineSettings, closeOfflineSettings } = useOfflineContext();
-  
+  const [showOfflineSettings, setShowOfflineSettings] = useState(false);
+
   return (
-    <Dialog open={showOfflineSettings} onOpenChange={closeOfflineSettings}>
+    <Dialog open={showOfflineSettings} onOpenChange={() => setShowOfflineSettings(false)}>
       <DialogContent className="sm:max-w-md p-0">
-        <OfflineSettingsPanel onClose={closeOfflineSettings} />
+        <OfflineSettingsPanel onClose={() => setShowOfflineSettings(false)} />
       </DialogContent>
     </Dialog>
   );
 }
 
 function AppRoutes() {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
   const [showVoiceWidget, setShowVoiceWidget] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
   const [showGestureTutorial, setShowGestureTutorial] = useState(false);
   const { isOnline } = useOfflineContext();
 
   useEffect(() => {
-    if (initialLoad) {
-      setInitialLoad(false);
-      if (location.pathname === "/") {
-        navigate("/home");
-      }
-    }
-  }, [initialLoad, navigate]);
-
-  useEffect(() => {
-    const isMainPage = location.pathname === "/" || 
-                      location.pathname === "/knowledge-graph" || 
-                      location.pathname.startsWith("/canvas");
+    const isMainPage = location === "/" || 
+                      location === "/knowledge-graph" || 
+                      location.startsWith("/canvas");
     setShowVoiceWidget(isMainPage);
 
-    if (isMainPage && location.pathname === "/" && !showGestureTutorial) {
+    if (isMainPage && location === "/" && !showGestureTutorial) {
       const hasSeenTutorial = localStorage.getItem('gesture-tutorial-seen');
       if (!hasSeenTutorial) {
         setShowGestureTutorial(true);
         localStorage.setItem('gesture-tutorial-seen', 'true');
       }
     }
-  }, [location.pathname, showGestureTutorial]);
-  
+  }, [location, showGestureTutorial]);
+
   const handleTutorialComplete = () => {
     setShowGestureTutorial(false);
   };
-  
-  // Determine if we should show the offline banner
-  const showOfflineBanner = location.pathname !== "/splash" && location.pathname !== "/onboarding";
-  
-  return (
-    <>
-      <div className="pt-2">
-        {showOfflineBanner && <OfflineModeBanner />}
-        
-        <Routes>
-          <Route path="/splash" element={<SplashPage />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="/" element={<Home />} />
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/knowledge-graph" element={<KnowledgeGraphPage />} />
-          <Route path="/enhanced-knowledge-graph" element={<EnhancedKnowledgeGraphPage />} />
-          <Route path="/vr-experience" element={<VRExperience />} />
-          <Route path="/canvas" element={<CanvasPage />} />
-          <Route path="/canvas/:id" element={<CanvasPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/project-management" element={<ProjectManagementPage />} />
-          <Route path="/color-palette" element={<ColorPaletteGeneratorPage />} />
-          <Route path="/workbench" element={<EnhancedKnowledgeGraphPage />} />
-          <Route path="/visual-reasoning" element={<VisualReasoningPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/tutorials" element={<TutorialsPage />} />
-          <Route path="/file-test" element={<FileTestPage />} />
-          <Route path="/test" element={<TestPage />} />
-          <Route path="/system-status" element={<SystemStatusPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        
-        {/* Re-enable the voice widget */}
-        {showVoiceWidget && <FloatingVoiceWidget />}
-        {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
-        <OfflineDialog />
-        <CompanionWrapper />
-      </div>
-    </>
-  );
-}
 
-function CompanionWrapper() {
+  // Determine if we should show the offline banner
+  const showOfflineBanner = location !== "/splash" && location !== "/onboarding";
+
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const { isVisible } = useCompanion();
-  const location = useLocation();
   const navigate = useNavigate();
-  
+
+
   // Check if we should show help on first visit
   useEffect(() => {
     // Only show help on main pages, not splash or onboarding
-    const pathname = location.pathname;
+    const pathname = location;
     const isMainPage = pathname === "/" || pathname === "/knowledge-graph" || pathname.startsWith("/canvas");
     const hasSeenHelp = localStorage.getItem('companion-help-seen');
-    
+
     if (isMainPage && !hasSeenHelp) {
       // Small delay to ensure everything is loaded
       const timer = setTimeout(() => {
@@ -159,43 +108,70 @@ function CompanionWrapper() {
       return () => clearTimeout(timer);
     }
   }, [location]);
-  
+
   // Only show the companion on main pages
   const showCompanion = isVisible;
-  
+
   const handleAssistantClick = () => {
     // Navigate to home page to access the chat
     navigate("/");
   };
-  
+
   return (
     <>
-      {/* Enhanced Character-based Companion - this is the new feature */}
-      {showCompanion && (
-        <FloatingCharacter 
-          onAskHelp={() => setShowHelpDialog(true)}
-          onNavigateToPage={(page) => navigate(page)}
-          className="hidden md:block" // Only show on larger screens
+      <div className="pt-2">
+        {showOfflineBanner && <OfflineModeBanner />}
+
+        <Switch>
+          <Route path="/splash" component={SplashPage} />
+          <Route path="/onboarding" component={OnboardingPage} />
+          <Route path="/" component={Home} />
+          <Route path="/home" component={HomePage} />
+          <Route path="/chat" component={ChatPage} />
+          <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
+          <Route path="/enhanced-knowledge-graph" component={EnhancedKnowledgeGraphPage} />
+          <Route path="/vr-experience" component={VRExperience} />
+          <Route path="/canvas" component={CanvasPage} />
+          <Route path="/canvas/:id" component={CanvasPage} />
+          <Route path="/admin" component={AdminPage} />
+          <Route path="/project-management" component={ProjectManagementPage} />
+          <Route path="/color-palette" component={ColorPaletteGeneratorPage} />
+          <Route path="/workbench" component={EnhancedKnowledgeGraphPage} />
+          <Route path="/visual-reasoning" component={VisualReasoningPage} />
+          <Route path="/settings" component={SettingsPage} />
+          <Route path="/tutorials" component={TutorialsPage} />
+          <Route path="/file-test" component={FileTestPage} />
+          <Route path="/test" component={TestPage} />
+          <Route path="/system-status" component={SystemStatusPage} />
+          <Route component={NotFound} />
+        </Switch>
+
+        {showVoiceWidget && <FloatingVoiceWidget />}
+        {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
+        <OfflineDialog />
+        {showCompanion && (
+          <FloatingCharacter
+            onAskHelp={() => setShowHelpDialog(true)}
+            onNavigateToPage={(page) => navigate(page)}
+            className="hidden md:block" // Only show on larger screens
+          />
+        )}
+        <CompanionHelpDialog
+          open={showHelpDialog}
+          onOpenChange={setShowHelpDialog}
         />
-      )}
-      
-      <CompanionHelpDialog 
-        open={showHelpDialog} 
-        onOpenChange={setShowHelpDialog} 
-      />
-      
-      <CompanionSettingsDialog 
-        open={showSettingsDialog} 
-        onOpenChange={setShowSettingsDialog} 
-      />
+        <CompanionSettingsDialog
+          open={showSettingsDialog}
+          onOpenChange={setShowSettingsDialog}
+        />
+      </div>
     </>
   );
 }
 
 function App() {
   return (
-    <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <LanguageProvider>
           <UserProfileProvider>
@@ -223,7 +199,6 @@ function App() {
         </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
-    </BrowserRouter>
   );
 }
 
