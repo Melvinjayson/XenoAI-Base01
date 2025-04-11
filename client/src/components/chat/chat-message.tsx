@@ -119,12 +119,23 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             </div>
           </div>
 
-          <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full dark:text-slate-100 relative">
+          <div className={cn(
+              "bg-secondary rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] w-full dark:text-slate-100 relative",
+              message.isError && "bg-destructive/10 border border-destructive/30"
+            )}>
             {message.fallback && (
               <div className="mb-2 flex items-center gap-1">
-                <Badge variant="outline" className="text-xs py-0 px-1 border-amber-500 text-amber-600 gap-1 flex items-center">
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-xs py-0 px-1 gap-1 flex items-center",
+                    message.isError 
+                      ? "border-destructive text-destructive" 
+                      : "border-amber-500 text-amber-600"
+                  )}
+                >
                   <AlertCircle className="w-3 h-3" />
-                  Limited Mode
+                  {message.isError ? "Connection Issue" : "Limited Mode"}
                 </Badge>
                 <TooltipProvider>
                   <Tooltip>
@@ -135,8 +146,10 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
                       <p className="text-xs">
-                        Xeno AI is currently using limited capabilities due to API restrictions. 
-                        Some features like web search and detailed responses may be unavailable.
+                        {message.isError 
+                          ? "There was a problem connecting to the AI service. This could be due to network issues or server load. Try again in a moment."
+                          : "Xeno AI is currently using limited capabilities due to API restrictions. Some features like web search and detailed responses may be unavailable."
+                        }
                       </p>
                     </TooltipContent>
                   </Tooltip>

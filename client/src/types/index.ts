@@ -1,162 +1,130 @@
-export type AssetType = 'image' | 'chart' | 'table' | 'code';
+/**
+ * Type definitions for the Xeno AI application
+ */
 
-export type NodeType = 'query' | 'entity' | 'document' | 'concept' | 'insight' | 
-                      'person' | 'organization' | 'location' | 'time' | 'statistic' | 
-                      'feedback' | 'correction';
-
-export type EdgeType = 'search_result' | 'contains' | 'relates' | 'expansion' | 'search' | 
-                      'conversation' | 'related_to' | 'context_source' | 'affiliated_with' | 
-                      'conceptually_related' | 'includes' | 'located_near' | 'time_related' | 
-                      'expanded_by' | 'corrects' | 'enhances' | 'user_feedback' | 'ai_generated';
-
-export interface AssetData {
-  type: AssetType;
-  title?: string;
-  content: any; // The content varies by type
-}
-
-export interface MessageSource {
-  name: string;
-  url: string;
-  snippet?: string;
-  thumbnail?: string | null;
-  publishDate?: string | null;
-}
-
+// Chat Message Types
 export interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
-  sources?: MessageSource[] | {
-    name: string;
-    value: string;
-  }[];
-  assets?: AssetData[];
+  fallback?: boolean;
+  isError?: boolean;
+  isPending?: boolean;
+  sources?: any[];
+  assets?: any[];
   relatedQueries?: string[];
-  fallback?: boolean; // Indicates if this is a fallback response when API quota is exceeded
+  entities?: any[];
+  contextSources?: any[];
 }
 
+// Chat Context Types
+export interface ChatContextType {
+  messages: Message[];
+  isLoading: boolean;
+  sendMessage: (content: string, filters?: SearchFilters) => Promise<void>;
+  clearConversation: () => void;
+  addMessage: (message: { role: "user" | "assistant"; content: string }) => void;
+  analyzeConversationForCommands: () => Promise<{ hasSystemCommand: boolean; confidence: number }>;
+  executeSystemCommand: (command: string) => Promise<SystemCommandResult>;
+  createKnowledgeGraphFromConversation: () => Promise<{ graph: KnowledgeGraph; insights: any[]; query: string } | null>;
+  generateTaskList: () => Promise<TaskList>;
+  analyzeWorkbench: (files: File[]) => Promise<WorkbenchAnalysisResult>;
+}
+
+// Search Types
 export interface SearchResult {
   content: string;
-  sources: MessageSource[] | {
-    name: string;
-    value: string;
-  }[];
-  assets?: AssetData[];
-  relatedQueries?: string[];
-}
-
-export interface GraphNode {
-  id: string;
-  label: string;
-  type: NodeType;
-  description?: string;
-  score?: number;
-  createdAt: number;
-  color?: string;
-  size?: number;
-  data?: any;
-}
-
-export interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  label?: string;
-  type?: EdgeType;
-  weight?: number;
-  color?: string;
-  curvature?: number;
-}
-
-export interface KnowledgeGraph {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-}
-
-export interface GraphInsight {
-  id: string;
-  type: 'pattern' | 'cluster' | 'connection' | 'anomaly';
-  description: string;
-  relevance: number;
-  nodeIds: string[];
-  edgeIds: string[];
-  createdAt: number;
-  rationale?: string; // explanation for why this insight exists
-  confidence?: number; // confidence score (0-1)
-  history?: { // tracking changes over time for self-learning
-    previousRelevance?: number;
-    correctionCount?: number;
-    lastUpdated?: number;
-  };
+  sources: any[];
+  assets: any[];
+  relatedQueries: string[];
 }
 
 export interface SearchFilters {
-  timeRange?: string;
-  dateRange?: {
-    from: Date | undefined;
-    to: Date | undefined;
+  query?: string;
+  timeRange?: {
+    from?: Date;
+    to?: Date;
   };
+  contentTypes?: string[];
+  entities?: string[];
+  topics?: string[];
   sources?: string[];
-  contentType?: string[];
-  relevance?: number;
-  location?: string;
+  semanticQuery?: string;
+  excludeIds?: string[];
+  strictMatch?: boolean;
+  minRelevance?: number;
 }
 
-export type SystemCommandType = 'file_management' | 'project_creation' | 'knowledge_graph' | 'mind_map' | 'workbench' | 'other';
+// Knowledge Graph Types
+export interface KnowledgeNode {
+  id: string;
+  label: string;
+  type: string;
+  properties?: Record<string, any>;
+  confidence: number;
+  source?: string;
+}
 
+export interface KnowledgeEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  properties?: Record<string, any>;
+  confidence: number;
+}
+
+export interface KnowledgeGraph {
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
+  metadata?: Record<string, any>;
+}
+
+// Command System Types
 export interface SystemCommandResult {
   success: boolean;
   output: string;
   command: string;
-  commandType: SystemCommandType;
+  commandType: 'search' | 'system' | 'analysis' | 'file' | 'other' | 'file_management' | 'project_creation' | 'knowledge_graph' | 'mind_map' | 'workbench';
+  data?: any;
 }
 
+// Workbench Analysis Types
 export interface WorkbenchAnalysisResult {
-  activeProjects: number;
-  fileCount: number;
-  knowledgeGraphs: number;
-  mindMaps: number;
-  recentActivities: string[];
-  suggestedActions: string[];
-  focusAreas: string[];
+  summary: string;
+  codeInsights: {
+    type: string;
+    content: string;
+    priority: 'high' | 'medium' | 'low';
+    location?: string;
+  }[];
+  dependencies: string[];
+  mainComponents: {
+    name: string;
+    description: string;
+    dependencies: string[];
+  }[];
+  suggestions: {
+    type: 'refactor' | 'feature' | 'bug' | 'improvement';
+    description: string;
+    priority: 'high' | 'medium' | 'low';
+  }[];
 }
 
-export interface TaskItem {
+// Task Management Types
+export interface Task {
+  id: string;
   title: string;
   description: string;
   priority: 'high' | 'medium' | 'low';
-  estimatedHours?: number;
+  status: 'todo' | 'in_progress' | 'complete';
+  dueDate?: string;
+  tags?: string[];
 }
 
 export interface TaskList {
   title: string;
   description: string;
-  tasks: TaskItem[];
-}
-
-export interface ChatContextType {
-  messages: Message[];
-  isLoading: boolean;
-  sendMessage: (message: string, filters?: SearchFilters) => Promise<void>;
-  addMessage: (message: { role: "user" | "assistant", content: string }) => void;
-  clearConversation: () => void;
-  createKnowledgeGraphFromConversation: () => Promise<{
-    graph: KnowledgeGraph;
-    insights: GraphInsight[];
-    query: string;
-  } | null>;
-  analyzeConversationForCommands: () => Promise<{
-    hasSystemCommand: boolean;
-    command?: string;
-    action?: string;
-    target?: string;
-    parameters?: Record<string, any>;
-    confidence: number;
-  }>;
-  executeSystemCommand: (command: string) => Promise<SystemCommandResult>;
-  generateTaskList: () => Promise<TaskList>;
-  analyzeWorkbench: () => Promise<WorkbenchAnalysisResult>;
-  lastSearchResult: SearchResult | null;
+  tasks: Task[];
 }
