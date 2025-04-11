@@ -83,10 +83,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           content: "I'm having trouble connecting to the server. Please try again in a moment.",
           timestamp: Date.now(),
           fallback: true,
+          isError: true, // Mark as error for styling
         };
         setMessages((prev) => [...prev, timeoutMessage]);
       }
-    }, 15000); // 15 second timeout
+    }, 20000); // Increased to 20 seconds for better reliability
 
     try {
       // Prepare request parameters
