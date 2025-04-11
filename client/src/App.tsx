@@ -9,6 +9,9 @@ import KnowledgeGraphPage from "@/pages/knowledge-graph";
 import EnhancedKnowledgeGraphPage from "@/pages/enhanced-knowledge-graph";
 import SplashPage from "@/pages/splash-page";
 import OnboardingPage from "@/pages/onboarding-page";
+import LoginPage from "@/pages/login-page";
+import RegisterPage from "@/pages/register-page";
+import ApiKeyPage from "@/pages/api-key-page";
 import VRExperience from "@/pages/vr-experience";
 import CanvasPage from "@/pages/canvas-page";
 import AdminPage from "@/pages/admin-page";
@@ -33,6 +36,7 @@ import { ColorPaletteProvider } from "@/context/color-palette-context";
 import { MindMapProvider } from "@/context/mind-map-context";
 import { KnowledgeGraphProvider } from "@/context/knowledge-graph-context";
 import { CompanionProvider, useCompanion } from "@/context/companion-context";
+import { AuthProvider, useAuth } from "@/context/auth-context";
 import { GestureTutorial } from "@/components/ui/gesture-indicator";
 import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
 import { FloatingCharacter } from "@/components/ui/floating-character";
@@ -135,6 +139,9 @@ function AppRoutes() {
         <Switch>
           <Route path="/splash" component={SplashPage} />
           <Route path="/onboarding" component={OnboardingPage} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/register" component={RegisterPage} />
+          <Route path="/api-key" component={ApiKeyPage} />
           <Route path="/" component={Home} />
           <Route path="/home" component={HomePage} />
           <Route path="/chat" component={ChatPage} />
@@ -184,30 +191,32 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <LanguageProvider>
-          <UserProfileProvider>
-            <ColorPaletteProvider>
-              <ChatProvider>
-                <WebSocketProvider>
-                  <MindMapProvider>
-                    <KnowledgeGraphProvider>
-                      <NotificationProvider>
-                        <GestureProvider>
-                          <OfflineProvider>
-                            <CompanionProvider>
-                              <Router>
-                                <AppRoutes />
-                                <Toaster />
-                              </Router>
-                            </CompanionProvider>
-                          </OfflineProvider>
-                        </GestureProvider>
-                      </NotificationProvider>
-                    </KnowledgeGraphProvider>
-                  </MindMapProvider>
-                </WebSocketProvider>
-              </ChatProvider>
-            </ColorPaletteProvider>
-          </UserProfileProvider>
+          <AuthProvider>
+            <UserProfileProvider>
+              <ColorPaletteProvider>
+                <ChatProvider>
+                  <WebSocketProvider>
+                    <MindMapProvider>
+                      <KnowledgeGraphProvider>
+                        <NotificationProvider>
+                          <GestureProvider>
+                            <OfflineProvider>
+                              <CompanionProvider>
+                                <Router>
+                                  <AppRoutes />
+                                  <Toaster />
+                                </Router>
+                              </CompanionProvider>
+                            </OfflineProvider>
+                          </GestureProvider>
+                        </NotificationProvider>
+                      </KnowledgeGraphProvider>
+                    </MindMapProvider>
+                  </WebSocketProvider>
+                </ChatProvider>
+              </ColorPaletteProvider>
+            </UserProfileProvider>
+          </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
