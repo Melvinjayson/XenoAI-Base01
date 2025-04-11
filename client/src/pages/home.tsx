@@ -13,7 +13,7 @@ import { Message } from "@/types";
 import { Button } from "@/components/ui/button";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { useTheme } from "@/context/theme-context";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "wouter";
 import { SearchFilters } from "@/types";
 import { useGestureArea } from "@/context/gesture-context";
 import { GestureHandlers } from "@/hooks/use-gestures";
@@ -51,7 +51,7 @@ export default function Home() {
   const [showGestureIndicator, setShowGestureIndicator] = useState<string | null>(null);
   const { messages, isLoading, sendMessage, clearConversation } = useChat();
   const { isDarkMode } = useTheme();
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
 
   const { 
     isListening, 
@@ -180,7 +180,7 @@ export default function Home() {
 
   // Handle gesture swipe actions
   const handleSwipeLeft = () => {
-    navigate('/knowledge-graph');
+    setLocation('/knowledge-graph');
     setShowGestureIndicator('right');
     setTimeout(() => setShowGestureIndicator(null), 1500);
   };

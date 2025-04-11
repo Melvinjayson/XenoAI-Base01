@@ -2,10 +2,10 @@ import React from 'react';
 import { SystemStatus } from '@/components/system-status';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 
 export default function SystemStatusPage() {
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
   const [refreshKey, setRefreshKey] = React.useState(0);
 
   const handleRefresh = () => {
@@ -19,7 +19,7 @@ export default function SystemStatusPage() {
           <Button 
             variant="outline" 
             size="icon" 
-            onClick={() => navigate(-1)}
+            onClick={() => history.back()}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>

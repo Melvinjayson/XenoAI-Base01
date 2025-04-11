@@ -1,4 +1,4 @@
-import { Route, Switch } from "wouter";
+import { Route, Switch, Router, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -25,7 +25,7 @@ import { ChatProvider } from "@/context/chat-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
 import { GestureProvider } from "@/context/gesture-context";
-import { OfflineProvider } from "@/context/offline-context";
+import { OfflineProvider, useOfflineContext } from "@/context/offline-context";
 import { NotificationProvider } from "@/context/notification-context";
 import { WebSocketProvider } from "@/context/websocket-context";
 import { UserProfileProvider } from "@/context/user-profile-context";
@@ -43,7 +43,6 @@ import OfflineModeBanner from "@/components/offline-mode-banner";
 import OfflineSettingsPanel from "@/components/offline-settings-panel";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
-import { useLocation } from 'wouter';
 
 
 function OfflineDialog() {
@@ -89,7 +88,6 @@ function AppRoutes() {
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const { isVisible } = useCompanion();
-  const navigate = useNavigate();
 
 
   // Check if we should show help on first visit
@@ -114,7 +112,7 @@ function AppRoutes() {
 
   const handleAssistantClick = () => {
     // Navigate to home page to access the chat
-    navigate("/");
+    setLocation("/");
   };
 
   return (
@@ -152,7 +150,7 @@ function AppRoutes() {
         {showCompanion && (
           <FloatingCharacter
             onAskHelp={() => setShowHelpDialog(true)}
-            onNavigateToPage={(page) => navigate(page)}
+            onNavigateToPage={(page) => setLocation(page)}
             className="hidden md:block" // Only show on larger screens
           />
         )}
@@ -184,8 +182,10 @@ function App() {
                         <GestureProvider>
                           <OfflineProvider>
                             <CompanionProvider>
-                              <AppRoutes />
-                              <Toaster />
+                              <Router>
+                                <AppRoutes />
+                                <Toaster />
+                              </Router>
                             </CompanionProvider>
                           </OfflineProvider>
                         </GestureProvider>

@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCompanion } from '@/context/companion-context';
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 
 interface FloatingCompanionProps {
   className?: string;
@@ -35,17 +35,17 @@ export function FloatingCompanion({
   onSettings,
   onAssistant
 }: FloatingCompanionProps) {
-  const { characterStyle } = useCompanion();
+  const { character } = useCompanion();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [animationState, setAnimationState] = useState<'idle' | 'thinking' | 'speaking'>('idle');
-  const navigate = useNavigate();
-  const location = window.location.pathname;
+  const [location, setLocation] = useLocation();
+  const pathname = window.location.pathname;
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
 
   // Check if we should hide the companion
-  const isHiddenPage = location === '/' || location.includes('splash');
+  const isHiddenPage = pathname === '/' || pathname.includes('splash');
   if (isHiddenPage) return null;
 
   // Drag handlers
@@ -212,9 +212,9 @@ export function FloatingCompanion({
             animationState === 'thinking' && "animate-pulse",
             animationState === 'speaking' && "animate-bounce"
           )}>
-            {characterStyle === 0 && <Bot size={isMinimized ? 20 : 28} />}
-            {characterStyle === 1 && <Brain size={isMinimized ? 20 : 28} />}
-            {characterStyle === 2 && <Sparkles size={isMinimized ? 20 : 28} />}
+            {character === 'assistant' && <Bot size={isMinimized ? 20 : 28} />}
+            {character === 'scientist' && <Brain size={isMinimized ? 20 : 28} />}
+            {character === 'mentor' && <Sparkles size={isMinimized ? 20 : 28} />}
           </div>
         </button>
 

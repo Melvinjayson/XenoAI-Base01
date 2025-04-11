@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Settings, Info, Zap, Volume2, Palette, Server } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { 
   Tabs, 
   TabsContent, 
@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function SettingsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('models');
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
 
   return (
     <div className="container py-10">
@@ -196,7 +196,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground">Monitor the health of all system components</p>
                   </div>
                   <Button 
-                    onClick={() => navigate('/system-status')}
+                    onClick={() => setLocation('/system-status')}
                     variant="outline"
                     size="sm"
                     className="flex items-center gap-2"
