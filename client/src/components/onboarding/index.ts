@@ -1,4 +1,11 @@
-export { default as WelcomeTour } from './welcome-tour';
-export { default as FeatureTour } from './feature-tour';
-export { default as OnboardingProvider } from './onboarding-provider';
-export { default as TourTrigger } from './tour-trigger';
+import WelcomeTour from './welcome-tour';
+import FeatureTour from './feature-tour';
+import TourTrigger from './tour-trigger';
+import OnboardingProvider from './onboarding-provider';
+
+export { 
+  WelcomeTour,
+  FeatureTour,
+  TourTrigger,
+  OnboardingProvider
+};

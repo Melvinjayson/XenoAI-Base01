@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Settings, Info, Zap, Volume2, Palette, Server } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Info, Zap, Volume2, Palette, Server, User } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { 
   Tabs, 
@@ -16,13 +16,24 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-//import ModelStatusWidget from '@/components/model-status-widget'; // Removed since ModelStatusWidget is no longer used.
+import { AccountSettings } from '@/components/auth';
+import { ApiKeySetup } from '@/components/auth';
+import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('models');
   const [location, setLocation] = useLocation();
+
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    // Set account tab as default if authenticated
+    if (isAuthenticated && activeTab === 'models') {
+      setActiveTab('account');
+    }
+  }, [isAuthenticated]);
 
   return (
     <div className="container py-10">
@@ -37,12 +48,17 @@ export default function SettingsPage() {
       </header>
 
       <Tabs
-        defaultValue="models"
+        defaultValue={isAuthenticated ? 'account' : 'models'}
         value={activeTab}
         onValueChange={setActiveTab}
         className="space-y-4"
       >
-        <TabsList className="grid grid-cols-5 h-auto p-1 md:w-[700px] w-full">
+        <TabsList className="grid grid-cols-6 h-auto p-1 md:w-[800px] w-full">
+          <TabsTrigger value="account" className="flex items-center">
+            <User className="mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Account</span>
+            <span className="sm:hidden">User</span>
+          </TabsTrigger>
           <TabsTrigger value="models" className="flex items-center">
             <Zap className="mr-2 h-4 w-4" />
             <span className="hidden sm:inline">Models</span>
@@ -69,6 +85,18 @@ export default function SettingsPage() {
             <span className="sm:hidden">Info</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="account" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4 md:col-span-1">
+              <AccountSettings />
+            </div>
+            
+            <div className="space-y-4 md:col-span-1">
+              <ApiKeySetup />
+            </div>
+          </div>
+        </TabsContent>
 
         <TabsContent value="models" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

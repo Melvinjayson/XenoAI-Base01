@@ -239,13 +239,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updatedUser = {
         ...user,
         settings: {
-          ...user.settings,
+          // Start with default settings, then apply existing settings, then apply new settings
+          ...defaultUserSettings,
+          ...(user.settings || {}),
           ...settings,
-          theme: (user.settings.theme || settings.theme || 'system') as "light" | "dark" | "system",
-          notifications: user.settings.notifications ?? settings.notifications ?? true,
-          defaultVoice: user.settings.defaultVoice || settings.defaultVoice || 'default',
-          enableAIFeatures: user.settings.enableAIFeatures ?? settings.enableAIFeatures ?? true,
-          apiKeyValid: user.settings.apiKeyValid ?? settings.apiKeyValid ?? false,
         },
       };
 
@@ -341,12 +338,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updatedUser = {
         ...user,
         settings: {
-          ...user.settings,
+          ...defaultUserSettings,
+          ...(user.settings || {}),
           apiKeyValid: isValid,
-          theme: (user.settings?.theme || 'system') as "light" | "dark" | "system",
-          notifications: user.settings?.notifications ?? true,
-          defaultVoice: user.settings?.defaultVoice || 'default',
-          enableAIFeatures: user.settings?.enableAIFeatures ?? true
         },
       };
 
@@ -371,12 +365,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const updatedUser = {
           ...user,
           settings: {
-            ...user.settings,
+            ...defaultUserSettings,
+            ...(user.settings || {}),
             apiKeyValid: false,
-            theme: (user.settings?.theme || 'system') as "light" | "dark" | "system",
-            notifications: user.settings?.notifications ?? true,
-            defaultVoice: user.settings?.defaultVoice || 'default',
-            enableAIFeatures: user.settings?.enableAIFeatures ?? true
           },
         };
         
