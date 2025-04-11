@@ -2,7 +2,24 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Loader2, CheckCircle, AlertCircle, XCircle, HelpCircle, RefreshCw, Signal, Wifi, WifiOff } from 'lucide-react';
+import { 
+  Loader2, 
+  CheckCircle, 
+  AlertCircle, 
+  XCircle, 
+  HelpCircle, 
+  RefreshCw, 
+  Signal, 
+  Wifi, 
+  WifiOff,
+  Activity,
+  Database,
+  BrainCircuit,
+  Globe,
+  ShieldCheck,
+  Zap,
+  Server
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
@@ -42,6 +59,36 @@ const getStatusIcon = (status: string) => {
       return <XCircle className="h-4 w-4 text-red-500" />;
     default:
       return <HelpCircle className="h-4 w-4 text-gray-500" />;
+  }
+};
+
+const getComponentIcon = (componentKey: string, status: string) => {
+  const colorClass = status.toLowerCase() === 'operational' 
+    ? 'text-green-500' 
+    : status.toLowerCase() === 'degraded' 
+      ? 'text-yellow-500' 
+      : status.toLowerCase() === 'outage' 
+        ? 'text-red-500' 
+        : 'text-gray-500';
+  
+  // Get custom icon based on component type
+  switch (componentKey) {
+    case 'ai_models':
+      return <BrainCircuit className={`h-4 w-4 ${colorClass}`} />;
+    case 'data_acquisition':
+      return <Database className={`h-4 w-4 ${colorClass}`} />;
+    case 'knowledge_graph':
+      return <Activity className={`h-4 w-4 ${colorClass}`} />;
+    case 'meta_learning':
+      return <Zap className={`h-4 w-4 ${colorClass}`} />;
+    case 'security':
+      return <ShieldCheck className={`h-4 w-4 ${colorClass}`} />;
+    case 'websocket':
+      return <Wifi className={`h-4 w-4 ${colorClass}`} />;
+    case 'cross_domain':
+      return <Globe className={`h-4 w-4 ${colorClass}`} />;
+    default:
+      return <Server className={`h-4 w-4 ${colorClass}`} />;
   }
 };
 
@@ -239,6 +286,35 @@ export function SystemStatus() {
         
         <Separator className="my-4" />
         
+        {/* Summary Statistics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-muted rounded-lg p-3 shadow-sm">
+            <div className="text-xs text-muted-foreground">Components</div>
+            <div className="text-2xl font-semibold">{Object.keys(statusData.components).length}</div>
+          </div>
+          
+          <div className="bg-muted rounded-lg p-3 shadow-sm">
+            <div className="text-xs text-muted-foreground">Operational</div>
+            <div className="text-2xl font-semibold text-green-500">
+              {Object.values(statusData.components).filter(c => c.status === 'operational').length}
+            </div>
+          </div>
+          
+          <div className="bg-muted rounded-lg p-3 shadow-sm">
+            <div className="text-xs text-muted-foreground">Degraded</div>
+            <div className="text-2xl font-semibold text-yellow-500">
+              {Object.values(statusData.components).filter(c => c.status === 'degraded').length}
+            </div>
+          </div>
+          
+          <div className="bg-muted rounded-lg p-3 shadow-sm">
+            <div className="text-xs text-muted-foreground">Outages</div>
+            <div className="text-2xl font-semibold text-red-500">
+              {Object.values(statusData.components).filter(c => c.status === 'outage').length}
+            </div>
+          </div>
+        </div>
+        
         {/* Component Status Accordion */}
         <h3 className="text-sm font-medium mb-4">Component Status</h3>
         <Accordion type="single" collapsible className="w-full">
@@ -246,7 +322,7 @@ export function SystemStatus() {
             <AccordionItem key={key} value={key}>
               <AccordionTrigger className="flex items-center gap-2">
                 <span className="flex items-center gap-2">
-                  {getStatusIcon(data.status)}
+                  {getComponentIcon(key, data.status)}
                   <span className="capitalize">{key.replace(/_/g, ' ')}</span>
                 </span>
                 <Badge className={`ml-auto mr-4 ${getStatusColor(data.status)}`}>
