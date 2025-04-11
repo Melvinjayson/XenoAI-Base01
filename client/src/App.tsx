@@ -30,7 +30,7 @@ import { LanguageProvider } from "@/context/language-context";
 import { GestureProvider } from "@/context/gesture-context";
 import { OfflineProvider, useOfflineContext } from "@/context/offline-context";
 import { NotificationProvider } from "@/context/notification-context";
-import { WebSocketProvider } from "@/context/websocket-context";
+import { WebSocketProvider, useWebSocket } from "@/context/websocket-context";
 import { UserProfileProvider } from "@/context/user-profile-context";
 import { ColorPaletteProvider } from "@/context/color-palette-context";
 import { MindMapProvider } from "@/context/mind-map-context";
@@ -45,6 +45,7 @@ import { CompanionSettingsDialog } from "@/components/companion-settings-dialog"
 import ModelStatusWidget from "@/components/model-status-widget";
 import OfflineModeBanner from "@/components/offline-mode-banner";
 import OfflineSettingsPanel from "@/components/offline-settings-panel";
+import { NetworkStatus } from "@/components/network-status";
 import { OnboardingProvider, TourTrigger } from "@/components/onboarding";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
@@ -67,6 +68,7 @@ function AppRoutes() {
   const [showVoiceWidget, setShowVoiceWidget] = useState(false);
   const [showGestureTutorial, setShowGestureTutorial] = useState(false);
   const { isOnline } = useOfflineContext();
+  const webSocketState = useWebSocket();
   
   // Check if this is the first visit and redirect to splash page
   useEffect(() => {
@@ -183,6 +185,14 @@ function AppRoutes() {
             open={showSettingsDialog}
             onOpenChange={setShowSettingsDialog}
           />
+          
+          {/* Network Status Indicator */}
+          {location !== "/splash" && 
+           location !== "/onboarding" && 
+           location !== "/login" && 
+           location !== "/register" && (
+            <NetworkStatus wsState={webSocketState} />
+          )}
           
           {/* Help & Tutorial Access Button */}
           {location !== "/splash" && 
