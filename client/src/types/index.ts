@@ -29,7 +29,8 @@ export interface ChatContextType {
   executeSystemCommand: (command: string) => Promise<SystemCommandResult>;
   createKnowledgeGraphFromConversation: () => Promise<{ graph: KnowledgeGraph; insights: any[]; query: string } | null>;
   generateTaskList: () => Promise<TaskList>;
-  analyzeWorkbench: (files: File[]) => Promise<WorkbenchAnalysisResult>;
+  analyzeWorkbench: (files?: File[]) => Promise<WorkbenchAnalysisResult>;
+  lastSearchResult?: SearchResult | null;
 }
 
 // Search Types

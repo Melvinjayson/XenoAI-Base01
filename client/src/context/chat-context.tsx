@@ -227,15 +227,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      // Add a fallback assistant message to the chat
+      // Add a fallback assistant message to the chat with error styling
       const fallbackMessage: Message = {
         id: `assistant-fallback-${Date.now()}`,
         role: "assistant",
         content: errorType === "api_limit" 
           ? "I'm having trouble connecting to my AI services due to resource limits. I can still help with basic tasks and local features."
-          : "I couldn't process your request. Please try again or try a simpler question.",
+          : errorType === "timeout"
+            ? "The connection to the server timed out. This might be due to network issues or high server load. Please try again in a moment."
+            : "I couldn't process your request. Please try again or try a simpler question.",
         timestamp: Date.now(),
         fallback: true,
+        isError: true, // Mark as error for improved styling
       };
       
       setMessages((prev) => [...prev, fallbackMessage]);
@@ -478,9 +481,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           description: "Please have a conversation first to generate tasks.",
           tasks: [
             {
+              id: "starter-task-1",
               title: "Start a conversation",
               description: "Chat with the AI about your project or research topic",
-              priority: 'high'
+              priority: 'high',
+              status: 'todo'
             }
           ]
         };
@@ -513,19 +518,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         description: "A basic project structure to get you started",
         tasks: [
           {
+            id: "default-task-1",
             title: "Define project scope",
             description: "Outline the goals and boundaries of your project",
-            priority: 'high'
+            priority: 'high',
+            status: 'todo'
           },
           {
+            id: "default-task-2",
             title: "Research topic",
             description: "Gather preliminary information about the subject",
-            priority: 'medium'
+            priority: 'medium',
+            status: 'todo'
           },
           {
+            id: "default-task-3",
             title: "Create project structure",
             description: "Organize your research materials and plan",
-            priority: 'medium'
+            priority: 'medium',
+            status: 'todo'
           }
         ]
       };
@@ -547,17 +558,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       
       // Return a default analysis
       return {
-        activeProjects: 0,
-        fileCount: 0,
-        knowledgeGraphs: 0,
-        mindMaps: 0,
-        recentActivities: ["Starting your research journey"],
-        suggestedActions: [
-          "Create your first research project",
-          "Build a knowledge graph from a conversation",
-          "Explore topics with a mind map"
-        ],
-        focusAreas: ["Research organization"]
+        summary: "No workbench data available yet",
+        codeInsights: [],
+        dependencies: [],
+        mainComponents: [],
+        suggestions: [
+          {
+            type: 'feature',
+            description: "Create your first research project",
+            priority: 'high'
+          },
+          {
+            type: 'feature',
+            description: "Build a knowledge graph from a conversation",
+            priority: 'medium'
+          },
+          {
+            type: 'improvement',
+            description: "Explore topics with a mind map",
+            priority: 'medium'
+          }
+        ]
       };
     }
   };
