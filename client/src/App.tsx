@@ -45,6 +45,7 @@ import { CompanionSettingsDialog } from "@/components/companion-settings-dialog"
 import ModelStatusWidget from "@/components/model-status-widget";
 import OfflineModeBanner from "@/components/offline-mode-banner";
 import OfflineSettingsPanel from "@/components/offline-settings-panel";
+import { OnboardingProvider, TourTrigger } from "@/components/onboarding";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
 
@@ -133,55 +134,65 @@ function AppRoutes() {
 
   return (
     <>
-      <div className="pt-2">
-        {showOfflineBanner && <OfflineModeBanner />}
+      <OnboardingProvider>
+        <div className="pt-2">
+          {showOfflineBanner && <OfflineModeBanner />}
 
-        <Switch>
-          <Route path="/splash" component={SplashPage} />
-          <Route path="/onboarding" component={OnboardingPage} />
-          <Route path="/login" component={LoginPage} />
-          <Route path="/register" component={RegisterPage} />
-          <Route path="/api-key" component={ApiKeyPage} />
-          <Route path="/" component={Home} />
-          <Route path="/home" component={HomePage} />
-          <Route path="/chat" component={ChatPage} />
-          <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
-          <Route path="/enhanced-knowledge-graph" component={EnhancedKnowledgeGraphPage} />
-          <Route path="/vr-experience" component={VRExperience} />
-          <Route path="/canvas" component={CanvasPage} />
-          <Route path="/canvas/:id" component={CanvasPage} />
-          <Route path="/admin" component={AdminPage} />
-          <Route path="/project-management" component={ProjectManagementPage} />
-          <Route path="/color-palette" component={ColorPaletteGeneratorPage} />
-          <Route path="/workbench" component={EnhancedKnowledgeGraphPage} />
-          <Route path="/visual-reasoning" component={VisualReasoningPage} />
-          <Route path="/settings" component={SettingsPage} />
-          <Route path="/tutorials" component={TutorialsPage} />
-          <Route path="/file-test" component={FileTestPage} />
-          <Route path="/test" component={TestPage} />
-          <Route path="/system-status" component={SystemStatusPage} />
-          <Route component={NotFound} />
-        </Switch>
+          <Switch>
+            <Route path="/splash" component={SplashPage} />
+            <Route path="/onboarding" component={OnboardingPage} />
+            <Route path="/login" component={LoginPage} />
+            <Route path="/register" component={RegisterPage} />
+            <Route path="/api-key" component={ApiKeyPage} />
+            <Route path="/" component={Home} />
+            <Route path="/home" component={HomePage} />
+            <Route path="/chat" component={ChatPage} />
+            <Route path="/knowledge-graph" component={KnowledgeGraphPage} />
+            <Route path="/enhanced-knowledge-graph" component={EnhancedKnowledgeGraphPage} />
+            <Route path="/vr-experience" component={VRExperience} />
+            <Route path="/canvas" component={CanvasPage} />
+            <Route path="/canvas/:id" component={CanvasPage} />
+            <Route path="/admin" component={AdminPage} />
+            <Route path="/project-management" component={ProjectManagementPage} />
+            <Route path="/color-palette" component={ColorPaletteGeneratorPage} />
+            <Route path="/workbench" component={EnhancedKnowledgeGraphPage} />
+            <Route path="/visual-reasoning" component={VisualReasoningPage} />
+            <Route path="/settings" component={SettingsPage} />
+            <Route path="/tutorials" component={TutorialsPage} />
+            <Route path="/file-test" component={FileTestPage} />
+            <Route path="/test" component={TestPage} />
+            <Route path="/system-status" component={SystemStatusPage} />
+            <Route component={NotFound} />
+          </Switch>
 
-        {showVoiceWidget && <FloatingVoiceWidget />}
-        {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
-        <OfflineDialog />
-        {showCompanion && (
-          <FloatingCharacter
-            onAskHelp={() => setShowHelpDialog(true)}
-            onNavigateToPage={(page) => setLocation(page)}
-            className="hidden md:block" // Only show on larger screens
+          {showVoiceWidget && <FloatingVoiceWidget />}
+          {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
+          <OfflineDialog />
+          {showCompanion && (
+            <FloatingCharacter
+              onAskHelp={() => setShowHelpDialog(true)}
+              onNavigateToPage={(page) => setLocation(page)}
+              className="hidden md:block" // Only show on larger screens
+            />
+          )}
+          <CompanionHelpDialog
+            open={showHelpDialog}
+            onOpenChange={setShowHelpDialog}
           />
-        )}
-        <CompanionHelpDialog
-          open={showHelpDialog}
-          onOpenChange={setShowHelpDialog}
-        />
-        <CompanionSettingsDialog
-          open={showSettingsDialog}
-          onOpenChange={setShowSettingsDialog}
-        />
-      </div>
+          <CompanionSettingsDialog
+            open={showSettingsDialog}
+            onOpenChange={setShowSettingsDialog}
+          />
+          
+          {/* Help & Tutorial Access Button */}
+          {location !== "/splash" && 
+           location !== "/onboarding" && 
+           location !== "/login" && 
+           location !== "/register" && (
+            <TourTrigger position="bottom-right" showTooltip={true} />
+          )}
+        </div>
+      </OnboardingProvider>
     </>
   );
 }
