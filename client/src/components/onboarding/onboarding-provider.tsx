@@ -1,92 +1,90 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { useTutorialStore, voiceTutorials } from '@/services/tutorial-service';
+import { useTutorialStore } from '@/services/tutorial-service';
 import WelcomeTour from './welcome-tour';
 import FeatureTour from './feature-tour';
 
 interface OnboardingProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
+  autoStartWelcomeTour?: boolean;
+  autoStartFeatureTour?: boolean;
 }
 
-/**
- * OnboardingProvider manages the display of onboarding tutorials and feature tours
- * based on user actions and state. It decides when to show tutorials and handles
- * the progression through different tutorials.
- */
-const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children }) => {
+const OnboardingProvider: React.FC<OnboardingProviderProps> = ({
+  children,
+  autoStartWelcomeTour = true,
+  autoStartFeatureTour = false,
+}) => {
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
-  const [currentFeatureTour, setCurrentFeatureTour] = useState<string | null>(null);
-  
-  const { user, isAuthenticated } = useAuth();
-  const { 
-    completedTutorials,
-    activeTutorialId, 
-    hasCompletedTutorial, 
-    startTutorial 
-  } = useTutorialStore();
+  const [showFeatureTour, setShowFeatureTour] = useState(false);
+  const { user } = useAuth();
+  const { completedTutorials } = useTutorialStore();
 
-  // Detect new user and show welcome tour
+  // Check if user is new and should see welcome tour
   useEffect(() => {
-    if (isAuthenticated && user) {
-      // Check if this appears to be a first-time user
-      const isNewUser = !hasCompletedTutorial('welcome-tour');
-      
-      if (isNewUser) {
-        // Delay the welcome tour slightly to allow the UI to settle
-        const timer = setTimeout(() => {
-          setShowWelcomeTour(true);
-        }, 1500);
-        
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [isAuthenticated, user, hasCompletedTutorial]);
+    if (user && autoStartWelcomeTour && !completedTutorials.includes('welcome-tour')) {
+      // Delay showing the welcome tour to ensure UI is fully loaded
+      const timer = setTimeout(() => {
+        setShowWelcomeTour(true);
+      }, 1000);
 
-  // Track active tutorials
-  useEffect(() => {
-    if (activeTutorialId) {
-      setCurrentFeatureTour(activeTutorialId);
-    } else {
-      setCurrentFeatureTour(null);
+      return () => clearTimeout(timer);
     }
-  }, [activeTutorialId]);
+  }, [user, completedTutorials, autoStartWelcomeTour]);
+
+  // Check if user should see feature tour after welcome tour
+  useEffect(() => {
+    if (
+      user && 
+      autoStartFeatureTour && 
+      completedTutorials.includes('welcome-tour') && 
+      !completedTutorials.includes('feature-tour')
+    ) {
+      // Delay showing the feature tour
+      const timer = setTimeout(() => {
+        setShowFeatureTour(true);
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [user, completedTutorials, autoStartFeatureTour]);
 
   // Handle welcome tour completion
   const handleWelcomeTourComplete = () => {
     setShowWelcomeTour(false);
     
-    // Maybe trigger a follow-up tutorial
-    // For example, show the voice tutorial after the welcome tour
-    if (!hasCompletedTutorial('voice-basics')) {
-      startTutorial('voice-basics');
+    // If auto start feature tour is enabled, show it after welcome tour
+    if (autoStartFeatureTour && !completedTutorials.includes('feature-tour')) {
+      setTimeout(() => {
+        setShowFeatureTour(true);
+      }, 500);
     }
   };
 
   // Handle feature tour completion
   const handleFeatureTourComplete = () => {
-    setCurrentFeatureTour(null);
+    setShowFeatureTour(false);
   };
 
   return (
     <>
       {children}
       
-      {/* Welcome tour for new users */}
+      {/* Welcome Tour */}
       {showWelcomeTour && (
-        <WelcomeTour
-          onComplete={handleWelcomeTourComplete}
+        <WelcomeTour 
+          onComplete={handleWelcomeTourComplete} 
           autoStart={true}
           showSkip={true}
         />
       )}
       
-      {/* Feature tours */}
-      {currentFeatureTour && (
-        <FeatureTour
-          tutorialId={currentFeatureTour}
-          tutorials={voiceTutorials}
-          onComplete={handleFeatureTourComplete}
-          placement="bottom"
+      {/* Feature Tour */}
+      {showFeatureTour && (
+        <FeatureTour 
+          onComplete={handleFeatureTourComplete} 
+          autoStart={true}
+          showSkip={true}
         />
       )}
     </>

@@ -39,7 +39,7 @@ interface TutorialState {
   completeTutorial: (tutorialId: string) => void;
   nextStep: () => void;
   previousStep: () => void;
-  resetTutorial: () => void;
+  resetTutorial: (tutorialId?: string) => void;
   toggleAutoPlay: () => void;
   toggleVoice: () => void;
   dismissTutorial: () => void;
@@ -76,8 +76,18 @@ export const useTutorialStore = create<TutorialState>()(
           currentStepIndex: Math.max(0, state.currentStepIndex - 1)
         })),
       
-      resetTutorial: () => 
-        set({ currentStepIndex: 0 }),
+      resetTutorial: (tutorialId?: string) => {
+        if (tutorialId) {
+          // Remove specific tutorial from completed list
+          set(state => ({
+            completedTutorials: state.completedTutorials.filter(id => id !== tutorialId),
+            currentStepIndex: 0
+          }));
+        } else {
+          // Just reset the current step
+          set({ currentStepIndex: 0 });
+        }
+      },
       
       toggleAutoPlay: () => 
         set(state => ({ 

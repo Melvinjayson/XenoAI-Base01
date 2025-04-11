@@ -1,253 +1,190 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, HelpCircle, Play, Pause } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ArrowRight, ArrowLeft, MessageSquare, Mic, Brain, Share2, Database } from 'lucide-react';
+import { useTutorialStore } from '@/services/tutorial-service';
 import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
+  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useTutorialStore, Tutorial, TutorialStep } from '@/services/tutorial-service';
+
+// Define the feature tour steps
+const featureSteps = [
+  {
+    id: 'chat-features',
+    title: 'Advanced Chat Features',
+    description: 'Xeno AI understands context and can maintain coherent conversations across multiple topics. Try asking follow-up questions or referring to previous parts of your conversation.',
+    icon: <MessageSquare className="h-12 w-12 text-primary" />,
+    action: 'Try: "Can you explain how databases work? Now, what are the different types?"',
+  },
+  {
+    id: 'voice-interactions',
+    title: 'Voice Recognition',
+    description: 'Use natural voice commands to interact with Xeno. The voice interface understands nuanced requests and can respond with synthesized speech.',
+    icon: <Mic className="h-12 w-12 text-primary" />,
+    action: 'Click the microphone icon and try saying: "What are the benefits of using TypeScript?"',
+  },
+  {
+    id: 'knowledge-graph',
+    title: 'Interactive Knowledge Graph',
+    description: 'Visualize connections between concepts with the knowledge graph. Click nodes to explore related topics and expand your understanding.',
+    icon: <Share2 className="h-12 w-12 text-primary" />,
+    action: 'Try asking: "Show me a knowledge graph about web development frameworks"',
+  },
+  {
+    id: 'data-acquisition',
+    title: 'Autonomous Data Acquisition',
+    description: 'Xeno can autonomously seek new information to answer your questions. When needed, it will search for up-to-date information from trusted sources.',
+    icon: <Database className="h-12 w-12 text-primary" />,
+    action: 'Try asking about a specific technology or recent development',
+  },
+  {
+    id: 'multi-agent',
+    title: 'Multi-Agent Collaboration',
+    description: 'Complex problems are solved through a collaboration of specialized AI agents. Each agent has different expertise and works together to provide comprehensive solutions.',
+    icon: <Brain className="h-12 w-12 text-primary" />,
+    action: 'Try: "Help me design an e-commerce application architecture"',
+  },
+];
 
 interface FeatureTourProps {
-  tutorialId: string;
-  tutorials: Tutorial[];
   onComplete?: () => void;
   autoStart?: boolean;
-  placement?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'auto';
+  showSkip?: boolean;
 }
 
 const FeatureTour: React.FC<FeatureTourProps> = ({
-  tutorialId,
-  tutorials,
   onComplete,
-  autoStart = true,
-  placement = 'auto',
+  autoStart = false,
+  showSkip = true,
 }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [autoPlay, setAutoPlay] = useState(false);
-  const [currentTutorial, setCurrentTutorial] = useState<Tutorial | null>(null);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [isVisible, setIsVisible] = useState(autoStart);
+  const [currentStep, setCurrentStep] = useState(0);
+  const { completedTutorials, completeTutorial } = useTutorialStore();
   
-  const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const {
-    startTutorial,
-    completeTutorial,
-    activeTutorialId,
-    hasCompletedTutorial,
-    autoPlayTutorials,
-    voiceEnabled,
-    toggleAutoPlay,
-    toggleVoice,
-  } = useTutorialStore();
-
   useEffect(() => {
-    // Find current tutorial from the provided list
-    const tutorial = tutorials.find(t => t.id === tutorialId);
+    // Check if the user has already completed the feature tour
+    const hasCompletedFeatureTour = completedTutorials.includes('feature-tour');
     
-    if (tutorial) {
-      setCurrentTutorial(tutorial);
-      
-      // Check if this tutorial should be shown
-      const alreadyCompleted = hasCompletedTutorial(tutorialId);
-      const isActive = activeTutorialId === tutorialId;
-      
-      setIsVisible(autoStart && !alreadyCompleted || isActive);
-      setAutoPlay(autoPlayTutorials);
+    if (hasCompletedFeatureTour) {
+      setIsVisible(false);
+    } else if (autoStart) {
+      setIsVisible(true);
     }
-    
-    return () => {
-      if (autoPlayTimerRef.current) {
-        clearTimeout(autoPlayTimerRef.current);
-      }
-    };
-  }, [tutorialId, tutorials, autoStart, activeTutorialId, hasCompletedTutorial, autoPlayTutorials]);
-
-  useEffect(() => {
-    // Handle auto-play functionality
-    if (isVisible && autoPlay && currentTutorial) {
-      const currentStep = currentTutorial.steps[currentStepIndex];
-      
-      if (currentStep && currentStep.delay && currentStepIndex < currentTutorial.steps.length - 1) {
-        autoPlayTimerRef.current = setTimeout(() => {
-          goToNextStep();
-        }, currentStep.delay);
-      }
-    }
-    
-    return () => {
-      if (autoPlayTimerRef.current) {
-        clearTimeout(autoPlayTimerRef.current);
-      }
-    };
-  }, [isVisible, autoPlay, currentStepIndex, currentTutorial]);
-
-  if (!currentTutorial || !isVisible) {
-    return null;
-  }
-
-  const currentStep: TutorialStep | undefined = 
-    currentTutorial.steps[currentStepIndex];
-  
-  if (!currentStep) {
-    return null;
-  }
+  }, [completedTutorials, autoStart]);
 
   const goToNextStep = () => {
-    if (autoPlayTimerRef.current) {
-      clearTimeout(autoPlayTimerRef.current);
-    }
-    
-    if (currentStepIndex < currentTutorial.steps.length - 1) {
-      setCurrentStepIndex(currentStepIndex + 1);
+    if (currentStep < featureSteps.length - 1) {
+      setCurrentStep(currentStep + 1);
     } else {
-      finishTutorial();
+      finishTour();
     }
   };
 
   const goToPreviousStep = () => {
-    if (autoPlayTimerRef.current) {
-      clearTimeout(autoPlayTimerRef.current);
-    }
-    
-    if (currentStepIndex > 0) {
-      setCurrentStepIndex(currentStepIndex - 1);
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
     }
   };
 
-  const finishTutorial = () => {
+  const finishTour = () => {
     setIsVisible(false);
-    completeTutorial(tutorialId);
+    completeTutorial('feature-tour');
     if (onComplete) {
       onComplete();
     }
   };
 
-  const skipTutorial = () => {
+  const skipTour = () => {
     setIsVisible(false);
+    completeTutorial('feature-tour');
     if (onComplete) {
       onComplete();
     }
   };
 
-  const toggleAutoPlayState = () => {
-    toggleAutoPlay();
-    setAutoPlay(!autoPlay);
-  };
+  // Allow external components to show this tour
+  useEffect(() => {
+    const handleShowFeatureTour = () => {
+      setIsVisible(true);
+      setCurrentStep(0);
+    };
 
-  // Determine position based on placement prop
-  let positionClass = "fixed inset-0 flex items-center justify-center z-50";
-  
-  if (placement === 'top') {
-    positionClass = "fixed top-4 inset-x-0 flex justify-center z-50";
-  } else if (placement === 'bottom') {
-    positionClass = "fixed bottom-4 inset-x-0 flex justify-center z-50";
-  } else if (placement === 'left') {
-    positionClass = "fixed left-4 inset-y-0 flex items-center z-50";
-  } else if (placement === 'right') {
-    positionClass = "fixed right-4 inset-y-0 flex items-center z-50";
+    // You could listen for a custom event here if needed
+    // window.addEventListener('show-feature-tour', handleShowFeatureTour);
+    // return () => window.removeEventListener('show-feature-tour', handleShowFeatureTour);
+  }, []);
+
+  if (!isVisible) {
+    return null;
   }
 
+  const currentFeatureStep = featureSteps[currentStep];
+
   return (
-    <>
-      {/* Optional overlay - only show for center placement */}
-      {placement === 'center' && (
-        <div className="fixed inset-0 bg-black/50 z-40" />
-      )}
-      
-      <div className={positionClass}>
-        <Card className="w-full max-w-md mx-4 shadow-lg">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold">
-                {currentStep.title}
-              </CardTitle>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+      <Card className="w-full max-w-md mx-4">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl font-semibold">
+              {currentFeatureStep.title}
+            </CardTitle>
+            {showSkip && (
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={skipTutorial}
+                onClick={skipTour}
                 className="h-6 w-6"
               >
                 <X className="h-4 w-4" />
               </Button>
-            </div>
-            
-            <div className="flex justify-between items-center text-xs text-muted-foreground mt-1">
-              <span>
-                Step {currentStepIndex + 1} of {currentTutorial.steps.length}
-              </span>
-              
-              <div className="flex space-x-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6"
-                  onClick={toggleAutoPlayState}
-                >
-                  {autoPlay ? (
-                    <Pause className="h-4 w-4" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                </Button>
-                
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6"
-                  onClick={toggleVoice}
-                >
-                  <HelpCircle className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          
-          <CardContent>
-            <div className="space-y-2 py-2">
-              {currentStep.characterType && (
-                <div className="flex justify-center">
-                  <div className="rounded-full bg-primary/10 p-2 mb-2">
-                    <HelpCircle className="h-6 w-6 text-primary" />
-                  </div>
-                </div>
-              )}
-              
-              <p className="text-sm">
-                {currentStep.content}
+            )}
+          </div>
+          <CardDescription>
+            Feature {currentStep + 1} of {featureSteps.length}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent>
+          <div className="flex flex-col items-center space-y-4 py-2">
+            {currentFeatureStep.icon}
+            <p className="text-center text-sm">
+              {currentFeatureStep.description}
+            </p>
+            <div className="bg-muted/50 rounded-md p-3 w-full">
+              <p className="text-center text-xs text-muted-foreground font-medium">
+                {currentFeatureStep.action}
               </p>
-              
-              {currentStep.voicePrompt && (
-                <div className="mt-2 p-2 bg-muted rounded-md">
-                  <p className="text-xs font-medium">Try saying:</p>
-                  <p className="text-sm font-semibold text-primary">"{currentStep.voicePrompt}"</p>
-                </div>
-              )}
             </div>
-          </CardContent>
+          </div>
+        </CardContent>
+        
+        <CardFooter className="flex justify-between">
+          <Button
+            variant="outline"
+            onClick={goToPreviousStep}
+            disabled={currentStep === 0}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Previous
+          </Button>
           
-          <CardFooter className="flex justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToPreviousStep}
-              disabled={currentStepIndex === 0}
-            >
-              Previous
-            </Button>
-            
-            <Button
-              size="sm"
-              onClick={goToNextStep}
-            >
-              {currentStepIndex === currentTutorial.steps.length - 1 ? 'Finish' : 'Next'}
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    </>
+          <Button onClick={goToNextStep}>
+            {currentStep === featureSteps.length - 1 ? (
+              'Finish'
+            ) : (
+              <>
+                Next
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
   );
 };
 

@@ -1,128 +1,89 @@
 import React, { useState } from 'react';
-import { HelpCircle, X, Book, Mic, Brain, Zap, Users } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useTutorialStore, voiceTutorials } from '@/services/tutorial-service';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTutorialStore } from '@/services/tutorial-service';
 
 interface TourTriggerProps {
-  position?: 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left';
+  className?: string;
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   showTooltip?: boolean;
 }
 
-const TourTrigger: React.FC<TourTriggerProps> = ({
+const TourTrigger: React.FC<TourTriggerProps> = ({ 
+  className,
   position = 'bottom-right',
-  showTooltip = true,
+  showTooltip = false 
 }) => {
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
-  const { startTutorial, hasCompletedTutorial } = useTutorialStore();
+  const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [showFeatureTour, setShowFeatureTour] = useState(false);
+  const { resetTutorial } = useTutorialStore();
 
-  // Determine position CSS classes
-  let positionClasses = 'fixed bottom-4 right-4';
-  
-  switch (position) {
-    case 'top-right':
-      positionClasses = 'fixed top-4 right-4';
-      break;
-    case 'bottom-left':
-      positionClasses = 'fixed bottom-4 left-4';
-      break;
-    case 'top-left':
-      positionClasses = 'fixed top-4 left-4';
-      break;
-    default:
-      positionClasses = 'fixed bottom-4 right-4';
-  }
-
-  // Start a specific tutorial
-  const handleStartTutorial = (tutorialId: string) => {
-    startTutorial(tutorialId);
-    setIsTooltipOpen(false);
+  const startWelcomeTour = () => {
+    resetTutorial('welcome-tour');
+    setShowWelcomeTour(true);
   };
 
-  // Start the welcome tour
-  const handleStartWelcomeTour = () => {
-    startTutorial('welcome-tour');
-    setIsTooltipOpen(false);
+  const startFeatureTour = () => {
+    resetTutorial('feature-tour');
+    setShowFeatureTour(true);
   };
+
+  // Generate position-based classes
+  const positionClasses = {
+    'top-left': 'top-4 left-4',
+    'top-right': 'top-4 right-4',
+    'bottom-left': 'bottom-4 left-4', 
+    'bottom-right': 'bottom-4 right-4'
+  };
+
+  const positionClass = positionClasses[position];
 
   return (
-    <div className={`${positionClasses} z-40`}>
-      <TooltipProvider>
-        <Tooltip open={showTooltip && isTooltipOpen} onOpenChange={setIsTooltipOpen}>
-          <DropdownMenu>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-full h-10 w-10 shadow-md">
-                  <HelpCircle className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Help & Tutorials</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              
-              <DropdownMenuItem onClick={handleStartWelcomeTour}>
-                <Book className="mr-2 h-4 w-4" />
-                <span>Welcome Tour</span>
-              </DropdownMenuItem>
-              
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Voice Features</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              
-              {/* Voice Tutorials */}
-              {voiceTutorials
-                .filter(tutorial => tutorial.category === 'voice')
-                .map(tutorial => {
-                  const isCompleted = hasCompletedTutorial(tutorial.id);
-                  
-                  let icon;
-                  switch (tutorial.icon) {
-                    case 'mic':
-                      icon = <Mic className="mr-2 h-4 w-4" />;
-                      break;
-                    case 'zap':
-                      icon = <Zap className="mr-2 h-4 w-4" />;
-                      break;
-                    case 'users':
-                      icon = <Users className="mr-2 h-4 w-4" />;
-                      break;
-                    default:
-                      icon = <HelpCircle className="mr-2 h-4 w-4" />;
-                  }
-                  
-                  return (
-                    <DropdownMenuItem 
-                      key={tutorial.id}
-                      onClick={() => handleStartTutorial(tutorial.id)}
-                      className={isCompleted ? 'opacity-60' : ''}
-                    >
-                      {icon}
-                      <span>{tutorial.name}</span>
-                      {isCompleted && (
-                        <span className="ml-2 text-xs text-muted-foreground">(Completed)</span>
-                      )}
-                    </DropdownMenuItem>
-                  );
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <TooltipContent side="left">
-            <p>Need help? Click for tutorials</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
+    <>
+      <div className={`fixed ${positionClass} z-50 ${className || ''}`}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="rounded-full shadow-md bg-card hover:bg-card/90"
+              aria-label="Help and tutorials"
+            >
+              <HelpCircle className="h-5 w-5" />
+              {showTooltip && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={startWelcomeTour}>
+              Start Welcome Tour
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={startFeatureTour}>
+              Feature Tour
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* We'll conditionally render the tour components when these are true */}
+      {/* These will be replaced with actual imports once we implement them */}
+      {showWelcomeTour && (
+        <div className="welcome-tour-placeholder" style={{ display: 'none' }} />
+      )}
+      {showFeatureTour && (
+        <div className="feature-tour-placeholder" style={{ display: 'none' }} />
+      )}
+    </>
   );
 };
 
