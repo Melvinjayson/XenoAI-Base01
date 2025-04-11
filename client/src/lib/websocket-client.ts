@@ -21,7 +21,7 @@ export class WebSocketClient {
   private pingInterval: NodeJS.Timeout | null = null;
   private connectionTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
+  private maxReconnectAttempts: number = 10; // Increased from 5 to be more resilient
   private messageHandlers: Map<string, Set<MessageCallback>> = new Map();
   private state: WebSocketState = {
     isConnected: false,
@@ -33,6 +33,13 @@ export class WebSocketClient {
 
   private constructor() {
     this.connect();
+    
+    // Listen for online/offline events to automatically reconnect
+    window.addEventListener('online', () => {
+      console.log('Network connection restored, reconnecting WebSocket');
+      this.reconnectAttempts = 0; // Reset attempts on network recovery
+      this.connect();
+    });
   }
 
   public static getInstance(): WebSocketClient {
@@ -243,11 +250,24 @@ export class WebSocketClient {
   private scheduleReconnect() {
     // Only schedule if not already scheduled
     if (!this.reconnectTimer) {
-      console.log('Scheduling WebSocket reconnect in 5 seconds');
+      // Use exponential backoff for reconnection delay
+      const backoffDelay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts - 1), 30000);
+      const delay = Math.max(2000, backoffDelay); // At least 2 seconds, max 30 seconds
+      
+      console.log(`Scheduling WebSocket reconnect in ${Math.round(delay/1000)} seconds (attempt ${this.reconnectAttempts})`);
+      
       this.reconnectTimer = setTimeout(() => {
         this.reconnectTimer = null;
-        this.connect();
-      }, 5000);
+        
+        // Check if we're online before attempting to reconnect
+        if (navigator.onLine) {
+          console.log(`Attempting reconnection (${this.reconnectAttempts} of ${this.maxReconnectAttempts})`);
+          this.connect();
+        } else {
+          console.log('Network appears offline, waiting for online event');
+          // We'll rely on the 'online' event handler to reconnect when back online
+        }
+      }, delay);
     }
   }
 
