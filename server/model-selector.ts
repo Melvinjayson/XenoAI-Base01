@@ -11,19 +11,19 @@ import { apiQuotaManager, ApiService } from './api-quota-manager';
 
 // Define available models with their capabilities
 const availableModels: ModelConfig[] = [
-  // Local models
+  // Local models — backed by Groq (Llama 3.3 70B)
   {
-    id: 'llama4-behemot',
-    name: 'Llama 4 Behemot',
+    id: 'llama-3.3-70b-versatile',
+    name: 'Llama 3.3 70B (Groq)',
     provider: 'local',
-    contextSize: 256000, // Upgraded to 256K context window
+    contextSize: 128000,
     inputCostPer1K: 0,
     outputCostPer1K: 0,
-    capabilities: ['text', 'embedding', 'reasoning'], // Added reasoning capability
-    maxTokens: 8192, // Increased maximum output tokens
+    capabilities: ['text', 'reasoning'],
+    maxTokens: 2048,
     temperature: 0.7,
     category: 'advanced',
-    latency: 'medium'
+    latency: 'low'
   },
   
   // OpenAI models
