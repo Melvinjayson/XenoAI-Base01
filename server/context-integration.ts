@@ -74,10 +74,17 @@ export async function enhancedContextAnalysis(
           Related Topics: related1, related2, related3
         `;
         
-        const result = await processMessage(enhancedPrompt, [], { 
-          systemPrompt: 'You are an expert conversation analyst. Provide accurate and concise analysis.',
-          forceAdvanced: false
-        });
+        // Race against a 5 s timeout so context analysis never blocks the main response
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('context analysis timeout')), 5000)
+        );
+        const result = await Promise.race([
+          processMessage(enhancedPrompt, [], { 
+            systemPrompt: 'You are an expert conversation analyst. Provide accurate and concise analysis.',
+            forceAdvanced: false
+          }),
+          timeoutPromise
+        ]);
         
         // Parse the structured response
         const lines = result.message.split('\n');
@@ -261,17 +268,19 @@ export async function processWithEnhancedContext(
     };
     
     // Process both messages to update memory
-    await enhancedMemoryManager.processMessage(
-      userMessage,
+    await enhancedMemoryManager.addMemory(
+      userMessage.content,
       sessionId,
-      context.entities,
+      'episodic',
+      context.entities.map(e => e.value),
       context.topics || []
     );
     
-    await enhancedMemoryManager.processMessage(
-      assistantMessage,
+    await enhancedMemoryManager.addMemory(
+      assistantMessage.content,
       sessionId,
-      [], // No entities for assistant message
+      'episodic',
+      [],
       context.topics || []
     );
   }

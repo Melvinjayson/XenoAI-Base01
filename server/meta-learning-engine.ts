@@ -273,7 +273,8 @@ async function analyzeLearningEvent(eventId: string): Promise<LearningInsight[]>
     // Process and store insights
     const generatedInsights: LearningInsight[] = [];
     
-    for (const insightData of response.insights) {
+    const insightsList = Array.isArray((response as any)?.insights) ? (response as any).insights : [];
+    for (const insightData of insightsList) {
       // Map the insight type string to enum
       const type = mapStringToInsightType(insightData.type);
       if (!type) continue; // Skip if invalid type
