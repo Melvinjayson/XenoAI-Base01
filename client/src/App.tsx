@@ -35,20 +35,14 @@ import { UserProfileProvider } from "@/context/user-profile-context";
 import { ColorPaletteProvider } from "@/context/color-palette-context";
 import { MindMapProvider } from "@/context/mind-map-context";
 import { KnowledgeGraphProvider } from "@/context/knowledge-graph-context";
-import { CompanionProvider, useCompanion } from "@/context/companion-context";
-import { AuthProvider, useAuth } from "@/context/auth-context";
-import { GestureTutorial } from "@/components/ui/gesture-indicator";
-import { FloatingVoiceWidget } from "@/components/floating-voice-widget";
-import { FloatingCharacter } from "@/components/ui/floating-character";
-import { CompanionHelpDialog } from "@/components/companion-help-dialog";
-import { CompanionSettingsDialog } from "@/components/companion-settings-dialog";
-import ModelStatusWidget from "@/components/model-status-widget";
+import { CompanionProvider } from "@/context/companion-context";
+import { AuthProvider } from "@/context/auth-context";
 import OfflineModeBanner from "@/components/offline-mode-banner";
 import OfflineSettingsPanel from "@/components/offline-settings-panel";
 import { NetworkStatus } from "@/components/network-status";
-import { OnboardingProvider, TourTrigger } from "@/components/onboarding";
+import { OnboardingProvider } from "@/components/onboarding";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 
 function OfflineDialog() {
@@ -64,80 +58,16 @@ function OfflineDialog() {
 }
 
 function AppRoutes() {
-  const [location, setLocation] = useLocation();
-  const [showVoiceWidget, setShowVoiceWidget] = useState(false);
-  const [showGestureTutorial, setShowGestureTutorial] = useState(false);
+  const [location] = useLocation();
   const { isOnline } = useOfflineContext();
   const webSocketState = useWebSocket();
-  
-  // Check if this is the first visit and redirect to splash page
-  useEffect(() => {
-    // Only redirect if currently on the home page
-    if (location === "/") {
-      const hasVisitedSplash = localStorage.getItem('has-visited-splash');
-      if (!hasVisitedSplash) {
-        localStorage.setItem('has-visited-splash', 'true');
-        setLocation('/splash');
-      }
-    }
-  }, [location, setLocation]);
 
-  useEffect(() => {
-    const isMainPage = location === "/" || 
-                      location === "/knowledge-graph" || 
-                      location.startsWith("/canvas");
-    setShowVoiceWidget(isMainPage);
-
-    if (isMainPage && location === "/" && !showGestureTutorial) {
-      const hasSeenTutorial = localStorage.getItem('gesture-tutorial-seen');
-      if (!hasSeenTutorial) {
-        setShowGestureTutorial(true);
-        localStorage.setItem('gesture-tutorial-seen', 'true');
-      }
-    }
-  }, [location, showGestureTutorial]);
-
-  const handleTutorialComplete = () => {
-    setShowGestureTutorial(false);
-  };
-
-  // Determine if we should show the offline banner
   const showOfflineBanner = location !== "/splash" && location !== "/onboarding";
-
-  const [showHelpDialog, setShowHelpDialog] = useState(false);
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
-  const { isVisible } = useCompanion();
-
-
-  // Check if we should show help on first visit
-  useEffect(() => {
-    // Only show help on main pages, not splash or onboarding
-    const pathname = location;
-    const isMainPage = pathname === "/" || pathname === "/knowledge-graph" || pathname.startsWith("/canvas");
-    const hasSeenHelp = localStorage.getItem('companion-help-seen');
-
-    if (isMainPage && !hasSeenHelp) {
-      // Small delay to ensure everything is loaded
-      const timer = setTimeout(() => {
-        setShowHelpDialog(true);
-        localStorage.setItem('companion-help-seen', 'true');
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [location]);
-
-  // Only show the companion on main pages
-  const showCompanion = isVisible;
-
-  const handleAssistantClick = () => {
-    // Navigate to home page to access the chat
-    setLocation("/");
-  };
 
   return (
     <>
       <OnboardingProvider>
-        <div className="pt-2">
+        <div>
           {showOfflineBanner && <OfflineModeBanner />}
 
           <Switch>
@@ -167,39 +97,13 @@ function AppRoutes() {
             <Route component={NotFound} />
           </Switch>
 
-          {showVoiceWidget && <FloatingVoiceWidget />}
-          {showGestureTutorial && <GestureTutorial onComplete={handleTutorialComplete} />}
           <OfflineDialog />
-          {showCompanion && (
-            <FloatingCharacter
-              onAskHelp={() => setShowHelpDialog(true)}
-              onNavigateToPage={(page) => setLocation(page)}
-              className="hidden md:block" // Only show on larger screens
-            />
-          )}
-          <CompanionHelpDialog
-            open={showHelpDialog}
-            onOpenChange={setShowHelpDialog}
-          />
-          <CompanionSettingsDialog
-            open={showSettingsDialog}
-            onOpenChange={setShowSettingsDialog}
-          />
-          
-          {/* Network Status Indicator */}
-          {location !== "/splash" && 
-           location !== "/onboarding" && 
-           location !== "/login" && 
+
+          {location !== "/splash" &&
+           location !== "/onboarding" &&
+           location !== "/login" &&
            location !== "/register" && (
             <NetworkStatus wsState={webSocketState} />
-          )}
-          
-          {/* Help & Tutorial Access Button */}
-          {location !== "/splash" && 
-           location !== "/onboarding" && 
-           location !== "/login" && 
-           location !== "/register" && (
-            <TourTrigger position="bottom-right" showTooltip={true} />
           )}
         </div>
       </OnboardingProvider>

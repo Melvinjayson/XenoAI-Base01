@@ -26,7 +26,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     {
       id: "welcome",
       role: "assistant",
-      content: "Hi there! I'm Xeno AI, your personal AI assistant. You can ask me questions, and I'll search for answers. Try asking something or tap the mic to use voice input.",
+      content: "Hi! I'm Xeno AI. Ask me anything.",
       timestamp: Date.now(),
     },
   ]);
