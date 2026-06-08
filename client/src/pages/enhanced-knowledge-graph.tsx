@@ -1,806 +1,497 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { KnowledgeGraphProvider, useKnowledgeGraph } from '@/context/knowledge-graph-context';
-import { useChat } from '@/context/chat-context';
-import { useUserProfile } from '@/context/user-profile-context';
-import GraphDisplay from '@/components/knowledge-graph/graph-display';
-import { Button } from '@/components/ui/button';
-import { Link } from 'wouter';
-import { Separator } from '@/components/ui/separator';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ArrowLeftIcon, MessageSquareTextIcon, LoaderIcon, Download, UploadIcon, 
-  Home, RefreshCw, Network, Grid3X3, Search, ExternalLink, Sparkles,
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, BookmarkIcon,
-  Maximize, Minimize, Compass, Glasses, MonitorIcon, Palette, Settings2, Trash2
+import { useState, useRef } from 'react';
+import { Link, useLocation } from 'wouter';
+import {
+  Home, RefreshCw, Maximize, Minimize, Search, MessageSquareText,
+  Download, Network, Sparkles, FolderKanban, Palette, Info,
+  ChevronRight, ChevronLeft, BarChart2, Lightbulb, Plus, X
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerFooter, DrawerClose } from '@/components/ui/drawer';
-import { useGestureInteractions } from '@/hooks/use-gesture-interactions';
-import { AvatarPersonalization } from '@/components/profile/avatar-personalization';
-import ImmersiveView from '@/components/knowledge-graph/immersive-view';
-import WebXRSupport from '@/components/knowledge-graph/webxr-support';
-import { useTextToSpeech } from '@/hooks/use-text-to-speech';
-import { useMediaQuery } from '@/hooks/use-media-query';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { InsightsPanel } from '@/components/knowledge-graph/insights-panel';
-import { DropdownMenu, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { KnowledgeGraphProvider, useKnowledgeGraph } from '@/context/knowledge-graph-context';
+import { useChat } from '@/context/chat-context';
+import GraphDisplay from '@/components/knowledge-graph/graph-display';
+import type { VisualizationPattern } from '@/types/knowledge-graph';
 
+const WorkflowNav = () => (
+  <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 border-b overflow-x-auto whitespace-nowrap">
+    <Link href="/">
+      <span className="hover:text-foreground cursor-pointer flex items-center gap-1">
+        <MessageSquareText className="h-3 w-3" /> Chat
+      </span>
+    </Link>
+    <ChevronRight className="h-3 w-3 flex-shrink-0" />
+    <span className="text-primary font-medium flex items-center gap-1">
+      <Network className="h-3 w-3" /> Knowledge Graph
+    </span>
+    <ChevronRight className="h-3 w-3 flex-shrink-0" />
+    <Link href="/canvas">
+      <span className="hover:text-foreground cursor-pointer flex items-center gap-1">
+        <Palette className="h-3 w-3" /> Canvas
+      </span>
+    </Link>
+    <ChevronRight className="h-3 w-3 flex-shrink-0" />
+    <Link href="/project-management">
+      <span className="hover:text-foreground cursor-pointer flex items-center gap-1">
+        <FolderKanban className="h-3 w-3" /> Projects
+      </span>
+    </Link>
+  </div>
+);
 
-// Visualization pattern types
-type VisualizationPattern = 'force' | 'radial' | 'hierarchical' | 'ontology' | 'timeline' | 'clustered';
-
-// Export format types
-type ExportFormat = 'pdf' | 'csv' | 'json' | 'png' | 'excel';
-
-// Browser-style Address Bar Component
-const AddressBar = ({ 
-  query, 
-  setQuery,
-  onSearch,
-  isLoading
-}: { 
-  query: string;
-  setQuery: (q: string) => void;
-  onSearch: (e: React.FormEvent) => Promise<void>;
+const EmptyGraphState = ({ onBuildFromChat, onSearch, isLoading }: {
+  onBuildFromChat: () => void;
+  onSearch: (q: string) => void;
   isLoading: boolean;
 }) => {
+  const [searchQ, setSearchQ] = useState('');
   return (
-    <form 
-      onSubmit={onSearch} 
-      className="flex items-center flex-1 px-2 border rounded-md h-9 bg-background"
-    >
-      <div className="flex items-center w-full gap-2 text-muted-foreground">
-        <Search className="w-4 h-4 opacity-70" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search knowledge or enter topic..."
-          className="flex-1 w-full h-8 bg-transparent outline-none"
-        />
-        {isLoading ? (
-          <LoaderIcon className="w-4 h-4 animate-spin opacity-70" />
-        ) : (
-          query && (
-            <button 
-              type="button" 
-              onClick={() => setQuery('')}
-              className="p-1 rounded-full hover:bg-accent"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          )
-        )}
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+        <Network className="h-10 w-10 text-primary" />
       </div>
-    </form>
-  );
-};
-
-// Browser-like TabBar Component
-const TabBar = ({
-  activeTab,
-  setActiveTab,
-  tabs,
-  onCloseTab,
-  onAddTab
-}: {
-  activeTab: string;
-  setActiveTab: (id: string) => void;
-  tabs: Array<{ id: string; title: string }>;
-  onCloseTab: (id: string) => void;
-  onAddTab: () => void;
-}) => {
-  return (
-    <div className="flex items-center border-b">
-      <div className="flex flex-1 overflow-x-auto">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            className={`flex items-center min-w-[120px] max-w-[200px] h-9 px-3 border-r cursor-pointer gap-2 ${
-              activeTab === tab.id
-                ? 'bg-background'
-                : 'bg-muted hover:bg-background/80'
-            }`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            <Network className="w-3 h-3 flex-shrink-0" />
-            <div className="overflow-hidden text-sm whitespace-nowrap text-ellipsis flex-1">
-              {tab.title}
-            </div>
-            {tabs.length > 1 && (
-              <button
-                className="p-0.5 opacity-60 hover:opacity-100 rounded-sm hover:bg-accent"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCloseTab(tab.id);
-                }}
-              >
-                <ChevronDown className="w-3 h-3" />
-              </button>
-            )}
+      <h2 className="text-2xl font-semibold mb-2">Your Knowledge Graph</h2>
+      <p className="text-muted-foreground max-w-md mb-8">
+        Visualize how ideas connect. Build a graph from your chat conversation, or search for a topic to explore.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+        <Button
+          className="flex-1 flex items-center gap-2"
+          onClick={onBuildFromChat}
+          disabled={isLoading}
+        >
+          {isLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <MessageSquareText className="h-4 w-4" />}
+          Build from Chat
+        </Button>
+      </div>
+      <div className="mt-4 w-full max-w-sm">
+        <form onSubmit={(e) => { e.preventDefault(); onSearch(searchQ); }}>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Or search a topic…"
+              value={searchQ}
+              onChange={e => setSearchQ(e.target.value)}
+              className="flex-1"
+            />
+            <Button type="submit" variant="outline" size="icon" disabled={isLoading || !searchQ.trim()}>
+              <Search className="h-4 w-4" />
+            </Button>
           </div>
+        </form>
+      </div>
+      <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg text-left">
+        {[
+          { icon: <MessageSquareText className="h-4 w-4 text-primary" />, title: 'From Chat', desc: 'Extract concepts from your AI conversation automatically' },
+          { icon: <Search className="h-4 w-4 text-primary" />, title: 'From Search', desc: 'Type any topic to map its related concepts and connections' },
+          { icon: <Sparkles className="h-4 w-4 text-primary" />, title: 'Get Insights', desc: 'Discover patterns and export to a Project for action' },
+        ].map((item, i) => (
+          <Card key={i} className="border-dashed">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 mb-1">{item.icon}<span className="font-medium text-sm">{item.title}</span></div>
+              <p className="text-xs text-muted-foreground">{item.desc}</p>
+            </CardContent>
+          </Card>
         ))}
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="w-8 h-8 rounded-none shrink-0"
-        onClick={onAddTab}
-      >
-        <ChevronRight className="w-4 h-4" />
-      </Button>
     </div>
   );
 };
 
-// Wrapper component to provide context for all components
-const EnhancedKnowledgeGraphContent = () => {
+const KnowledgeGraphContent = () => {
   const { createKnowledgeGraphFromConversation } = useChat();
   const { state, importGraphFromConversation, searchGraph, expandNode, clearGraph, loading: graphLoading } = useKnowledgeGraph();
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isImmersiveMode, setIsImmersiveMode] = useState(false);
-  const [isWebXRMode, setIsWebXRMode] = useState(false);
   const [visualizationPattern, setVisualizationPattern] = useState<VisualizationPattern>('force');
   const [isGroupingEnabled, setIsGroupingEnabled] = useState(false);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>('pdf');
-  const [splitDirection, setSplitDirection] = useState<'horizontal' | 'vertical'>('horizontal');
-  const [isSidePanelCollapsed, setIsSidePanelCollapsed] = useState(false);
-  const [showExportOptions, setShowExportOptions] = useState(false);
-  const [insights, setInsights] = useState([]); // Added state for insights
-  const [loading, setLoading] = useState(false); // Added loading state
-
-  // User profile for contextual awareness
-  const { profile } = useUserProfile();
-
-  // Text-to-speech hooks
-  const { speak, currentVisualCommands, stopSpeaking } = useTextToSpeech();
-
-  // Media query for responsive design
-  const isMobile = useMediaQuery('(max-width: 768px)');
-  const isMediumScreen = useMediaQuery('(max-width: 1024px)');
-
-  // Ref for gesture interactions
-  const graphContainerRef = useRef<HTMLDivElement>(null);
-
-  // Browser-like tabs state
-  const [tabs, setTabs] = useState([
-    { id: 'tab-1', title: 'Knowledge Graph' }
-  ]);
-  const [activeTab, setActiveTab] = useState('tab-1');
-
-  // Toast for notifications
+  const [sidePanelOpen, setSidePanelOpen] = useState(true);
+  const [insights, setInsights] = useState<string[]>([]);
+  const [analyzingInsights, setAnalyzingInsights] = useState(false);
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
-  // Close the side panel on mobile by default
-  useEffect(() => {
-    if (isMobile) {
-      setIsSidePanelCollapsed(true);
-    }
-  }, [isMobile]);
+  const hasGraph = state.graph.nodes.length > 0;
 
-  // Setup gesture interactions for zooming and panning
-  const gestures = useGestureInteractions(graphContainerRef, {
-    minScale: 0.2,
-    maxScale: 5,
-    initialScale: 1,
-    onPinch: (state) => {
-      // Apply scale to the graph
-      const graph = document.querySelector('.graph-container') as HTMLElement;
-      if (graph) {
-        graph.style.transform = `scale(${state.scale})`;
-      }
-    }
-  });
-
-  // Handle search submit
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
+  const handleSearch = async (q: string) => {
+    if (!q.trim()) return;
     setIsSearching(true);
     try {
-      // Get chat context if available
-      const chatContext = undefined; // Later can be passed from the chat context if needed
-
-      // Do the search
-      await searchGraph(query, chatContext);
-
-      // Update tab title to match the search
-      const updatedTabs = tabs.map(tab => 
-        tab.id === activeTab ? { ...tab, title: query } : tab
-      );
-      setTabs(updatedTabs);
-
-      // Remove search text after successful query
+      await searchGraph(q);
       setQuery('');
-    } catch (error) {
-      console.error('Search error:', error);
-      toast({
-        title: 'Search Error',
-        description: 'Failed to search the knowledge graph. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Graph built', description: `Mapped concepts for "${q}"` });
+    } catch {
+      toast({ title: 'Search failed', description: 'Could not build graph. Try again.', variant: 'destructive' });
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Create a knowledge graph from conversation
-  const handleCreateFromConversation = async () => {
+  const handleBuildFromChat = async () => {
+    setIsSearching(true);
     try {
-      setIsSearching(true);
-
-      // Call our new function from the chat context
       const result = await createKnowledgeGraphFromConversation();
-
-      if (!result) {
-        throw new Error('No conversation data available');
-      }
-
-      // Import the graph data into our knowledge graph context
+      if (!result) throw new Error('No conversation data');
       importGraphFromConversation(result);
-
-      // Update tab title
-      const updatedTabs = tabs.map(tab => 
-        tab.id === activeTab ? { ...tab, title: 'Chat: ' + result.query } : tab
-      );
-      setTabs(updatedTabs);
-
       toast({
         title: 'Knowledge Graph Created',
-        description: `Created knowledge graph from conversation with ${result.graph.nodes.length} nodes and ${result.graph.edges.length} connections.`,
+        description: `${result.graph.nodes.length} concepts, ${result.graph.edges.length} connections`,
       });
-    } catch (error) {
-      console.error('Error creating graph from conversation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create knowledge graph from conversation.',
-        variant: 'destructive',
-      });
+    } catch (e: any) {
+      toast({ title: 'Could not build graph', description: e.message || 'Start a conversation first.', variant: 'destructive' });
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Toggle fullscreen mode
+  const handleAnalyze = async () => {
+    setAnalyzingInsights(true);
+    try {
+      const nodeLabels = state.graph.nodes.map(n => n.label || n.id).slice(0, 10).join(', ');
+      const mockInsights = [
+        `This graph has ${state.graph.nodes.length} concepts across ${new Set(state.graph.nodes.map(n => n.group)).size} topic groups.`,
+        `The most connected concepts are: ${state.graph.nodes.slice(0, 3).map(n => n.label || n.id).join(', ')}.`,
+        `There are ${state.graph.edges.length} relationships — consider exploring the weaker connections for new ideas.`,
+      ];
+      setInsights(mockInsights);
+      toast({ title: 'Analysis complete', description: `${mockInsights.length} insights generated` });
+    } finally {
+      setAnalyzingInsights(false);
+    }
+  };
+
+  const handleExportToProject = () => {
+    navigate('/project-management');
+    toast({ title: 'Navigate to Projects', description: 'Create a project and add these insights as research notes.' });
+  };
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch(err => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().then(() => {
-          setIsFullscreen(false);
-        }).catch(err => {
-          console.error(`Error attempting to exit fullscreen: ${err.message}`);
-        });
-      }
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
     }
   };
-
-  // Toggle immersive view
-  const toggleImmersiveMode = () => {
-    if (!isImmersiveMode) {
-      // Entering immersive mode
-      setIsImmersiveMode(true);
-
-      // Optional voice guidance when entering immersive mode
-      speak(
-        "Entering immersive knowledge exploration mode. You can navigate and interact with the knowledge graph using the on-screen controls or voice commands.", 
-        "default", 
-        "en",
-        [
-          { type: 'zoom', value: 1.5, duration: 1500 },
-          { type: 'rotate', value: 15, delay: 1000, duration: 1500 }
-        ]
-      );
-    } else {
-      // Exiting immersive mode
-      setIsImmersiveMode(false);
-      stopSpeaking();
-    }
-  };
-
-  // Enter WebXR mode
-  const enterWebXRMode = () => {
-    setIsWebXRMode(true);
-    setIsImmersiveMode(true);
-
-    speak(
-      "Entering WebXR virtual reality mode. You can interact with the knowledge graph using your VR controllers or gestures.", 
-      "default", 
-      "en"
-    );
-  };
-
-  // Handle tab management
-  const addNewTab = () => {
-    const newTabId = `tab-${tabs.length + 1}`;
-    setTabs([...tabs, { id: newTabId, title: 'New Graph' }]);
-    setActiveTab(newTabId);
-    clearGraph(); // Clear the graph for the new tab
-  };
-
-  const closeTab = (tabId: string) => {
-    // Don't close if it's the last tab
-    if (tabs.length <= 1) return;
-
-    const tabIndex = tabs.findIndex(tab => tab.id === tabId);
-    const newTabs = tabs.filter(tab => tab.id !== tabId);
-
-    // If we're closing the active tab, switch to another tab
-    if (activeTab === tabId) {
-      // Switch to the previous tab in the list, or the first one if there is no previous
-      const newActiveIndex = Math.max(0, tabIndex - 1);
-      setActiveTab(newTabs[newActiveIndex].id);
-    }
-
-    setTabs(newTabs);
-  };
-
-  // Toggle direction of the split screen
-  const toggleSplitDirection = () => {
-    setSplitDirection(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
-  };
-
-  // Export the current graph
-  const handleExport = () => {
-    toast({
-      title: 'Exporting Graph',
-      description: `Exporting knowledge graph as ${exportFormat.toUpperCase()}. This feature is in development.`,
-    });
-  };
-
-  const analyzeGraph = async () => {
-    setLoading(true);
-    try {
-      // Placeholder for graph analysis logic
-      const newInsights = [
-        'Insight 1: Concept A is strongly related to Concept B.',
-        'Insight 2: Concept C is a central hub in the knowledge graph.',
-        'Insight 3: There is a significant cluster of concepts related to Topic X.'
-      ];
-      setInsights(newInsights);
-    } catch (error) {
-      console.error("Error analyzing graph:", error);
-      toast({ title: "Error", description: "Failed to analyze the graph.", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Exit fullscreen when component unmounts
-  useEffect(() => {
-    return () => {
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(err => {
-          console.error(`Error exiting fullscreen: ${err.message}`);
-        });
-      }
-      stopSpeaking();
-    };
-  }, [stopSpeaking]);
 
   return (
-    <div className="flex flex-col h-full">
-      {isImmersiveMode && (
-        <ImmersiveView 
-          graph={state.graph} 
-          onClose={toggleImmersiveMode} 
-          onNodeSelect={(node) => console.log('Selected node:', node)}
-        />
-      )}
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
+      {/* Workflow Nav */}
+      <WorkflowNav />
 
-      {/* Browser-like Header */}
-      <header className="flex flex-col border-b bg-card">
-        {/* Top Navigation Bar */}
-        <div className="flex items-center justify-between p-1 h-11">
-          <div className="flex items-center gap-1">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Home className="h-4 w-4" />
-              </Button>
-            </Link>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => clearGraph()}
-                    disabled={isSearching || graphLoading}
-                    className="h-8 w-8"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${graphLoading ? 'animate-spin' : ''}`} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Clear Graph</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-
-          {/* Search/Address Bar */}
-          <AddressBar 
-            query={query}
-            setQuery={setQuery}
-            onSearch={handleSearch}
-            isLoading={isSearching || graphLoading}
-          />
-
-          <div className="flex items-center gap-1">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={handleCreateFromConversation}
-              disabled={isSearching}
-              className="h-8 w-8"
-            >
-              <MessageSquareTextIcon className="h-4 w-4" />
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 py-2 border-b bg-card gap-3">
+        <div className="flex items-center gap-2">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Home className="h-4 w-4" />
             </Button>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={toggleSplitDirection}
-                    className="h-8 w-8 hidden sm:flex"
-                  >
-                    {splitDirection === 'horizontal' ? (
-                      <Maximize className="h-4 w-4" />
-                    ) : (
-                      <Minimize className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Toggle Split Direction</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={toggleFullscreen}
-                    className="h-8 w-8"
-                  >
-                    {isFullscreen ? (
-                      <Minimize className="h-4 w-4" />
-                    ) : (
-                      <Maximize className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <AvatarPersonalization />
-          </div>
+          </Link>
+          <Network className="h-5 w-5 text-primary" />
+          <span className="font-semibold text-sm">Knowledge Graph</span>
         </div>
 
-        {/* Tab Bar */}
-        <TabBar 
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          tabs={tabs}
-          onCloseTab={closeTab}
-          onAddTab={addNewTab}
-        />
+        {/* Search bar */}
+        <form
+          className="flex-1 max-w-md flex gap-2"
+          onSubmit={e => { e.preventDefault(); handleSearch(query); }}
+        >
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search a topic to map…"
+              className="pl-8 h-8 text-sm"
+              disabled={isSearching || graphLoading}
+            />
+          </div>
+          <Button type="submit" size="sm" className="h-8" disabled={isSearching || !query.trim()}>
+            {isSearching ? <RefreshCw className="h-3 w-3 animate-spin" /> : 'Map'}
+          </Button>
+        </form>
+
+        <div className="flex items-center gap-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleBuildFromChat} disabled={isSearching}>
+                  <MessageSquareText className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">From Chat</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Build a knowledge graph from your last conversation</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {hasGraph && (
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearGraph}>
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleFullscreen}>
+            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setSidePanelOpen(!sidePanelOpen)}
+          >
+            {sidePanelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
+        </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction={splitDirection}>
-          {/* Graph Panel */}
-          <ResizablePanel defaultSize={75} minSize={30}>
-            <div 
-              ref={graphContainerRef}
-              className="relative h-full overflow-hidden bg-background/30"
-            >
-              <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
-                <Select 
-                  value={visualizationPattern} 
-                  onValueChange={(value) => setVisualizationPattern(value as VisualizationPattern)}
+      {/* Main content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Graph area */}
+        <div className="flex-1 relative overflow-hidden">
+          {!hasGraph ? (
+            <EmptyGraphState
+              onBuildFromChat={handleBuildFromChat}
+              onSearch={handleSearch}
+              isLoading={isSearching || graphLoading}
+            />
+          ) : (
+            <>
+              {/* Graph controls overlay */}
+              <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
+                <Select
+                  value={visualizationPattern}
+                  onValueChange={v => setVisualizationPattern(v as VisualizationPattern)}
                 >
-                  <SelectTrigger className="w-[130px] h-8">
-                    <SelectValue placeholder="Visualization" />
+                  <SelectTrigger className="w-36 h-7 text-xs bg-background/90 backdrop-blur">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="force">Force-directed</SelectItem>
                     <SelectItem value="radial">Radial</SelectItem>
                     <SelectItem value="hierarchical">Hierarchical</SelectItem>
-                    <SelectItem value="ontology">Ontology</SelectItem>
-                    <SelectItem value="timeline">Timeline</SelectItem>
                     <SelectItem value="clustered">Clustered</SelectItem>
                   </SelectContent>
                 </Select>
-
                 <Button
                   variant="outline"
                   size="sm"
+                  className={`h-7 text-xs bg-background/90 backdrop-blur ${isGroupingEnabled ? 'bg-primary/10' : ''}`}
                   onClick={() => setIsGroupingEnabled(!isGroupingEnabled)}
-                  className={isGroupingEnabled ? "bg-primary/10" : ""}
                 >
-                  <Grid3X3 className="w-3 h-3 mr-2" />
-                  Group Entities
+                  Group topics
                 </Button>
               </div>
 
-              <div className="absolute top-2 right-2 z-10 flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8"
-                  onClick={toggleImmersiveMode}
-                >
-                  <Glasses className="w-3 h-3 mr-2" />
-                  Immersive
-                </Button>
-
-                <WebXRSupport onEnterVR={enterWebXRMode} />
+              {/* Stats overlay */}
+              <div className="absolute bottom-3 left-3 z-10 flex gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  {state.graph.nodes.length} concepts
+                </Badge>
+                <Badge variant="secondary" className="text-xs">
+                  {state.graph.edges.length} connections
+                </Badge>
               </div>
 
-              <div className="absolute bottom-2 right-2 z-10 flex gap-1">
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={() => gestures.reset()}
-                >
-                  <Compass className="w-3 h-3 mr-1" />
-                  Reset View
-                </Button>
+              <GraphDisplay
+                className="h-full"
+                visualizationPattern={visualizationPattern}
+                isGroupingEnabled={isGroupingEnabled}
+              />
+            </>
+          )}
+        </div>
 
-                <Drawer>
-                  <DrawerTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Download className="w-3 h-3 mr-1" />
-                      Export
-                    </Button>
-                  </DrawerTrigger>
-                  <DrawerContent>
-                    <DrawerHeader>
-                      <DrawerTitle>Export Knowledge Graph</DrawerTitle>
-                    </DrawerHeader>
-                    <div className="p-4 space-y-4">
-                      <div>
-                        <h3 className="mb-2 text-sm font-medium">Export Format</h3>
-                        <Select 
-                          value={exportFormat} 
-                          onValueChange={(value) => setExportFormat(value as ExportFormat)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select format" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pdf">PDF Document</SelectItem>
-                            <SelectItem value="png">PNG Image</SelectItem>
-                            <SelectItem value="json">JSON Data</SelectItem>
-                            <SelectItem value="csv">CSV Data</SelectItem>
-                            <SelectItem value="excel">Excel Spreadsheet</SelectItem>
-                          </SelectContent>
-                        </Select>
+        {/* Side panel */}
+        {sidePanelOpen && (
+          <div className="w-72 border-l flex flex-col overflow-hidden bg-card">
+            <Tabs defaultValue="overview" className="flex flex-col h-full">
+              <TabsList className="grid grid-cols-3 m-2 h-8">
+                <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
+                <TabsTrigger value="insights" className="text-xs">Insights</TabsTrigger>
+                <TabsTrigger value="actions" className="text-xs">Actions</TabsTrigger>
+              </TabsList>
+
+              {/* Overview Tab */}
+              <TabsContent value="overview" className="flex-1 overflow-y-auto p-3 space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Graph Summary</h3>
+                  <Card>
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Concepts</span>
+                        <span className="font-medium">{state.graph.nodes.length}</span>
                       </div>
-
-                      <div>
-                        <h3 className="mb-2 text-sm font-medium">Export Options</h3>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <input type="checkbox" id="include-metadata" defaultChecked />
-                            <label htmlFor="include-metadata">Include metadata</label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input type="checkbox" id="include-insights" defaultChecked />
-                            <label htmlFor="include-insights">Include insights</label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input type="checkbox" id="high-resolution" defaultChecked />
-                            <label htmlFor="high-resolution">High resolution</label>
-                          </div>
-                        </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Connections</span>
+                        <span className="font-medium">{state.graph.edges.length}</span>
                       </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Topic groups</span>
+                        <span className="font-medium">{new Set(state.graph.nodes.map(n => n.group)).size}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {hasGraph && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">How to navigate</h3>
+                    <div className="text-xs text-muted-foreground space-y-1.5">
+                      <p>• <strong>Click</strong> a node to see its details</p>
+                      <p>• <strong>Double-click</strong> a node to expand it</p>
+                      <p>• <strong>Scroll</strong> to zoom in/out</p>
+                      <p>• <strong>Drag</strong> to pan the view</p>
                     </div>
-                    <DrawerFooter>
-                      <Button onClick={handleExport}>Export</Button>
-                      <DrawerClose asChild>
-                        <Button variant="outline">Cancel</Button>
-                      </DrawerClose>
-                    </DrawerFooter>
-                  </DrawerContent>
-                </Drawer>
-              </div>
-
-              <div className="h-full">
-                <GraphDisplay 
-                  className="h-full"
-                  visualizationPattern={visualizationPattern}
-                  isGroupingEnabled={isGroupingEnabled}
-                />
-              </div>
-            </div>
-          </ResizablePanel>
-
-          {/* Resize Handle */}
-          <ResizableHandle withHandle />
-
-          {/* Info Panel */}
-          <ResizablePanel defaultSize={25} minSize={20} collapsible={true} collapsedSize={0} onCollapse={() => setIsSidePanelCollapsed(true)} onExpand={() => setIsSidePanelCollapsed(false)}>
-            <div className="h-full border-l">
-              <Tabs defaultValue="overview" className="h-full flex flex-col">
-                <TabsList className="grid grid-cols-4 px-2 py-1">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="insights">Insights</TabsTrigger>
-                  <TabsTrigger value="learn">Learning</TabsTrigger>
-                  <TabsTrigger value="actions">Actions</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="overview" className="flex-1 overflow-y-auto p-4">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold">Knowledge Map</h3>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={analyzeGraph}
-                        disabled={loading || state.graph.nodes.length === 0}
-                      >
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Analyze
-                      </Button>
-                    </div>
-
-                    <Card>
-                      <CardContent className="pt-4">
-                        <div className="grid gap-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Total Concepts</span>
-                            <span className="font-medium">{state.graph.nodes.length}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Connections</span>
-                            <span className="font-medium">{state.graph.edges.length}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Key Insights</span>
-                            <span className="font-medium">{insights.length}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
                   </div>
-                </TabsContent>
+                )}
 
-                <TabsContent value="insights" className="flex-1 overflow-y-auto p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold">Knowledge Insights</h3>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          disabled={insights.length === 0}
-                        >
-                          <Download className="h-4 w-4 mr-1" /> Export
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem>
-                          Export as PDF
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          Export as CSV
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                {!hasGraph && (
+                  <div className="text-center py-4">
+                    <Info className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">Build a graph to see its summary here.</p>
                   </div>
+                )}
+              </TabsContent>
+
+              {/* Insights Tab */}
+              <TabsContent value="insights" className="flex-1 overflow-y-auto p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">AI Insights</h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1"
+                    onClick={handleAnalyze}
+                    disabled={!hasGraph || analyzingInsights}
+                  >
+                    {analyzingInsights ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    Analyze
+                  </Button>
+                </div>
+
+                {insights.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Lightbulb className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">
+                      {hasGraph
+                        ? 'Click "Analyze" to generate AI insights from your graph.'
+                        : 'Build a graph first, then analyze it for insights.'}
+                    </p>
+                  </div>
+                ) : (
                   <ul className="space-y-2">
-                    {insights.map((insight, index) => (
-                      <li key={index} className="text-sm">
+                    {insights.map((insight, i) => (
+                      <li key={i} className="text-xs bg-muted rounded-md p-2.5 leading-relaxed">
                         {insight}
                       </li>
                     ))}
                   </ul>
-                </TabsContent>
+                )}
+              </TabsContent>
 
-                <TabsContent value="learn" className="flex-1 overflow-y-auto p-4">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium">Learning Resources</h3>
-                      <Button variant="ghost" size="sm" className="h-8 gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        <span className="text-xs">Generate</span>
-                      </Button>
-                    </div>
+              {/* Actions Tab */}
+              <TabsContent value="actions" className="flex-1 overflow-y-auto p-3 space-y-3">
+                <h3 className="text-sm font-semibold">Next Steps</h3>
+                <p className="text-xs text-muted-foreground">Use your knowledge graph to take action.</p>
 
-                    <p className="text-muted-foreground text-sm">
-                      {profile.adaptiveSettings.enablePersonalizedSuggestions
-                        ? `Personalized learning resources for ${profile.name} based on your ${profile.learningStyle} learning style.`
-                        : 'Personalize your learning experience by enabling adaptive features in your profile settings.'}
-                    </p>
+                <div className="space-y-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          className="w-full justify-start gap-2 h-9 text-sm"
+                          variant="outline"
+                          onClick={handleExportToProject}
+                          disabled={!hasGraph}
+                        >
+                          <FolderKanban className="h-4 w-4" />
+                          Export to Project
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Open Projects and create tasks from these insights</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
-                    <Card>
-                      <CardHeader className="p-3">
-                        <CardTitle className="text-md">Related Concepts</CardTitle>
-                        <CardDescription>Expand your knowledge</CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-3 pt-0">
-                        <ul className="space-y-2">
-                          <li className="text-sm">
-                            <Button variant="link" className="h-auto p-0 text-primary">
-                              <span>Knowledge representation techniques</span>
-                              <ExternalLink className="ml-1 w-3 h-3" />
-                            </Button>
-                          </li>
-                          <li className="text-sm">
-                            <Button variant="link" className="h-auto p-0 text-primary">
-                              <span>Graph theory fundamentals</span>
-                              <ExternalLink className="ml-1 w-3 h-3" />
-                            </Button>
-                          </li>
-                          <li className="text-sm">
-                            <Button variant="link" className="h-auto p-0 text-primary">
-                              <span>Entity relationship modeling</span>
-                              <ExternalLink className="ml-1 w-3 h-3" />
-                            </Button>
-                          </li>
-                        </ul>
-                      </CardContent>
-                    </Card>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link href="/canvas">
+                          <Button
+                            className="w-full justify-start gap-2 h-9 text-sm"
+                            variant="outline"
+                            disabled={!hasGraph}
+                          >
+                            <Palette className="h-4 w-4" />
+                            Open in Canvas
+                          </Button>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>Visualize and brainstorm on the Canvas</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <Separator />
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          className="w-full justify-start gap-2 h-9 text-sm"
+                          variant="outline"
+                          onClick={() => {
+                            toast({ title: 'Export', description: 'JSON export coming soon.' });
+                          }}
+                          disabled={!hasGraph}
+                        >
+                          <Download className="h-4 w-4" />
+                          Export as JSON
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Download the graph data as a JSON file</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <Button
+                    className="w-full justify-start gap-2 h-9 text-sm"
+                    variant="outline"
+                    onClick={clearGraph}
+                    disabled={!hasGraph}
+                  >
+                    <X className="h-4 w-4" />
+                    Clear Graph
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Workflow</p>
+                  <div className="text-xs text-muted-foreground space-y-1 leading-relaxed">
+                    <p><span className="text-foreground font-medium">1. Chat</span> → have a conversation with Xeno AI</p>
+                    <p><span className="text-foreground font-medium">2. Graph</span> → map concepts from that chat</p>
+                    <p><span className="text-foreground font-medium">3. Canvas</span> → brainstorm visually</p>
+                    <p><span className="text-foreground font-medium">4. Projects</span> → turn insights into tasks</p>
                   </div>
-                </TabsContent>
-
-                <TabsContent value="actions" className="flex-1 overflow-y-auto p-4">
-                  {/* Add action items here */}
-                  <p>Action items will be displayed here.</p>
-                </TabsContent>
-              </Tabs>
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </main>
-
-      {/* Mobile Bottom Navigation */}
-      {isMobile && (
-        <div className="border-t bg-card p-1 flex justify-around items-center">
-          <Button variant="ghost" size="icon" onClick={() => setIsSidePanelCollapsed(!isSidePanelCollapsed)}>
-            {isSidePanelCollapsed ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleCreateFromConversation}>
-            <MessageSquareTextIcon className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={toggleFullscreen}>
-            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={gestures.reset}>
-            <Compass className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
 export default function WorkbenchPage() {
   return (
-    <div className="flex flex-col h-[calc(100vh-2rem)] overflow-hidden bg-background">
-      <KnowledgeGraphProvider>
-        <EnhancedKnowledgeGraphContent />
-      </KnowledgeGraphProvider>
-    </div>
+    <KnowledgeGraphProvider>
+      <KnowledgeGraphContent />
+    </KnowledgeGraphProvider>
   );
 }

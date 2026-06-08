@@ -1,0 +1,1 @@
+- [Context paths](context-paths.md) — React contexts live at `client/src/context/` (singular), not `contexts/`

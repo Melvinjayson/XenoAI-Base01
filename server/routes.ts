@@ -812,6 +812,87 @@ function setupApiRoutes(app: Express): void {
     }
   });
 
+  // Project Tasks routes
+  app.get('/api/projects/:id/tasks', async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) return res.status(400).json({ error: 'Invalid project ID' });
+      const taskList = await storage.getTasks(projectId);
+      res.status(200).json(taskList);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.post('/api/projects/:id/tasks', async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) return res.status(400).json({ error: 'Invalid project ID' });
+      const task = await storage.createTask({ ...req.body, projectId });
+      res.status(201).json(task);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.patch('/api/tasks/:id', async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) return res.status(400).json({ error: 'Invalid task ID' });
+      const task = await storage.updateTask(taskId, req.body);
+      if (!task) return res.status(404).json({ error: 'Task not found' });
+      res.status(200).json(task);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.delete('/api/tasks/:id', async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) return res.status(400).json({ error: 'Invalid task ID' });
+      await storage.deleteTask(taskId);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Project Research Insights routes
+  app.get('/api/projects/:id/insights', async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) return res.status(400).json({ error: 'Invalid project ID' });
+      const insightList = await storage.getResearchInsights(projectId);
+      res.status(200).json(insightList);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.post('/api/projects/:id/insights', async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) return res.status(400).json({ error: 'Invalid project ID' });
+      const insight = await storage.createResearchInsight({ ...req.body, projectId });
+      res.status(201).json(insight);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.patch('/api/insights/:id', async (req: Request, res: Response) => {
+    try {
+      const insightId = parseInt(req.params.id);
+      if (isNaN(insightId)) return res.status(400).json({ error: 'Invalid insight ID' });
+      const insight = await storage.updateResearchInsight(insightId, req.body);
+      if (!insight) return res.status(404).json({ error: 'Insight not found' });
+      res.status(200).json(insight);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   // Decision Framework Analysis
   app.post('/api/decision/analyze', analyzeDecision);
   
